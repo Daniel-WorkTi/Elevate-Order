@@ -1,0 +1,38 @@
+---
+description: ELEVATE visual identity and UX canon — operations workspace, not analytics SaaS
+alwaysApply: true
+---
+
+# ELEVATE identity (mandatory)
+
+Full canon: [DESIGN.md](../../DESIGN.md). Architecture: [ARCHITECTURE.md](../../ARCHITECTURE.md).
+
+## Product
+
+Premium **operations** workspace: problematic orders → WhatsApp → incidents/tracking → profits.  
+**Not** a generic analytics dashboard.
+
+## Nav ONLY
+
+Inbox · Orders · Templates · Profits · Connections  
+
+Never: Pricing, Meta Ads, Analytics, Upgrade CTA, fake search, fake notification bell.
+
+## Supply
+
+Operational queues: tabs **[ Dropi ] [ Dropea ]** — never mix.  
+Profits may aggregate with filters. Messages use only that order’s supply data.
+
+## Visual
+
+Canvas `#F7F8FA` · Surface `#FFFFFF` · Text `#0A0C10` / `#667085` · Border `#E6E8EC`  
+Blue `#2563EB` / hover `#1D4ED8` / soft `#EFF6FF`  
+WhatsApp green **only** on WhatsApp actions. Muted emerald/amber/red for status.
+
+Geist-style type · 8px spacing · dense + whitespace · 1px borders · subtle shadows · thin icons · tables · segmented controls · pill badges.
+
+Radius: container 16 · card 14 · input/button 10 · small 8 · badge pill.
+
+Avoid: card grids, glass, neon, heavy gradients, marketing art, oversized type, fake analytics/notifications/automation, heavy shadows.
+
+Desktop: 1440×1024. Stack: shadcn + Tailwind 4 · TanStack Table · Motion (controlled) · 21st.dev inspiration only.
