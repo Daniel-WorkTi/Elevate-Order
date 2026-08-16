@@ -1,54 +1,72 @@
+import { PanelLeftClose } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import type { MouseEvent } from "react";
 
-import markAsset from "@/assets/elevate-mark.png.asset.json";
+import markUrl from "@/assets/elevate-mark.png";
 import { SidebarNav } from "@/components/app-shell/sidebar-nav";
 import { UserMenu, type Operator } from "@/components/app-shell/user-menu";
-import { WorkspaceSwitcher, type Workspace } from "@/components/app-shell/workspace-switcher";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type AppSidebarProps = {
   pathname: string;
-  workspace: Workspace;
   operator: Operator;
   inboxCount?: number | undefined;
   collapsed?: boolean | undefined;
   className?: string | undefined;
   onNavigate?: (() => void) | undefined;
+  onToggleCollapse?: (() => void) | undefined;
 };
 
 export function AppSidebar({
   pathname,
-  workspace,
   operator,
   inboxCount,
   collapsed = false,
   className,
   onNavigate,
+  onToggleCollapse,
 }: AppSidebarProps) {
+  function handleCollapsedClick(event: MouseEvent<HTMLElement>) {
+    if (!collapsed || !onToggleCollapse) return;
+    // Ignore the collapse control itself (not present when collapsed).
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("[data-sidebar-collapse]")) return;
+    onToggleCollapse();
+  }
+
   return (
     <aside
       className={cn(
-        "sticky top-0 z-40 flex h-screen shrink-0 flex-col bg-[color:var(--elevate-sidebar)] text-sidebar-foreground",
-        collapsed ? "w-[72px]" : "w-[264px]",
+        "flex h-dvh min-h-dvh shrink-0 flex-col bg-[color:var(--elevate-sidebar)] text-sidebar-foreground",
+        collapsed ? "w-[72px] cursor-pointer" : "w-[264px]",
         className,
       )}
+      title={collapsed ? "Click to expand sidebar" : undefined}
+      onClick={handleCollapsedClick}
     >
-      <div className={cn("px-6 pt-8 pb-5", collapsed && "px-3 pt-6")}>
+      <div
+        className={cn(
+          "flex items-start justify-between gap-2 px-6 pt-8 pb-5",
+          collapsed && "justify-center px-3 pt-6",
+        )}
+      >
         <Link
           to="/"
           onClick={onNavigate}
           className={cn(
-            "flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/50",
+            "flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/50",
             collapsed && "justify-center",
           )}
+          aria-label="ELEVATE Orders home"
         >
-          <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-white">
+          <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-white">
             <img
-              src={markAsset.url}
+              src={markUrl}
               alt=""
-              className="size-[22px]"
-              width={22}
-              height={22}
+              className="size-9 object-contain"
+              width={36}
+              height={36}
               decoding="async"
               fetchPriority="high"
             />
@@ -62,22 +80,37 @@ export function AppSidebar({
             <span className="sr-only">ELEVATE Orders</span>
           )}
         </Link>
+
+        {onToggleCollapse && !collapsed ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            data-sidebar-collapse=""
+            className="size-8 shrink-0 rounded-[8px] text-[color:var(--sidebar-muted)] hover:bg-white/[0.06] hover:text-white"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleCollapse();
+            }}
+            aria-label="Collapse sidebar"
+          >
+            <PanelLeftClose className="size-4" strokeWidth={1.5} />
+          </Button>
+        ) : null}
       </div>
 
-      <div className={cn("px-4 pb-5", collapsed && "px-2")}>
-        <WorkspaceSwitcher workspace={workspace} collapsed={collapsed} />
+      <div className={cn("mb-3 border-t border-white/[0.06]", collapsed ? "mx-2" : "mx-4")} />
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <SidebarNav
+          pathname={pathname}
+          inboxCount={inboxCount}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
       </div>
 
-      <div className="mx-4 mb-3 border-t border-white/[0.06]" />
-
-      <SidebarNav
-        pathname={pathname}
-        inboxCount={inboxCount}
-        collapsed={collapsed}
-        onNavigate={onNavigate}
-      />
-
-      <div className="mt-auto border-t border-white/[0.06] p-3">
+      <div className="mt-auto shrink-0 border-t border-white/[0.06] p-3">
         <UserMenu operator={operator} collapsed={collapsed} />
       </div>
     </aside>

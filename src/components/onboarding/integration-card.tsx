@@ -23,7 +23,7 @@ export function IntegrationCard({ integration, className }: IntegrationCardProps
       <div
         className={cn("grid size-12 place-items-center rounded-[12px]", integration.accentClass)}
       >
-        <Icon className="size-7" />
+        <Icon className="size-full object-contain" />
       </div>
 
       <h3 className="mt-5 text-[18px] font-semibold tracking-tight text-foreground">

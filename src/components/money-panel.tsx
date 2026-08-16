@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { Banknote, PackageCheck, TriangleAlert, Plug } from "lucide-react";
 
+import { useExchangeRate } from "@/components/app-shell/use-exchange-rate";
+import { formatMoney } from "@/lib/money/format-money";
 import { orders, type Order } from "@/lib/orders";
 
-const EUR_TO_BRL = 6.32;
-
+/** Legacy panel — uses shared FX hook; never hardcodes a rate. */
 function useMoney(currency: "EUR" | "BRL") {
-  return (valueEur: number) =>
-    new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(currency === "EUR" ? valueEur : valueEur * EUR_TO_BRL);
+  const fx = useExchangeRate("EUR", "BRL");
+  return (valueEur: number) => {
+    if (currency === "EUR") return formatMoney(valueEur, "EUR", "pt-PT");
+    if (typeof fx.rate !== "number" || !Number.isFinite(fx.rate)) return "—";
+    return formatMoney(valueEur * fx.rate, "BRL", "pt-BR");
+  };
 }
 
 function sum(list: Order[]) {
@@ -134,7 +135,7 @@ export function MoneyPanel() {
           ))}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          Câmbio de referência: 1 € = {EUR_TO_BRL.toFixed(2)} R$
+          Câmbio via conversor global (AppShell). Sem taxa hardcoded.
         </p>
       </div>
     </section>

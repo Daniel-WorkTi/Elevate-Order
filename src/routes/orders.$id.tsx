@@ -1,20 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import { CustomerSection } from "@/components/orders/detail/customer-section";
+import { MessageComposer } from "@/components/orders/detail/message-composer";
+import { OrderDetailHeader } from "@/components/orders/detail/order-detail-header";
+import { OrderDetailSkeleton } from "@/components/orders/detail/order-detail-skeleton";
+import { OrderItemsSection } from "@/components/orders/detail/order-items-section";
+import { OrderTimeline } from "@/components/orders/detail/order-timeline";
+import { SupplyInformation } from "@/components/orders/detail/supply-information";
+import { TrackingSection } from "@/components/orders/detail/tracking-section";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelativeTimestamp } from "@/lib/format-relative-time";
-import {
-  formatOrderId,
-  formatOrderTotal,
-  getOrderSupply,
-  safeTrackingHref,
-  SUPPLY_LABEL,
-} from "@/lib/order-domain";
-import { getSyncedOrder } from "@/lib/synced-orders.functions";
+import { Separator } from "@/components/ui/separator";
+import { getDemoOrderByOrderId } from "@/lib/inbox/inbox-to-orders";
+import { formatOrderId } from "@/lib/order-domain";
+import { getSyncedOrder, listOrderEvents } from "@/lib/synced-orders.functions";
 
 export const Route = createFileRoute("/orders/$id")({
   head: ({ params }) => ({
@@ -26,103 +26,132 @@ export const Route = createFileRoute("/orders/$id")({
 function OrderDetailPage() {
   const { id } = Route.useParams();
   const orderId = Number(id);
-  const query = useQuery({
+  const validId = Number.isInteger(orderId) && orderId > 0;
+
+  const orderQuery = useQuery({
     queryKey: ["order", orderId],
-    enabled: Number.isInteger(orderId) && orderId > 0,
+    enabled: validId,
     queryFn: () => getSyncedOrder({ data: { orderId } }),
   });
 
-  const order = query.data?.order ?? null;
-  const updated = order ? formatRelativeTimestamp(order.last_event_at) : null;
-  const trackingHref = order ? safeTrackingHref(order.tracking_url) : null;
-  const supply = order ? getOrderSupply(order) : null;
+  const syncedOrder = orderQuery.data?.order ?? null;
+  const demoOrder =
+    !orderQuery.isPending && !syncedOrder && validId ? getDemoOrderByOrderId(orderId) : null;
+  const order = syncedOrder ?? demoOrder;
+
+  const eventsQuery = useQuery({
+    queryKey: ["order-events", orderId],
+    enabled: validId && Boolean(syncedOrder),
+    queryFn: () => listOrderEvents({ data: { orderId } }),
+  });
+
+  const loadError =
+    !validId || demoOrder
+      ? null
+      : (orderQuery.data?.error ?? (orderQuery.isError ? "Unable to load this order." : null));
+  const notFound = validId && !orderQuery.isPending && !loadError && !order;
 
   return (
-    <AppShell title={order ? formatOrderId(order) : `Order #${id}`} subtitle="Synchronized order">
-      <div className="mb-4">
-        <Button asChild variant="ghost" className="h-8 rounded-[8px] px-2 text-[13px]">
-          <Link to="/orders">
-            <ArrowLeft className="size-3.5" strokeWidth={1.5} />
-            Back to Orders
-          </Link>
-        </Button>
-      </div>
-
-      {query.isPending ? (
-        <div className="space-y-3 rounded-[16px] border border-border bg-card p-6">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-64" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      ) : null}
-
-      {!query.isPending && (query.data?.error || !order) ? (
-        <div className="rounded-[16px] border border-border bg-card px-6 py-12 text-center">
-          <p className="text-[15px] font-medium">{query.data?.error ?? "Order not found."}</p>
-          <Button asChild className="mt-4 h-9 rounded-[10px] text-[13px] shadow-none">
-            <Link to="/orders">Back to Orders</Link>
-          </Button>
-        </div>
-      ) : null}
-
-      {!query.isPending && order ? (
-        <div className="rounded-[16px] border border-border bg-card p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-[20px] font-semibold tracking-tight">{formatOrderId(order)}</h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                {supply ? SUPPLY_LABEL[supply] : order.source}
-                {order.shopify_order_id ? ` · Shopify #${order.shopify_order_id}` : ""}
-              </p>
-            </div>
-            <OrderStatusBadge order={order} />
+    <AppShell
+      title={order ? formatOrderId(order) : `Order #${id}`}
+      subtitle="Order detail"
+    >
+      {!validId ? (
+        <NotFoundState />
+      ) : orderQuery.isPending ? (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="h-4 w-20 rounded bg-muted" />
+            <div className="h-7 w-48 rounded bg-muted" />
           </div>
-
-          <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Detail label="Customer" value={order.customer_name ?? "—"} />
-            <Detail label="Total" value={formatOrderTotal(order) ?? "—"} />
-            <Detail label="Shipping" value={order.shipping_company ?? "—"} />
-            <Detail label="Updated" value={updated?.relative ?? "—"} title={updated?.exact} />
-            <Detail label="Tracking" value={order.tracking_code ?? "—"} mono />
-            <Detail label="Details" value={order.details ?? "—"} />
-          </dl>
-
-          {trackingHref ? (
-            <a
-              href={trackingHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 inline-flex text-[13px] font-medium text-[color:var(--elevate-blue)] hover:underline"
-            >
-              Open tracking link
-            </a>
-          ) : null}
+          <OrderDetailSkeleton />
         </div>
-      ) : null}
+      ) : loadError ? (
+        <ErrorState message={loadError} onRetry={() => void orderQuery.refetch()} />
+      ) : notFound || !order ? (
+        <NotFoundState />
+      ) : (
+        <div className="space-y-6">
+          <OrderDetailHeader order={order} />
+
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.95fr)_minmax(300px,1fr)]">
+            <div className="order-1 space-y-0 rounded-[16px] border border-border bg-card">
+              <div className="p-5 md:p-6">
+                <CustomerSection order={order} />
+              </div>
+              <Separator />
+              <div className="p-5 md:p-6">
+                <OrderItemsSection order={order} />
+              </div>
+              <Separator />
+              <div className="p-5 md:p-6">
+                <SupplyInformation order={order} />
+              </div>
+              <Separator />
+              <div className="p-5 md:p-6">
+                <TrackingSection order={order} />
+              </div>
+              <div className="hidden lg:block">
+                <Separator />
+                <div className="p-5 md:p-6">
+                  <OrderTimeline
+                    events={eventsQuery.data?.events ?? []}
+                    error={eventsQuery.data?.error ?? null}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <aside className="order-2 lg:sticky lg:top-24">
+              <MessageComposer order={order} />
+            </aside>
+
+            <div className="order-3 rounded-[16px] border border-border bg-card p-5 md:p-6 lg:hidden">
+              <OrderTimeline
+                events={eventsQuery.data?.events ?? []}
+                error={eventsQuery.data?.error ?? null}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
 
-function Detail({
-  label,
-  value,
-  title,
-  mono,
-}: {
-  label: string;
-  value: string;
-  title?: string | undefined;
-  mono?: boolean | undefined;
-}) {
+function NotFoundState() {
   return (
-    <div>
-      <dt className="text-[12px] text-muted-foreground">{label}</dt>
-      <dd
-        className={`mt-1 text-[14px] text-foreground ${mono ? "font-mono text-[13px]" : ""}`}
-        title={title}
-      >
-        {value}
-      </dd>
+    <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
+      <h2 className="text-[18px] font-semibold tracking-tight text-foreground">Order not found</h2>
+      <p className="mt-2 text-[13px] text-muted-foreground">
+        This order may have been removed or the URL is incorrect.
+      </p>
+      <Button asChild className="mt-5 h-9 rounded-[10px] text-[13px] shadow-none">
+        <Link to="/orders">Back to Orders</Link>
+      </Button>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
+      <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
+        Unable to load this order.
+      </h2>
+      <p className="mt-2 text-[13px] text-muted-foreground">{message}</p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        <Button
+          type="button"
+          onClick={onRetry}
+          className="h-9 rounded-[10px] text-[13px] shadow-none"
+        >
+          Retry
+        </Button>
+        <Button asChild variant="outline" className="h-9 rounded-[10px] text-[13px] shadow-none">
+          <Link to="/orders">Back to Orders</Link>
+        </Button>
+      </div>
     </div>
   );
 }

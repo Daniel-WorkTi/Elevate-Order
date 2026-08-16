@@ -23,8 +23,15 @@ export type SyncedOrder = {
   last_event_at: string | null;
 };
 
-const ORDER_COLUMNS =
+const ORDER_COLUMNS_FULL =
+  "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, country, city, postal_code, address, product_summary, source, last_event_at, created_at";
+
+const ORDER_COLUMNS_LEGACY =
   "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at, created_at";
+
+function isMissingColumnError(error: { message?: string } | null | undefined) {
+  return /column|schema cache|does not exist/i.test(error?.message ?? "");
+}
 
 export type OrdersQueryInput = {
   supply: Supply;
@@ -66,6 +73,14 @@ type OrdersRow = {
   tracking_url: string | null;
   shipping_company: string | null;
   total: number | string | null;
+  currency: string | null;
+  customer_name: string | null;
+  phone: string | null;
+  country: string | null;
+  city: string | null;
+  postal_code: string | null;
+  address: string | null;
+  product_summary: string | null;
   source: string;
   last_event_at: string | null;
   created_at: string | null;
@@ -89,10 +104,10 @@ function mapOrder(row: OrdersRow): OperationalOrder {
     tracking_url: row.tracking_url,
     shipping_company: row.shipping_company,
     total: asNumber(row.total),
-    currency: null,
-    customer_name: null,
-    phone: null,
-    country: null,
+    currency: row.currency ?? null,
+    customer_name: row.customer_name ?? null,
+    phone: row.phone ?? null,
+    country: row.country ?? null,
     source: row.source,
     last_event_at: row.last_event_at,
     created_at: row.created_at,
@@ -115,7 +130,9 @@ function isSortField(value: string): value is OrderSortField {
 }
 
 function parseSupply(value: unknown): Supply {
-  return value === "dropea" ? "dropea" : "dropi";
+  if (value === "dropea") return "dropea";
+  if (value === "shopify") return "shopify";
+  return "dropi";
 }
 
 export function parseOrdersQuery(data: unknown): OrdersQueryInput {
@@ -166,7 +183,11 @@ function applySupplyFilter<
   },
 >(query: T, supply: Supply): T {
   if (supply === "dropea") return query.ilike("source", "%dropea%");
-  return query.ilike("source", "%dropi%").not("source", "ilike", "%dropea%");
+  if (supply === "shopify") return query.ilike("source", "%shopify%");
+  return query
+    .ilike("source", "%dropi%")
+    .not("source", "ilike", "%dropea%")
+    .not("source", "ilike", "%shopify%");
 }
 
 function applyDateFilter<
@@ -194,7 +215,7 @@ function applySearchFilter<T extends { or: (filters: string) => T }>(query: T, s
   }
 
   return query.or(
-    `tracking_code.ilike.%${sanitized}%,status_name.ilike.%${sanitized}%,shipping_company.ilike.%${sanitized}%,details.ilike.%${sanitized}%`,
+    `tracking_code.ilike.%${sanitized}%,status_name.ilike.%${sanitized}%,shipping_company.ilike.%${sanitized}%,details.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%,product_summary.ilike.%${sanitized}%`,
   );
 }
 
@@ -218,25 +239,44 @@ function emptyResult(error: string | null, input: OrdersQueryInput): OrdersQuery
   };
 }
 
-export const listSyncedOrders = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("orders")
-    .select(
-      "order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at",
-    )
-    .order("last_event_at", { ascending: false, nullsFirst: false })
-    .limit(50);
+function syncedOrdersErrorMessage(error: unknown): string {
+  const text =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message)
+      : error instanceof Error
+        ? error.message
+        : "";
 
-  if (error) {
-    console.error("listSyncedOrders failed", error);
-    return {
-      orders: [] as SyncedOrder[],
-      error: "Não foi possível carregar os pedidos sincronizados.",
-    };
+  if (/Missing Supabase environment variable/i.test(text)) {
+    return "Falta configurar as chaves do Supabase no .env. Reinicie o servidor depois de salvar.";
   }
+  if (/Could not find the table|relation .* does not exist|schema cache/i.test(text)) {
+    return "As tabelas orders ainda não existem neste projeto. Rode a migration no SQL Editor do Supabase.";
+  }
+  return "Não foi possível carregar os pedidos sincronizados.";
+}
 
-  return { orders: (data ?? []) as SyncedOrder[], error: null as string | null };
+export const listSyncedOrders = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("orders")
+      .select(
+        "order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at",
+      )
+        .order("last_event_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("listSyncedOrders failed", error);
+      return { orders: [] as SyncedOrder[], error: syncedOrdersErrorMessage(error) };
+    }
+
+    return { orders: (data ?? []) as SyncedOrder[], error: null as string | null };
+  } catch (error) {
+    console.error("listSyncedOrders failed", error);
+    return { orders: [] as SyncedOrder[], error: syncedOrdersErrorMessage(error) };
+  }
 });
 
 export const querySyncedOrders = createServerFn({ method: "GET" })
@@ -270,7 +310,7 @@ export const querySyncedOrders = createServerFn({ method: "GET" })
       };
 
       let listQuery = applyListFilters(
-        supabaseAdmin.from("orders").select(ORDER_COLUMNS, { count: "exact" }),
+        supabaseAdmin.from("orders").select(ORDER_COLUMNS_FULL, { count: "exact" }),
       );
 
       listQuery = listQuery.order(data.sort, {
@@ -280,7 +320,18 @@ export const querySyncedOrders = createServerFn({ method: "GET" })
 
       const from = (data.page - 1) * data.pageSize;
       const to = from + data.pageSize - 1;
-      const { data: rows, error, count } = await listQuery.range(from, to);
+      let { data: rows, error, count } = await listQuery.range(from, to);
+
+      if (error && isMissingColumnError(error)) {
+        listQuery = applyListFilters(
+          supabaseAdmin.from("orders").select(ORDER_COLUMNS_LEGACY, { count: "exact" }),
+        );
+        listQuery = listQuery.order(data.sort, {
+          ascending: data.dir === "asc",
+          nullsFirst: false,
+        });
+        ({ data: rows, error, count } = await listQuery.range(from, to));
+      }
 
       if (error) {
         console.error("querySyncedOrders failed", error);
@@ -334,9 +385,23 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: row, error } = await supabaseAdmin
         .from("orders")
-        .select(ORDER_COLUMNS)
+        .select(ORDER_COLUMNS_FULL)
         .eq("order_id", data.orderId)
         .maybeSingle();
+
+      if (error && isMissingColumnError(error)) {
+        const fallback = await supabaseAdmin
+          .from("orders")
+          .select(ORDER_COLUMNS_LEGACY)
+          .eq("order_id", data.orderId)
+          .maybeSingle();
+        if (fallback.error) {
+          console.error("getSyncedOrder failed", fallback.error);
+          return { order: null, error: "Unable to load this order." };
+        }
+        if (!fallback.data) return { order: null, error: null };
+        return { order: mapOrder(fallback.data as OrdersRow), error: null };
+      }
 
       if (error) {
         console.error("getSyncedOrder failed", error);
@@ -349,5 +414,52 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
     } catch (error) {
       console.error("getSyncedOrder failed", error);
       return { order: null, error: "Unable to load this order." };
+    }
+  });
+
+export type OrderEventRow = {
+  id: string;
+  order_id: number;
+  event_date: string;
+  status_id: number | null;
+  status_name: string | null;
+  details: string | null;
+  tracking_code: string | null;
+  tracking_url: string | null;
+  shipping_company: string | null;
+  total: number | null;
+  source: string;
+  created_at: string;
+};
+
+export const listOrderEvents = createServerFn({ method: "GET" })
+  .validator((data: unknown) => {
+    const raw = (data ?? {}) as Record<string, unknown>;
+    const orderId = typeof raw["orderId"] === "number" ? raw["orderId"] : Number(raw["orderId"]);
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      throw new Error("Invalid order id");
+    }
+    return { orderId };
+  })
+  .handler(async ({ data }): Promise<{ events: OrderEventRow[]; error: string | null }> => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: rows, error } = await supabaseAdmin
+        .from("order_events")
+        .select(
+          "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at",
+        )
+        .eq("order_id", data.orderId)
+        .order("event_date", { ascending: true });
+
+      if (error) {
+        console.error("listOrderEvents failed", error);
+        return { events: [], error: "Unable to load timeline." };
+      }
+
+      return { events: (rows ?? []) as OrderEventRow[], error: null };
+    } catch (error) {
+      console.error("listOrderEvents failed", error);
+      return { events: [], error: "Unable to load timeline." };
     }
   });

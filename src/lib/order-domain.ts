@@ -1,4 +1,4 @@
-export type Supply = "dropi" | "dropea";
+export type Supply = "dropi" | "dropea" | "shopify";
 
 export type OrderStatusKey =
   | "incident"
@@ -34,6 +34,7 @@ export type OperationalOrder = {
 export const SUPPLY_LABEL: Record<Supply, string> = {
   dropi: "Dropi",
   dropea: "Dropea",
+  shopify: "Shopify",
 };
 
 const STATUS_LABEL: Record<Exclude<OrderStatusKey, "unknown">, string> = {
@@ -64,12 +65,13 @@ const STATUS_RULES: Array<{ key: Exclude<OrderStatusKey, "unknown">; pattern: Re
 ];
 
 export function isSupply(value: string): value is Supply {
-  return value === "dropi" || value === "dropea";
+  return value === "dropi" || value === "dropea" || value === "shopify";
 }
 
 export function getOrderSupply(order: Pick<OperationalOrder, "source">): Supply | null {
   const source = order.source.trim().toLowerCase();
   if (source.includes("dropea")) return "dropea";
+  if (source.includes("shopify")) return "shopify";
   if (source.includes("dropi")) return "dropi";
   return null;
 }
@@ -77,7 +79,8 @@ export function getOrderSupply(order: Pick<OperationalOrder, "source">): Supply 
 export function supplyMatchesSource(supply: Supply, source: string): boolean {
   const normalized = source.trim().toLowerCase();
   if (supply === "dropea") return normalized.includes("dropea");
-  return normalized.includes("dropi") && !normalized.includes("dropea");
+  if (supply === "shopify") return normalized.includes("shopify");
+  return normalized.includes("dropi") && !normalized.includes("dropea") && !normalized.includes("shopify");
 }
 
 export function getOrderStatus(order: Pick<OperationalOrder, "status_name" | "details">): {

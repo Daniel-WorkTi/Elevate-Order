@@ -1,34 +1,73 @@
 import { useEffect, useState } from "react";
 
-type ExchangeRateState = {
+import { getExchangeRate } from "@/lib/currency.functions";
+import type { ExchangeRateResult } from "@/lib/currency/currency-types";
+
+export type UseExchangeRateState = {
   rate: number | null;
   updatedAt: Date | null;
+  loading: boolean;
+  cached: boolean;
+  provider: string | null;
+  error: string | null;
+  result: ExchangeRateResult | null;
 };
 
-/** Fetches a public FX rate for the shell control. Never invents a fallback rate. */
-export function useExchangeRate(from = "EUR", to = "BRL") {
-  const [state, setState] = useState<ExchangeRateState>({ rate: null, updatedAt: null });
+const INITIAL: UseExchangeRateState = {
+  rate: null,
+  updatedAt: null,
+  loading: true,
+  cached: false,
+  provider: null,
+  error: null,
+  result: null,
+};
+
+/** Client hook over the server-cached exchange-rate function. Never invents rates. */
+export function useExchangeRate(from = "EUR", to = "BRL"): UseExchangeRateState {
+  const [state, setState] = useState<UseExchangeRateState>(INITIAL);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
-        if (from === to) {
-          if (!cancelled) setState({ rate: 1, updatedAt: new Date() });
+        const { rate, error } = await getExchangeRate({ data: { from, to } });
+        if (cancelled) return;
+        if (!rate) {
+          setState({
+            rate: null,
+            updatedAt: null,
+            loading: false,
+            cached: false,
+            provider: null,
+            error: error ?? "Rate unavailable",
+            result: null,
+          });
           return;
         }
-        const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
-        if (!res.ok) throw new Error("fx failed");
-        const data = (await res.json()) as { rates: Record<string, number>; date: string };
-        if (cancelled) return;
-        const rate = data.rates[to];
         setState({
-          rate: typeof rate === "number" ? rate : null,
-          updatedAt: data.date ? new Date(`${data.date}T16:00:00Z`) : new Date(),
+          rate: rate.rate,
+          updatedAt: new Date(rate.fetchedAt),
+          loading: false,
+          cached: rate.cached,
+          provider: rate.provider,
+          error: null,
+          result: rate,
         });
-      } catch {
-        if (!cancelled) setState({ rate: null, updatedAt: null });
+      } catch (err) {
+        if (cancelled) return;
+        console.error("useExchangeRate failed", err);
+        setState({
+          rate: null,
+          updatedAt: null,
+          loading: false,
+          cached: false,
+          provider: null,
+          error: "Rate unavailable",
+          result: null,
+        });
       }
     }
 

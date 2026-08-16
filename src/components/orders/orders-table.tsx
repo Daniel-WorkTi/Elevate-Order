@@ -86,7 +86,13 @@ export function OrdersTable({
       <div className="overflow-hidden rounded-[16px] border border-border bg-card">
         <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
           <p className="text-[15px] font-medium text-foreground">
-            Unable to load {search.supply === "dropea" ? "Dropea" : "Dropi"} orders.
+            Unable to load{" "}
+            {search.supply === "dropea"
+              ? "Dropea"
+              : search.supply === "shopify"
+                ? "Shopify"
+                : "Dropi"}{" "}
+            orders.
           </p>
           <p className="mt-1 text-[13px] text-muted-foreground">{error}</p>
           <div className="mt-5 flex gap-2">
@@ -102,7 +108,15 @@ export function OrdersTable({
               variant="outline"
               className="h-9 rounded-[10px] border-border text-[13px] shadow-none"
             >
-              <Link to="/connections" search={{ source: search.supply }}>
+              <Link
+                to={
+                  search.supply === "shopify"
+                    ? "/connections/shopify"
+                    : search.supply === "dropea"
+                      ? "/connections/dropea"
+                      : "/connections/dropi"
+                }
+              >
                 Check connection
               </Link>
             </Button>

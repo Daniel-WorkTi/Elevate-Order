@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      message_templates: {
+        Row: {
+          id: string
+          supply: string
+          kind: string
+          name: string
+          description: string
+          content: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          supply: string
+          kind: string
+          name: string
+          description?: string
+          content: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          supply?: string
+          kind?: string
+          name?: string
+          description?: string
+          content?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_events: {
         Row: {
           created_at: string
@@ -67,13 +100,23 @@ export type Database = {
       }
       orders: {
         Row: {
+          address: string | null
+          city: string | null
+          country: string | null
           created_at: string
+          currency: string | null
+          customer_name: string | null
           details: string | null
+          email: string | null
           id: string
           last_event_at: string | null
           order_id: number
+          phone: string | null
+          postal_code: string | null
+          product_summary: string | null
           shipping_company: string | null
           shopify_order_id: number | null
+          snapshot: Json | null
           source: string
           status_id: number | null
           status_name: string | null
@@ -83,13 +126,23 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
+          currency?: string | null
+          customer_name?: string | null
           details?: string | null
+          email?: string | null
           id?: string
           last_event_at?: string | null
           order_id: number
+          phone?: string | null
+          postal_code?: string | null
+          product_summary?: string | null
           shipping_company?: string | null
           shopify_order_id?: number | null
+          snapshot?: Json | null
           source?: string
           status_id?: number | null
           status_name?: string | null
@@ -99,13 +152,23 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
+          currency?: string | null
+          customer_name?: string | null
           details?: string | null
+          email?: string | null
           id?: string
           last_event_at?: string | null
           order_id?: number
+          phone?: string | null
+          postal_code?: string | null
+          product_summary?: string | null
           shipping_company?: string | null
           shopify_order_id?: number | null
+          snapshot?: Json | null
           source?: string
           status_id?: number | null
           status_name?: string | null

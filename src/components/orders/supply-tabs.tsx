@@ -1,8 +1,9 @@
+import { SupplyMark } from "@/components/supply-logo";
 import { cn } from "@/lib/utils";
 import type { Supply } from "@/lib/order-domain";
 import { SUPPLY_LABEL } from "@/lib/order-domain";
 
-const SUPPLIES: Supply[] = ["dropi", "dropea"];
+const SUPPLIES: Supply[] = ["dropi", "dropea", "shopify"];
 
 export function SupplyTabs({
   value,
@@ -27,13 +28,14 @@ export function SupplyTabs({
             aria-selected={selected}
             onClick={() => onChange(supply)}
             className={cn(
-              "h-[38px] min-w-[96px] rounded-[8px] px-4 text-[13px] font-medium transition-colors duration-150",
+              "inline-flex h-[38px] min-w-[96px] items-center justify-center gap-2 rounded-[8px] px-3.5 text-[13px] font-medium transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40",
               selected
                 ? "border border-[color:var(--elevate-blue)]/20 bg-[color:var(--elevate-blue-soft)] text-[color:var(--elevate-blue)]"
                 : "border border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
+            <SupplyMark supply={supply} size={18} />
             {SUPPLY_LABEL[supply]}
           </button>
         );

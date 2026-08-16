@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link2, Megaphone, Target, TrendingUp, Wallet } from "lucide-react";
 
+import { useExchangeRate } from "@/components/app-shell/use-exchange-rate";
+import { formatMoney } from "@/lib/money/format-money";
 import { orders, type Order } from "@/lib/orders";
 
-const EUR_TO_BRL = 6.32;
 const AD_SPEND_KEY = "elevate-ad-spend";
 const AD_ACCOUNT_KEY = "elevate-ad-account";
 
@@ -23,6 +24,7 @@ export function MetaAdsPanel() {
   const [adSpend, setAdSpend] = useState(1180);
   const [adAccount, setAdAccount] = useState("");
   const [connected, setConnected] = useState(false);
+  const fx = useExchangeRate("EUR", "BRL");
 
   useEffect(() => {
     const saved = localStorage.getItem(AD_SPEND_KEY);
@@ -31,12 +33,11 @@ export function MetaAdsPanel() {
     if (acc) setAdAccount(acc);
   }, []);
 
-  const money = (valueEur: number) =>
-    new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(currency === "EUR" ? valueEur : valueEur * EUR_TO_BRL);
+  const money = (valueEur: number) => {
+    if (currency === "EUR") return formatMoney(valueEur, "EUR", "pt-PT");
+    if (typeof fx.rate !== "number" || !Number.isFinite(fx.rate)) return "—";
+    return formatMoney(valueEur * fx.rate, "BRL", "pt-BR");
+  };
 
   const delivered = orders.filter((o) => o.status === "confirmed" || o.status === "messaged");
   const revenue = sum(delivered);

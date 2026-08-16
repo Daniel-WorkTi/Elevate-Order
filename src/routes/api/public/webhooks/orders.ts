@@ -1,27 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
 
-const eventSchema = z.object({
-  order_id: z.number().int(),
-  event_date: z.string().min(1),
-  status_id: z.number().int().nullable().optional(),
-  status_name: z.string().nullable().optional(),
-  details: z.string().nullable().optional(),
-  tracking_code: z.string().nullable().optional(),
-  tracking_url: z.string().nullable().optional(),
-  shopify_order_id: z.number().int().nullable().optional(),
-  shipping_company: z.string().nullable().optional(),
-  total: z.union([z.string(), z.number()]).nullable().optional(),
-  source: z.string().nullable().optional(),
-});
-
-const payloadSchema = z.union([eventSchema, z.array(eventSchema).max(500)]);
-
-function toNumber(value: string | number | null | undefined) {
-  if (value === null || value === undefined) return null;
-  const parsed = typeof value === "number" ? value : Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+import {
+  coalesceStatic,
+  dropiWebhookPayloadSchema,
+  normalizeDropiWebhookEvent,
+  type NormalizedDropiEvent,
+} from "@/lib/integrations/dropi/dropi-webhook-normalize";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -29,6 +13,20 @@ function json(body: unknown, status = 200) {
     headers: { "content-type": "application/json" },
   });
 }
+
+type ExistingOrderRow = {
+  order_id: number;
+  customer_name: string | null;
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+  postal_code: string | null;
+  address: string | null;
+  country: string | null;
+  product_summary: string | null;
+  currency: string | null;
+  snapshot: unknown;
+};
 
 export const Route = createFileRoute("/api/public/webhooks/orders")({
   server: {
@@ -51,27 +49,40 @@ export const Route = createFileRoute("/api/public/webhooks/orders")({
           return json({ error: "Invalid JSON body" }, 400);
         }
 
-        const parsed = payloadSchema.safeParse(raw);
+        const parsed = dropiWebhookPayloadSchema.safeParse(raw);
         if (!parsed.success) {
           return json({ error: "Invalid payload", issues: parsed.error.issues }, 422);
         }
 
-        const events = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+        let events: NormalizedDropiEvent[];
+        try {
+          const list = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+          events = list.map((event) => normalizeDropiWebhookEvent(event));
+        } catch (error) {
+          return json(
+            {
+              error: "Invalid payload",
+              message: error instanceof Error ? error.message : "Normalization failed",
+            },
+            422,
+          );
+        }
+
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const eventRows = events.map((e) => ({
           order_id: e.order_id,
-          event_date: new Date(e.event_date).toISOString(),
-          status_id: e.status_id ?? null,
-          status_name: e.status_name ?? null,
-          details: e.details ?? null,
-          tracking_code: e.tracking_code ?? null,
-          tracking_url: e.tracking_url ?? null,
-          shopify_order_id: e.shopify_order_id ?? null,
-          shipping_company: e.shipping_company ?? null,
-          total: toNumber(e.total),
-          source: e.source ?? "Dropi Pro",
-          raw: e as unknown as import("@/integrations/supabase/types").Json,
+          event_date: e.event_date,
+          status_id: e.status_id,
+          status_name: e.status_name,
+          details: e.details,
+          tracking_code: e.tracking_code,
+          tracking_url: e.tracking_url,
+          shopify_order_id: e.shopify_order_id,
+          shipping_company: e.shipping_company,
+          total: e.total,
+          source: e.source,
+          raw: e.raw as import("@/integrations/supabase/types").Json,
         }));
 
         const { error: eventsError } = await supabaseAdmin
@@ -83,27 +94,60 @@ export const Route = createFileRoute("/api/public/webhooks/orders")({
           return json({ error: "Failed to store events" }, 500);
         }
 
-        // Keep one current row per order, using the most recent event received.
-        const latest = new Map<number, (typeof eventRows)[number]>();
-        for (const row of eventRows) {
+        // Latest logistics event per order_id in this batch.
+        const latest = new Map<number, NormalizedDropiEvent>();
+        for (const row of events) {
           const current = latest.get(row.order_id);
           if (!current || row.event_date > current.event_date) latest.set(row.order_id, row);
         }
 
-        const orderRows = [...latest.values()].map((row) => ({
-          order_id: row.order_id,
-          shopify_order_id: row.shopify_order_id,
-          status_id: row.status_id,
-          status_name: row.status_name,
-          details: row.details,
-          tracking_code: row.tracking_code,
-          tracking_url: row.tracking_url,
-          shipping_company: row.shipping_company,
-          total: row.total,
-          source: row.source,
-          last_event_at: row.event_date,
-          updated_at: new Date().toISOString(),
-        }));
+        const orderIds = [...latest.keys()];
+        const { data: existingRows, error: existingError } = await supabaseAdmin
+          .from("orders")
+          .select(
+            "order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot",
+          )
+          .in("order_id", orderIds);
+
+        if (existingError) {
+          console.error("orders lookup failed", existingError);
+          // Continue — treat as no existing rows (static fields still saved from payload).
+        }
+
+        const existingById = new Map<number, ExistingOrderRow>(
+          ((existingRows ?? []) as ExistingOrderRow[]).map((row) => [row.order_id, row]),
+        );
+
+        const nowIso = new Date().toISOString();
+        const orderRows = [...latest.values()].map((row) => {
+          const existing = existingById.get(row.order_id);
+          return {
+            order_id: row.order_id,
+            shopify_order_id: row.shopify_order_id,
+            status_id: row.status_id,
+            status_name: row.status_name,
+            details: row.details,
+            tracking_code: row.tracking_code,
+            tracking_url: row.tracking_url,
+            shipping_company: row.shipping_company,
+            total: row.total,
+            source: row.source,
+            last_event_at: row.event_date,
+            updated_at: nowIso,
+            customer_name: coalesceStatic(row.customer_name, existing?.customer_name),
+            phone: coalesceStatic(row.phone, existing?.phone),
+            email: coalesceStatic(row.email, existing?.email),
+            city: coalesceStatic(row.city, existing?.city),
+            postal_code: coalesceStatic(row.postal_code, existing?.postal_code),
+            address: coalesceStatic(row.address, existing?.address),
+            country: coalesceStatic(row.country, existing?.country),
+            product_summary: coalesceStatic(row.product_summary, existing?.product_summary),
+            currency: coalesceStatic(row.currency, existing?.currency),
+            snapshot: (row.raw ?? existing?.snapshot ?? null) as
+              | import("@/integrations/supabase/types").Json
+              | null,
+          };
+        });
 
         const { error: ordersError } = await supabaseAdmin
           .from("orders")
@@ -111,6 +155,37 @@ export const Route = createFileRoute("/api/public/webhooks/orders")({
 
         if (ordersError) {
           console.error("orders upsert failed", ordersError);
+          // If migration not applied yet, retry logistics-only upsert so status sync still works.
+          if (/product_summary|customer_name|snapshot|column/i.test(ordersError.message ?? "")) {
+            const logisticsOnly = orderRows.map(
+              ({
+                customer_name: _c,
+                phone: _p,
+                email: _e,
+                city: _city,
+                postal_code: _pc,
+                address: _a,
+                country: _co,
+                product_summary: _pr,
+                currency: _cu,
+                snapshot: _s,
+                ...rest
+              }) => rest,
+            );
+            const { error: fallbackError } = await supabaseAdmin
+              .from("orders")
+              .upsert(logisticsOnly, { onConflict: "order_id" });
+            if (fallbackError) {
+              console.error("orders logistics upsert failed", fallbackError);
+              return json({ error: "Failed to store orders" }, 500);
+            }
+            return json({
+              ok: true,
+              received: eventRows.length,
+              orders: logisticsOnly.length,
+              warning: "Static order columns missing — run migration 20260813220000_orders_static_fields",
+            });
+          }
           return json({ error: "Failed to store orders" }, 500);
         }
 

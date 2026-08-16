@@ -21,6 +21,10 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfitsRouteImport } from './routes/profits'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as ConnectionsIndexRouteImport } from './routes/connections.index'
+import { Route as ConnectionsDropeaRouteImport } from './routes/connections.dropea'
+import { Route as ConnectionsDropiRouteImport } from './routes/connections.dropi'
+import { Route as ConnectionsShopifyRouteImport } from './routes/connections.shopify'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as ApiPublicWebhooksOrdersRouteImport } from './routes/api/public/webhooks/orders'
 
@@ -84,6 +88,26 @@ const TemplatesRoute = TemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConnectionsIndexRoute = ConnectionsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConnectionsRoute,
+} as any)
+const ConnectionsDropeaRoute = ConnectionsDropeaRouteImport.update({
+  id: '/dropea',
+  path: '/dropea',
+  getParentRoute: () => ConnectionsRoute,
+} as any)
+const ConnectionsDropiRoute = ConnectionsDropiRouteImport.update({
+  id: '/dropi',
+  path: '/dropi',
+  getParentRoute: () => ConnectionsRoute,
+} as any)
+const ConnectionsShopifyRoute = ConnectionsShopifyRouteImport.update({
+  id: '/shopify',
+  path: '/shopify',
+  getParentRoute: () => ConnectionsRoute,
+} as any)
 const OrdersIdRoute = OrdersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -99,7 +123,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ads': typeof AdsRoute
   '/analytics': typeof AnalyticsRoute
-  '/connections': typeof ConnectionsRoute
+  '/connections': typeof ConnectionsRouteWithChildren
   '/help': typeof HelpRoute
   '/integracao-api': typeof IntegracaoApiRoute
   '/onboarding': typeof OnboardingRoute
@@ -108,14 +132,17 @@ export interface FileRoutesByFullPath {
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
+  '/connections/dropea': typeof ConnectionsDropeaRoute
+  '/connections/dropi': typeof ConnectionsDropiRoute
+  '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
+  '/connections/': typeof ConnectionsIndexRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ads': typeof AdsRoute
   '/analytics': typeof AnalyticsRoute
-  '/connections': typeof ConnectionsRoute
   '/help': typeof HelpRoute
   '/integracao-api': typeof IntegracaoApiRoute
   '/onboarding': typeof OnboardingRoute
@@ -124,7 +151,11 @@ export interface FileRoutesByTo {
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
+  '/connections/dropea': typeof ConnectionsDropeaRoute
+  '/connections/dropi': typeof ConnectionsDropiRoute
+  '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
+  '/connections': typeof ConnectionsIndexRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
 }
 export interface FileRoutesById {
@@ -132,7 +163,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ads': typeof AdsRoute
   '/analytics': typeof AnalyticsRoute
-  '/connections': typeof ConnectionsRoute
+  '/connections': typeof ConnectionsRouteWithChildren
   '/help': typeof HelpRoute
   '/integracao-api': typeof IntegracaoApiRoute
   '/onboarding': typeof OnboardingRoute
@@ -141,7 +172,11 @@ export interface FileRoutesById {
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
+  '/connections/dropea': typeof ConnectionsDropeaRoute
+  '/connections/dropi': typeof ConnectionsDropiRoute
+  '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
+  '/connections/': typeof ConnectionsIndexRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
 }
 export interface FileRouteTypes {
@@ -159,14 +194,17 @@ export interface FileRouteTypes {
     | '/profits'
     | '/settings'
     | '/templates'
+    | '/connections/dropea'
+    | '/connections/dropi'
+    | '/connections/shopify'
     | '/orders/$id'
+    | '/connections/'
     | '/api/public/webhooks/orders'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ads'
     | '/analytics'
-    | '/connections'
     | '/help'
     | '/integracao-api'
     | '/onboarding'
@@ -175,7 +213,11 @@ export interface FileRouteTypes {
     | '/profits'
     | '/settings'
     | '/templates'
+    | '/connections/dropea'
+    | '/connections/dropi'
+    | '/connections/shopify'
     | '/orders/$id'
+    | '/connections'
     | '/api/public/webhooks/orders'
   id:
     | '__root__'
@@ -191,7 +233,11 @@ export interface FileRouteTypes {
     | '/profits'
     | '/settings'
     | '/templates'
+    | '/connections/dropea'
+    | '/connections/dropi'
+    | '/connections/shopify'
     | '/orders/$id'
+    | '/connections/'
     | '/api/public/webhooks/orders'
   fileRoutesById: FileRoutesById
 }
@@ -199,7 +245,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdsRoute: typeof AdsRoute
   AnalyticsRoute: typeof AnalyticsRoute
-  ConnectionsRoute: typeof ConnectionsRoute
+  ConnectionsRoute: typeof ConnectionsRouteWithChildren
   HelpRoute: typeof HelpRoute
   IntegracaoApiRoute: typeof IntegracaoApiRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -297,6 +343,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/connections/': {
+      id: '/connections/'
+      path: '/'
+      fullPath: '/connections/'
+      preLoaderRoute: typeof ConnectionsIndexRouteImport
+      parentRoute: typeof ConnectionsRoute
+    }
+    '/connections/dropea': {
+      id: '/connections/dropea'
+      path: '/dropea'
+      fullPath: '/connections/dropea'
+      preLoaderRoute: typeof ConnectionsDropeaRouteImport
+      parentRoute: typeof ConnectionsRoute
+    }
+    '/connections/dropi': {
+      id: '/connections/dropi'
+      path: '/dropi'
+      fullPath: '/connections/dropi'
+      preLoaderRoute: typeof ConnectionsDropiRouteImport
+      parentRoute: typeof ConnectionsRoute
+    }
+    '/connections/shopify': {
+      id: '/connections/shopify'
+      path: '/shopify'
+      fullPath: '/connections/shopify'
+      preLoaderRoute: typeof ConnectionsShopifyRouteImport
+      parentRoute: typeof ConnectionsRoute
+    }
     '/orders/$id': {
       id: '/orders/$id'
       path: '/$id'
@@ -314,6 +388,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ConnectionsRouteChildren {
+  ConnectionsDropeaRoute: typeof ConnectionsDropeaRoute
+  ConnectionsDropiRoute: typeof ConnectionsDropiRoute
+  ConnectionsShopifyRoute: typeof ConnectionsShopifyRoute
+  ConnectionsIndexRoute: typeof ConnectionsIndexRoute
+}
+
+const ConnectionsRouteChildren: ConnectionsRouteChildren = {
+  ConnectionsDropeaRoute: ConnectionsDropeaRoute,
+  ConnectionsDropiRoute: ConnectionsDropiRoute,
+  ConnectionsShopifyRoute: ConnectionsShopifyRoute,
+  ConnectionsIndexRoute: ConnectionsIndexRoute,
+}
+
+const ConnectionsRouteWithChildren = ConnectionsRoute._addFileChildren(
+  ConnectionsRouteChildren,
+)
+
 interface OrdersRouteChildren {
   OrdersIdRoute: typeof OrdersIdRoute
 }
@@ -329,7 +421,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdsRoute: AdsRoute,
   AnalyticsRoute: AnalyticsRoute,
-  ConnectionsRoute: ConnectionsRoute,
+  ConnectionsRoute: ConnectionsRouteWithChildren,
   HelpRoute: HelpRoute,
   IntegracaoApiRoute: IntegracaoApiRoute,
   OnboardingRoute: OnboardingRoute,

@@ -1,5 +1,4 @@
-import type { LucideIcon } from "lucide-react";
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType } from "react";
 
 export type IntegrationId = "shopify" | "dropi" | "dropea";
 
@@ -9,11 +8,10 @@ export type IntegrationOption = {
   id: IntegrationId;
   name: string;
   description: string;
-  /** Query param for /connections */
-  connectTo: "/connections";
+  connectTo: "/connections" | "/connections/shopify" | "/connections/dropi" | "/connections/dropea";
   search: { source: IntegrationId };
   accentClass: string;
-  Icon: ComponentType<SVGProps<SVGSVGElement>> | LucideIcon;
+  Icon: ComponentType<{ className?: string }>;
   status: IntegrationStatus;
 };
 

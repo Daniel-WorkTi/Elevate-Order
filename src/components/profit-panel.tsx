@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Megaphone, TrendingUp, Wallet, Link2, PiggyBank } from "lucide-react";
 
+import { useExchangeRate } from "@/components/app-shell/use-exchange-rate";
+import { formatMoney } from "@/lib/money/format-money";
 import { orders, type Order } from "@/lib/orders";
 
-const EUR_TO_BRL = 6.32;
 /** Custo médio de produto + envio estimado sobre a receita entregue. */
 const COGS_RATE = 0.42;
 const AD_SPEND_KEY = "elevate-ad-spend";
@@ -18,18 +19,18 @@ export function ProfitPanel() {
   const [mode, setMode] = useState<"gross" | "net">("net");
   const [adSpend, setAdSpend] = useState(1180);
   const [metaConnected] = useState(false);
+  const fx = useExchangeRate("EUR", "BRL");
 
   useEffect(() => {
     const saved = localStorage.getItem(AD_SPEND_KEY);
     if (saved) setAdSpend(Number(saved) || 0);
   }, []);
 
-  const money = (valueEur: number) =>
-    new Intl.NumberFormat(currency === "EUR" ? "pt-PT" : "pt-BR", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(currency === "EUR" ? valueEur : valueEur * EUR_TO_BRL);
+  const money = (valueEur: number) => {
+    if (currency === "EUR") return formatMoney(valueEur, "EUR", "pt-PT");
+    if (typeof fx.rate !== "number" || !Number.isFinite(fx.rate)) return "—";
+    return formatMoney(valueEur * fx.rate, "BRL", "pt-BR");
+  };
 
   const delivered = orders.filter((o) => o.status === "confirmed" || o.status === "messaged");
   const incidents = orders.filter((o) => o.status === "incident");

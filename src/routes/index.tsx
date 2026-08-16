@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/app-shell";
-import { OrdersBoard } from "@/components/orders-board";
-import { orders } from "@/lib/orders";
+import { InboxPageContent } from "@/components/inbox/inbox-page";
+import { inboxItemsForSupply } from "@/lib/inbox/inbox-demo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -18,9 +18,8 @@ export const Route = createFileRoute("/")({
 });
 
 function InboxPage() {
-  const inboxCount = orders.filter(
-    (o) => o.status === "incident" || o.status === "unanswered",
-  ).length;
+  const inboxCount =
+    inboxItemsForSupply("dropi").length + inboxItemsForSupply("dropea").length;
 
   return (
     <AppShell
@@ -28,7 +27,7 @@ function InboxPage() {
       subtitle="Orders that need your attention"
       inboxCount={inboxCount}
     >
-      <OrdersBoard />
+      <InboxPageContent />
     </AppShell>
   );
 }

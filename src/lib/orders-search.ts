@@ -5,7 +5,7 @@ import { PAGE_SIZES, type PageSize, type Supply } from "@/lib/order-domain";
 import type { OrdersQueryInput } from "@/lib/synced-orders.functions";
 
 export const ordersSearchSchema = z.object({
-  supply: z.enum(["dropi", "dropea"]).catch("dropi"),
+  supply: z.enum(["dropi", "dropea", "shopify"]).catch("dropi"),
   q: z.string().optional(),
   status: z.string().optional(),
   country: z.string().optional(),
