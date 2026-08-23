@@ -119,12 +119,15 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
         ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
       }),
       {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600,
-      secure: origin.startsWith("https://"),
-    });
+        httpOnly: true,
+        path: "/",
+        maxAge: 600,
+        // None is required so the cookie survives the return from admin.shopify.com.
+        // Lax is dropped when Shopify bounces through its Admin iframe.
+        sameSite: origin.startsWith("https://") ? "none" : "lax",
+        secure: origin.startsWith("https://"),
+      },
+    );
 
     return { url };
   });

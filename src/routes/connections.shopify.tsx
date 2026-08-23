@@ -1,5 +1,5 @@
 import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
-import { createFileRoute, getRouteApi, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -49,7 +49,6 @@ export const Route = createFileRoute("/connections/shopify")({
 
 function StoreConnectionPage() {
   const { t } = useI18n();
-  const navigate = useNavigate();
   const { error: oauthError } = connectionsRoute.useSearch();
   const query = useQuery(shopifyDashboardQuery);
   const oauthQuery = useQuery(shopifyOauthQuery);
@@ -168,10 +167,9 @@ function StoreConnectionPage() {
           oauthShop={oauth?.shopDomain ?? null}
           oauthError={oauthError === "oauth"}
           onOauthInstall={(shop) => {
-            void navigate({
-              to: "/auth/shopify",
-              search: { shop, ...(workspaceId ? { workspaceId } : {}) },
-            });
+            const params = new URLSearchParams({ shop });
+            if (workspaceId) params.set("workspaceId", workspaceId);
+            (window.top ?? window).location.assign(`/auth/shopify?${params.toString()}`);
           }}
           onConnect={connect}
           onDisconnect={() => {

@@ -44,12 +44,33 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+/** ELEVATE is a standalone workspace — Shopify Admin must not iframe it (cookie error). */
+function withStandaloneFrameHeaders(response: Response): Response {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html")) return response;
+  const headers = new Headers(response.headers);
+  headers.set("X-Frame-Options", "DENY");
+  const csp = headers.get("Content-Security-Policy");
+  const frameRule = "frame-ancestors 'none'";
+  headers.set(
+    "Content-Security-Policy",
+    csp ? `${csp}; ${frameRule}` : frameRule,
+  );
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const response = await withStandaloneFrameHeaders(
+        await normalizeCatastrophicSsrResponse(await handler.fetch(request, env, ctx)),
+      );
+      return response;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

@@ -111,6 +111,9 @@ export const en: TranslationDict = {
   "connections.shopifyConnectedStore": "Store",
   "connections.shopifyOrdersSynced": "Orders synced",
   "connections.shopifyOauthError": "Shopify authorization failed. Try connecting again.",
+  "connections.shopifyCookieHint":
+    "Connect the store from this ELEVATE page — not from Shopify Admin. A cookies error means the app is marked Embedded: turn Embedded app off in the Partner Dashboard.",
+  "connections.orUseAdminToken": "Or connect with an Admin API token (shpat_)",
   "connections.dropiHint": "Order update webhooks — supply account",
   "connections.dropeaHint": "API token + HMAC — supply account",
   "connections.selectedFromSetup": "Selected from setup",

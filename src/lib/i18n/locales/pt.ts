@@ -113,6 +113,9 @@ export const pt: TranslationDict = {
   "connections.shopifyConnectedStore": "Loja",
   "connections.shopifyOrdersSynced": "Pedidos sincronizados",
   "connections.shopifyOauthError": "A autorização Shopify falhou. Tente ligar novamente.",
+  "connections.shopifyCookieHint":
+    "Ligue a loja a partir desta página do ELEVATE — não pelo Admin da Shopify. Se aparecer um erro de cookies, a app está marcada como Embedded: no Partner Dashboard desligue Embedded app.",
+  "connections.orUseAdminToken": "Ou ligar com token Admin API (shpat_)",
   "connections.dropiHint": "Webhooks de atualização de pedidos — conta supply",
   "connections.dropeaHint": "Token API + HMAC — conta supply",
   "connections.selectedFromSetup": "Selecionado no setup",
