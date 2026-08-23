@@ -133,7 +133,8 @@ export const en: TranslationDict = {
   "connections.connectDropiHint":
     "Copy your unique URL, paste it in Dropi, then connect. Each workspace has its own link.",
   "connections.dropiPastOrdersNote":
-    "Orders appear only after Dropi sends webhook updates from now on. Past Dropi orders are not imported automatically — change a status in Dropi (or wait for a new event) and refresh Orders.",
+    "Connecting here only prepares ELEVATE. Paste this URL in Dropi notifications. New purchases appear after Dropi sends a webhook — confirmed orders go to Orders; Inbox only lists incidents and follow-up.",
+  "connections.waitingFirstWebhook": "Waiting for the first webhook",
   "connections.generatingWebhookUrl": "Generating your webhook URL…",
   "connections.webhookUrlError":
     "Could not create your webhook URL. Apply the workspace migration in Supabase.",
@@ -340,9 +341,14 @@ export const en: TranslationDict = {
   "orders.subtitle": "All synchronized orders.",
   "orders.detailSubtitle": "Order detail",
   "orders.refresh": "Refresh",
+  "orders.syncedNone": "No new Shopify orders.",
+  "orders.refreshNeedsShopify":
+    "Connect Shopify in Connections to import store orders. Dropi only sends orders by webhook.",
   "orders.searchPlaceholder": "Search order ID, Shopify ID or tracking...",
   "orders.emptyTitle": "No {{supply}} orders found.",
   "orders.emptyHint": "Try changing your filters or check the connection.",
+  "orders.emptyHintDropi":
+    "Refresh imports from Shopify. Dropi only sends orders by webhook — confirm the URL in Connections.",
   "orders.loadError": "Unable to load orders.",
   "orders.backToOrders": "Back to Orders",
   "orders.notFound": "Order not found",
@@ -611,7 +617,7 @@ export const en: TranslationDict = {
   "inbox.emptyTitle": "No orders need attention",
   "inbox.emptyHint": "Try another supply tab or clear filters.",
   "inbox.emptyQueueHint":
-    "The queue lists incidents, waiting, and unanswered messages from synced Dropi and Dropea orders.",
+    "The queue lists incidents, waiting, and unanswered messages. New Dropi purchases that are only confirmed appear in Orders, not here.",
   "inbox.loadingQueue": "Loading the queue…",
   "inbox.loadError": "Unable to load the inbox queue.",
   "inbox.today": "Today",
@@ -649,6 +655,13 @@ export const en: TranslationDict = {
   "inbox.recovery.updatedJustNow": "Data updated a few seconds ago",
   "inbox.recovery.updatedSeconds": "Data updated a few seconds ago",
   "inbox.recovery.days7": "7 days",
+  "inbox.recovery.emptyTitle": "No recovery data in this period",
+  "inbox.recovery.emptyHint":
+    "These figures only appear from real synced orders. Connect Dropi or Dropea to start receiving webhooks.",
+  "inbox.recovery.emptyHintLinked":
+    "No synced orders in this period. New Dropi purchases appear after the webhook is saved in Dropi and an event arrives.",
+  "inbox.recovery.viewConnections": "Open connections",
+  "inbox.recovery.viewOrders": "Open orders",
   "inbox.demo.addressIncomplete": "Address incomplete",
   "inbox.demo.waitingForReply": "Waiting for reply",
   "inbox.demo.deliveryFailed": "Delivery failed",

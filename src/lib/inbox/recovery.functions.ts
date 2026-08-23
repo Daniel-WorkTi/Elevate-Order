@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   aggregateRecovery,
   emptyRecoverySnapshot,
@@ -9,11 +10,13 @@ import {
   type RecoverySnapshot,
 } from "@/lib/inbox/aggregate-recovery";
 import { profitsDateRange, PROFIT_PERIODS, type ProfitPeriod } from "@/lib/profits/profits-search";
+import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 const inputSchema = z.object({
   period: z.enum(PROFIT_PERIODS).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
+  workspaceId: z.string().optional(),
 });
 
 export type RecoveryDashboardResult = {
@@ -96,6 +99,7 @@ async function loadEvents(
 }
 
 export const queryRecoveryDashboard = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => inputSchema.parse(data ?? {}))
   .handler(async ({ data }): Promise<RecoveryDashboardResult> => {
     const period = parsePeriod(data.period ?? "7d");
@@ -107,6 +111,11 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
     const fetchedAt = new Date().toISOString();
     const fromMs = range.from ? Date.parse(range.from) : null;
     const toMs = range.to ? Date.parse(range.to) : null;
+    const workspaceId = parseWorkspaceId(data.workspaceId);
+
+    if (!workspaceId) {
+      return { snapshot: emptyRecoverySnapshot(), fetchedAt, error: null };
+    }
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -117,9 +126,20 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
         "order_id, source, total, status_name, details, last_event_at, created_at";
 
       let rows: OrderRow[] | null = null;
-      const full = await supabaseAdmin.from("orders").select(fullSelect).limit(5000);
+      const full = await supabaseAdmin
+        .from("orders")
+        .select(fullSelect)
+        .eq("workspace_id", workspaceId)
+        .limit(5000);
+      if (full.error && isMissingWorkspaceColumn(full.error.message)) {
+        return { snapshot: emptyRecoverySnapshot(), fetchedAt, error: null };
+      }
       if (full.error && /column|schema cache|does not exist/i.test(full.error.message ?? "")) {
-        const legacy = await supabaseAdmin.from("orders").select(legacySelect).limit(5000);
+        const legacy = await supabaseAdmin
+          .from("orders")
+          .select(legacySelect)
+          .eq("workspace_id", workspaceId)
+          .limit(5000);
         if (legacy.error) {
           console.error("queryRecoveryDashboard orders", legacy.error);
           return {

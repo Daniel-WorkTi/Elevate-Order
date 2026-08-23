@@ -19,14 +19,16 @@ import { getWorkspaceWebhookUrl } from "@/lib/integrations/workspace-webhook.fun
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
 
-const dropeaDashboardQuery = queryOptions({
-  queryKey: ["connections", "dropea", "dashboard"],
-  queryFn: () => getDropeaDashboard(),
-  placeholderData: keepPreviousData,
-});
+function dropeaDashboardQuery(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["connections", "dropea", "dashboard", workspaceId],
+    queryFn: () => getDropeaDashboard({ data: { workspaceId } }),
+    enabled: Boolean(workspaceId),
+    placeholderData: keepPreviousData,
+  });
+}
 
 export const Route = createFileRoute("/connections/dropea")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(dropeaDashboardQuery),
   head: () => ({
     meta: [
       { title: metaT("meta.dropeaTitle") },
@@ -38,7 +40,6 @@ export const Route = createFileRoute("/connections/dropea")({
 
 function DropeaConnectionPage() {
   const t = useT();
-  const query = useQuery(dropeaDashboardQuery);
   const {
     linked,
     apiTokenConfigured,
@@ -47,6 +48,7 @@ function DropeaConnectionPage() {
     disconnect,
   } = useDropeaConnectionPreference();
   const { workspaceId } = useWorkspaceId();
+  const query = useQuery(dropeaDashboardQuery(workspaceId));
   const data = query.data;
   const loading = query.isPending && !data;
   const credentialsConfigured = apiTokenConfigured && hmacSecretConfigured;
@@ -82,7 +84,7 @@ function DropeaConnectionPage() {
   }));
 
   return (
-    <AppShell title={t("connections.title")} subtitle="Dropea">
+    <AppShell title={t("connections.title")}>
       <div className="space-y-5">
         {loading || !summary ? (
           <div className="space-y-3">
@@ -91,16 +93,12 @@ function DropeaConnectionPage() {
           </div>
         ) : (
           <>
-            <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
-              <ConnectionHero
-                supply="dropea"
-                title="Dropea"
-                subtitle={t("connections.dropeaSubtitle")}
-                statusLabel={t(dropeaStatusLabelKey(summary.status))}
-                statusClass={dropeaStatusClass(summary.status)}
-                methodLabel={t("connections.methodApi")}
-              />
-            </section>
+            <ConnectionHero
+              supply="dropea"
+              title="Dropea"
+              statusLabel={t(dropeaStatusLabelKey(summary.status))}
+              statusClass={dropeaStatusClass(summary.status)}
+            />
 
             <DropeaSetupPanel
               linked={linked}
@@ -116,7 +114,7 @@ function DropeaConnectionPage() {
               onDisconnect={disconnect}
             />
 
-            {fullyLinked ? (
+            {fullyLinked && activity.length > 0 ? (
               <ConnectionActivity
                 items={activity}
                 emptyLabel={t("connections.emptyDropeaActivity")}

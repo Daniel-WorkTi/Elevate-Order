@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
+import { parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+
 const WORKSPACE_KEY = "elevate-workspace-id";
 
 type Listener = () => void;
@@ -10,17 +12,27 @@ function emit() {
 }
 
 function createId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const webCrypto = globalThis.crypto;
+  if (webCrypto && typeof webCrypto.randomUUID === "function") {
+    return webCrypto.randomUUID();
   }
-  return `ws_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  const bytes = new Uint8Array(16);
+  if (webCrypto && typeof webCrypto.getRandomValues === "function") {
+    webCrypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function readId(): string {
   if (typeof window === "undefined") return "";
   try {
     const existing = window.localStorage.getItem(WORKSPACE_KEY)?.trim();
-    if (existing) return existing;
+    if (existing && parseWorkspaceId(existing)) return existing;
     const next = createId();
     window.localStorage.setItem(WORKSPACE_KEY, next);
     return next;

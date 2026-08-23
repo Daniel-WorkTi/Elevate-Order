@@ -51,7 +51,14 @@ test("messaged orders enter as follow-up", () => {
   assert.equal(item?.priority, "followup");
 });
 
-test("delivered and Shopify orders stay out of the inbox queue", () => {
+test("delivered orders stay out of the inbox queue", () => {
   assert.equal(operationalOrderToInboxItem(order({ status_name: "Delivered", details: null })), null);
-  assert.equal(operationalOrderToInboxItem(order({ source: "Shopify" })), null);
+});
+
+test("confirmed Shopify orders enter the Dropi inbox as waiting", () => {
+  const item = operationalOrderToInboxItem(
+    order({ source: "Shopify", status_name: "Confirmed", details: null }),
+  );
+  assert.equal(item?.supply, "dropi");
+  assert.equal(item?.priority, "waiting");
 });

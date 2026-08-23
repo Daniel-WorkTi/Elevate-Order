@@ -43,10 +43,12 @@ function Metric({
 export function PlatformRecoveryCard({
   platform,
   connected,
+  hasData = true,
   currency,
 }: {
   platform: PlatformRecovery;
   connected: boolean;
+  hasData?: boolean;
   currency: string;
 }) {
   const { t, locale } = useI18n();
@@ -73,7 +75,11 @@ export function PlatformRecoveryCard({
                 )}
                 aria-hidden
               />
-              {connected ? t("connections.connected") : t("connections.notConnected")}
+              {connected
+                ? hasData
+                  ? t("connections.connected")
+                  : t("connections.configured")
+                : t("connections.notConnected")}
             </p>
           </div>
         </div>
@@ -84,26 +90,44 @@ export function PlatformRecoveryCard({
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5">
           <Metric
             label={t("inbox.recovery.revenue")}
-            value={compactMoney(platform.revenue, currency, locale)}
+            value={
+              hasData && connected
+                ? compactMoney(platform.revenue, currency, locale)
+                : "—"
+            }
           />
           <Metric
             label={t("inbox.recovery.atRiskShort")}
-            value={formatMoney(platform.atRisk, currency, numberLocale)}
+            value={
+              hasData && connected
+                ? formatMoney(platform.atRisk, currency, numberLocale)
+                : "—"
+            }
             valueClass="text-[#F04438]"
           />
           <Metric
             label={t("inbox.recovery.recoveredShort")}
-            value={formatMoney(platform.recovered, currency, numberLocale)}
+            value={
+              hasData && connected
+                ? formatMoney(platform.recovered, currency, numberLocale)
+                : "—"
+            }
             valueClass="text-[#12B76A]"
           />
           <Metric
             label={t("inbox.recovery.confirmedShort")}
-            value={new Intl.NumberFormat(numberLocale).format(platform.confirmed)}
+            value={
+              hasData && connected
+                ? new Intl.NumberFormat(numberLocale).format(platform.confirmed)
+                : "—"
+            }
             valueClass="text-[#2563EB]"
           />
           <Metric
             label={t("inbox.recovery.rate")}
-            value={formatRecoveryRate(platform.rate, numberLocale)}
+            value={
+              hasData && connected ? formatRecoveryRate(platform.rate, numberLocale) : "—"
+            }
           />
         </div>
       </div>

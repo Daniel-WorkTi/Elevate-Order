@@ -12,9 +12,9 @@ import { SupplyInformation } from "@/components/orders/detail/supply-information
 import { TrackingSection } from "@/components/orders/detail/tracking-section";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
-import { getDemoOrderByOrderId } from "@/lib/inbox/inbox-to-orders";
 import { formatOrderId } from "@/lib/order-domain";
 import { getSyncedOrder, listOrderEvents } from "@/lib/synced-orders.functions";
 
@@ -28,28 +28,27 @@ export const Route = createFileRoute("/orders/$id")({
 function OrderDetailPage() {
   const t = useT();
   const { id } = Route.useParams();
+  const { workspaceId } = useWorkspaceId();
   const orderId = Number(id);
   const validId = Number.isInteger(orderId) && orderId > 0;
 
   const orderQuery = useQuery({
-    queryKey: ["order", orderId],
-    enabled: validId,
-    queryFn: () => getSyncedOrder({ data: { orderId } }),
+    queryKey: ["order", orderId, workspaceId],
+    enabled: validId && Boolean(workspaceId),
+    queryFn: () => getSyncedOrder({ data: { orderId, workspaceId } }),
   });
 
   const syncedOrder = orderQuery.data?.order ?? null;
-  const demoOrder =
-    !orderQuery.isPending && !syncedOrder && validId ? getDemoOrderByOrderId(orderId) : null;
-  const order = syncedOrder ?? demoOrder;
+  const order = syncedOrder;
 
   const eventsQuery = useQuery({
-    queryKey: ["order-events", orderId],
-    enabled: validId && Boolean(syncedOrder),
-    queryFn: () => listOrderEvents({ data: { orderId } }),
+    queryKey: ["order-events", orderId, workspaceId],
+    enabled: validId && Boolean(syncedOrder) && Boolean(workspaceId),
+    queryFn: () => listOrderEvents({ data: { orderId, workspaceId } }),
   });
 
   const loadError =
-    !validId || demoOrder
+    !validId
       ? null
       : (orderQuery.data?.error ??
         (orderQuery.isError ? t("orders.detail.loadError") : null));

@@ -27,9 +27,10 @@ function translateDemoPrefixed(
   value: string,
   t: (key: string, params?: Record<string, string | number | null | undefined>) => string,
 ) {
-  const [head, ...tail] = value.split(" · ");
+  const parts = value.split(" · ");
+  const head = parts[0] ?? "";
   if (head.startsWith("inbox.demo.")) {
-    return [t(head), ...tail].join(" · ");
+    return [t(head), ...parts.slice(1)].join(" · ");
   }
   return value;
 }

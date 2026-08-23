@@ -12,6 +12,7 @@ import { persistShopifyNormalizedOrders } from "@/lib/integrations/shopify/persi
 
 const shopInput = z.object({
   shop: z.string().min(3).max(120),
+  workspaceId: z.string().uuid().optional(),
 });
 
 const WEBHOOK_TOPICS = [
@@ -109,7 +110,15 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
     });
 
     const { setCookie } = await import("@tanstack/react-start/server");
-    setCookie(oauth.SHOPIFY_OAUTH_STATE_COOKIE, oauth.encodeOauthCookie({ state, shop, userId }), {
+    setCookie(
+      oauth.SHOPIFY_OAUTH_STATE_COOKIE,
+      oauth.encodeOauthCookie({
+        state,
+        shop,
+        userId,
+        ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
+      }),
+      {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
@@ -165,6 +174,7 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
         scope: token.scope,
         installed_at: new Date().toISOString(),
         uninstalled_at: null,
+        ...(cookie.workspaceId ? { workspace_id: cookie.workspaceId } : {}),
       },
       { onConflict: "user_id,shop_domain" },
     );
@@ -175,6 +185,13 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     }
 
     await registerShopifyWebhooks(shop, token.accessToken);
+    if (cookie.workspaceId) {
+      try {
+        await pullAndPersistShopifyOrders(shop, token.accessToken, 50, cookie.workspaceId);
+      } catch (error) {
+        console.error("[shopify] initial sync after install failed", error);
+      }
+    }
 
     setCookie(oauth.SHOPIFY_OAUTH_STATE_COOKIE, "", { path: "/", maxAge: 0 });
     return { ok: true, shop };
@@ -196,8 +213,11 @@ export const disconnectShopifyStore = createServerFn({ method: "POST" })
 
 export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .validator((data: unknown) =>
+    z.object({ workspaceId: z.string().uuid().optional() }).parse(data ?? {}),
+  )
   .handler(
-    async (): Promise<{
+    async ({ data }): Promise<{
       ok: boolean;
       imported: number;
       enriched: number;
@@ -208,7 +228,7 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: store, error } = await supabaseAdmin
           .from("shopify_stores")
-          .select("shop_domain, access_token")
+          .select("shop_domain, access_token, workspace_id")
           .eq("user_id", userId)
           .is("uninstalled_at", null)
           .order("installed_at", { ascending: false })
@@ -219,7 +239,21 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
           return { ok: false, imported: 0, enriched: 0, error: "No Shopify store connected." };
         }
 
-        const result = await pullAndPersistShopifyOrders(store.shop_domain, store.access_token, 50);
+        const workspaceId = data.workspaceId ?? store.workspace_id;
+        if (data.workspaceId) {
+          await supabaseAdmin
+            .from("shopify_stores")
+            .update({ workspace_id: data.workspaceId })
+            .eq("user_id", userId)
+            .eq("shop_domain", store.shop_domain);
+        }
+
+        const result = await pullAndPersistShopifyOrders(
+          store.shop_domain,
+          store.access_token,
+          50,
+          workspaceId,
+        );
         await supabaseAdmin
           .from("shopify_stores")
           .update({ last_sync_at: new Date().toISOString() })
@@ -248,6 +282,7 @@ export async function pullAndPersistShopifyOrders(
   shop: string,
   accessToken: string,
   limit: number,
+  workspaceId?: string | null,
 ) {
   const host = normalizeShopifyDomain(shop);
   if (!host) throw new Error("Invalid Shopify domain");
@@ -277,7 +312,7 @@ export async function pullAndPersistShopifyOrders(
   const normalized = rawOrders
     .map((row) => normalizeShopifyRestOrder(row as never))
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
-  return persistShopifyNormalizedOrders(normalized);
+  return persistShopifyNormalizedOrders(normalized, workspaceId);
 }
 
 async function registerShopifyWebhooks(shop: string, accessToken: string) {
@@ -318,16 +353,29 @@ export async function markShopifyShopUninstalled(shopDomain: string) {
     .is("uninstalled_at", null);
 }
 
-export async function findShopifyTokenForShop(shopDomain: string): Promise<string | null> {
+export async function findShopifyStoreForShop(shopDomain: string): Promise<{
+  accessToken: string;
+  workspaceId: string | null;
+} | null> {
   const shop = normalizeShopifyDomain(shopDomain);
   if (!shop) return null;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
     .from("shopify_stores")
-    .select("access_token")
+    .select("access_token, workspace_id")
     .eq("shop_domain", shop)
     .is("uninstalled_at", null)
     .limit(1)
     .maybeSingle();
-  return data?.access_token?.trim() || null;
+  const accessToken = data?.access_token?.trim() || "";
+  if (!accessToken) return null;
+  return {
+    accessToken,
+    workspaceId: typeof data?.workspace_id === "string" ? data.workspace_id : null,
+  };
+}
+
+export async function findShopifyTokenForShop(shopDomain: string): Promise<string | null> {
+  const store = await findShopifyStoreForShop(shopDomain);
+  return store?.accessToken ?? null;
 }

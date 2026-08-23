@@ -5,12 +5,15 @@ import { useT } from "@/lib/i18n/locale-context";
 
 type ShopifyStartSearch = {
   shop?: string;
+  workspaceId?: string;
 };
 
 export const Route = createFileRoute("/auth/shopify")({
   validateSearch: (search: Record<string, unknown>): ShopifyStartSearch => {
-    if (typeof search["shop"] === "string") return { shop: search["shop"] };
-    return {};
+    const result: ShopifyStartSearch = {};
+    if (typeof search["shop"] === "string") result.shop = search["shop"];
+    if (typeof search["workspaceId"] === "string") result.workspaceId = search["workspaceId"];
+    return result;
   },
   beforeLoad: async ({ search }) => {
     if (!search.shop) {
@@ -18,7 +21,12 @@ export const Route = createFileRoute("/auth/shopify")({
     }
     let url: string;
     try {
-      ({ url } = await startShopifyInstall({ data: { shop: search.shop } }));
+      ({ url } = await startShopifyInstall({
+        data: {
+          shop: search.shop,
+          ...(search.workspaceId ? { workspaceId: search.workspaceId } : {}),
+        },
+      }));
     } catch {
       throw redirect({
         to: "/connections/shopify",

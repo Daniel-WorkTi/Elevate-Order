@@ -12,6 +12,7 @@ import {
   buildWebhookRelativeUrl,
   webhookAuthConfigured,
 } from "@/lib/integrations/webhook-auth";
+import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 function envPresent(name: string) {
   const value = process.env[name]?.trim();
@@ -81,11 +82,16 @@ function deriveStatus(input: {
 
 export const getDropiDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => {
+    const raw = (data ?? {}) as Record<string, unknown>;
+    return { workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "" };
+  })
   .handler(
-  async (): Promise<DropiDashboardResult> => {
+  async ({ data }): Promise<DropiDashboardResult> => {
     const authConfigured = webhookAuthConfigured();
     const serverConfigured = envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
     const webhookRelativeUrl = buildWebhookRelativeUrl();
+    const workspaceId = parseWorkspaceId(data.workspaceId);
 
     const emptySummary = {
       status: deriveStatus({
@@ -120,6 +126,15 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
       };
     }
 
+    if (!workspaceId) {
+      return {
+        summary: emptySummary,
+        fields: [...DROPI_WEBHOOK_FIELDS],
+        recentEvents: [],
+        error: null,
+      };
+    }
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const todayIso = startOfDay(new Date()).toISOString();
@@ -128,6 +143,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
         supabaseAdmin
           .from("orders")
           .select("order_id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropi%")
           .not("source", "ilike", "%dropea%"),
         supabaseAdmin
@@ -135,6 +151,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
           .select(
             "id, order_id, event_date, status_name, details, tracking_code, tracking_url, shipping_company, total, source, raw, created_at",
           )
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropi%")
           .not("source", "ilike", "%dropea%")
           .order("event_date", { ascending: false })
@@ -142,10 +159,24 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
         supabaseAdmin
           .from("order_events")
           .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropi%")
           .not("source", "ilike", "%dropea%")
           .gte("event_date", todayIso),
       ]);
+
+      if (
+        isMissingWorkspaceColumn(ordersCountRes.error?.message) ||
+        isMissingWorkspaceColumn(eventsRes.error?.message) ||
+        isMissingWorkspaceColumn(todayCountRes.error?.message)
+      ) {
+        return {
+          summary: emptySummary,
+          fields: [...DROPI_WEBHOOK_FIELDS],
+          recentEvents: [],
+          error: null,
+        };
+      }
 
       if (ordersCountRes.error || eventsRes.error || todayCountRes.error) {
         console.error("getDropiDashboard query failed", {

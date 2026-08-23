@@ -102,6 +102,9 @@ export function OrdersToolbar({
       : t(DATE_PRESET_I18N_KEY[search.date])
     : t("common.date");
 
+  const statuses = facets.statuses ?? [];
+  const shippingCompanies = facets.shippingCompanies ?? [];
+  const countries = facets.countries ?? [];
   const moreCount = Number(Boolean(search.shipping)) + Number(Boolean(search.tracking));
 
   return (
@@ -137,12 +140,12 @@ export function OrdersToolbar({
               {t("orders.allStatuses")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {facets.statuses.length === 0 ? (
+            {statuses.length === 0 ? (
               <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
                 {t("orders.noStatusesYet")}
               </p>
             ) : (
-              facets.statuses.map((status) => (
+              statuses.map((status) => (
                 <DropdownMenuItem key={status} onClick={() => patch({ status })}>
                   {search.status === status ? <Check className="size-3.5" /> : null}
                   {status}
@@ -152,7 +155,7 @@ export function OrdersToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {facets.countries.length > 0 ? (
+        {countries.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <FilterButton
@@ -169,7 +172,7 @@ export function OrdersToolbar({
                 {t("orders.allCountries")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {facets.countries.map((country) => (
+              {countries.map((country) => (
                 <DropdownMenuItem key={country} onClick={() => patch({ country })}>
                   {search.country === country ? <Check className="size-3.5" /> : null}
                   {country}
@@ -278,7 +281,7 @@ export function OrdersToolbar({
             <DropdownMenuItem onClick={() => patch({}, ["shipping"])}>
               {t("common.any")}
             </DropdownMenuItem>
-            {facets.shippingCompanies.map((company) => (
+            {shippingCompanies.map((company) => (
               <DropdownMenuItem key={company} onClick={() => patch({ shipping: company })}>
                 {search.shipping === company ? <Check className="size-3.5" /> : null}
                 {company}

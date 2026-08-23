@@ -7,8 +7,18 @@ export type ResolvedWebhookAuth = {
 };
 
 /** Auth for public order webhooks: per-workspace token, global env token, or legacy apikey. */
+function webhookTokenFromRequest(request: Request): string {
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get("token")?.trim() ?? "";
+  if (queryToken) return queryToken;
+  const match = url.pathname.match(/\/webhooks\/orders\/([^/]+)\/?$/i);
+  const pathToken = match?.[1] ? decodeURIComponent(match[1]).trim() : "";
+  if (pathToken && pathToken !== "orders") return pathToken;
+  return "";
+}
+
 export async function resolvePublicWebhookAuth(request: Request): Promise<ResolvedWebhookAuth> {
-  const queryToken = new URL(request.url).searchParams.get("token")?.trim() ?? "";
+  const queryToken = webhookTokenFromRequest(request);
 
   if (queryToken) {
     try {

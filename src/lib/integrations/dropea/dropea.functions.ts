@@ -8,6 +8,7 @@ import {
   type DropeaDashboardResult,
 } from "@/lib/integrations/dropea/dropea-types";
 import { buildWebhookRelativeUrl } from "@/lib/integrations/webhook-auth";
+import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 function envPresent(name: string) {
   return Boolean(process.env[name]?.trim());
@@ -26,11 +27,16 @@ function deriveInfraStatus(input: {
 
 export const getDropeaDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => {
+    const raw = (data ?? {}) as Record<string, unknown>;
+    return { workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "" };
+  })
   .handler(
-  async (): Promise<DropeaDashboardResult> => {
+    async ({ data }): Promise<DropeaDashboardResult> => {
     const serverConfigured =
       envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
     const webhookRelativeUrl = buildWebhookRelativeUrl();
+    const workspaceId = parseWorkspaceId(data.workspaceId);
 
     const empty = {
       status: deriveInfraStatus({
@@ -58,6 +64,10 @@ export const getDropeaDashboard = createServerFn({ method: "GET" })
       };
     }
 
+    if (!workspaceId) {
+      return { summary: empty, recentEvents: [], error: null };
+    }
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const todayIso = startOfDay(new Date()).toISOString();
@@ -66,25 +76,37 @@ export const getDropeaDashboard = createServerFn({ method: "GET" })
         supabaseAdmin
           .from("orders")
           .select("order_id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropea%"),
         supabaseAdmin
           .from("orders")
           .select("last_event_at, source")
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropea%")
           .order("last_event_at", { ascending: false })
           .limit(1),
         supabaseAdmin
           .from("order_events")
           .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropea%")
           .gte("event_date", todayIso),
         supabaseAdmin
           .from("order_events")
           .select("id, order_id, event_date, status_name, details")
+          .eq("workspace_id", workspaceId)
           .ilike("source", "%dropea%")
           .order("event_date", { ascending: false })
           .limit(8),
       ]);
+
+      if (
+        isMissingWorkspaceColumn(ordersCountRes.error?.message) ||
+        isMissingWorkspaceColumn(latestRes.error?.message) ||
+        isMissingWorkspaceColumn(todayCountRes.error?.message)
+      ) {
+        return { summary: empty, recentEvents: [], error: null };
+      }
 
       if (ordersCountRes.error || latestRes.error || todayCountRes.error) {
         console.error("getDropeaDashboard failed", {

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
 import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { queryInboxQueue } from "@/lib/inbox/inbox.functions";
 import { queryRecoveryDashboard } from "@/lib/inbox/recovery.functions";
 import { sortInboxItems } from "@/lib/inbox/inbox-types";
@@ -52,17 +53,20 @@ export function InboxPageContent() {
   const [filters, setFilters] = useState<InboxFilters>(DEFAULT_FILTERS);
   const dropi = useDropiConnectionPreference();
   const dropea = useDropeaConnectionPreference();
+  const { workspaceId } = useWorkspaceId();
 
   const recoveryInput = useMemo(() => recoveryQueryInput(filters), [filters]);
   const recoveryQuery = useQuery({
-    queryKey: ["inbox", "recovery", recoveryInput],
-    queryFn: () => queryRecoveryDashboard({ data: recoveryInput }),
+    queryKey: ["inbox", "recovery", recoveryInput, workspaceId],
+    queryFn: () => queryRecoveryDashboard({ data: { ...recoveryInput, workspaceId } }),
+    enabled: Boolean(workspaceId),
     placeholderData: keepPreviousData,
   });
 
   const queueQuery = useQuery({
-    queryKey: ["inbox", "queue"],
-    queryFn: () => queryInboxQueue(),
+    queryKey: ["inbox", "queue", workspaceId],
+    queryFn: () => queryInboxQueue({ data: { workspaceId } }),
+    enabled: Boolean(workspaceId),
     placeholderData: keepPreviousData,
   });
 

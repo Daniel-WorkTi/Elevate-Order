@@ -24,6 +24,7 @@ export type Database = {
           shop_domain: string
           uninstalled_at: string | null
           user_id: string
+          workspace_id: string | null
         }
         Insert: {
           access_token: string
@@ -34,6 +35,7 @@ export type Database = {
           shop_domain: string
           uninstalled_at?: string | null
           user_id: string
+          workspace_id?: string | null
         }
         Update: {
           access_token?: string
@@ -44,6 +46,7 @@ export type Database = {
           shop_domain?: string
           uninstalled_at?: string | null
           user_id?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }

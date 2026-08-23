@@ -4,7 +4,7 @@ import type { Supply } from "@/lib/order-domain";
 import { SUPPLY_LABEL } from "@/lib/order-domain";
 import { cn } from "@/lib/utils";
 
-const SUPPLIES: Supply[] = ["dropi", "dropea", "shopify"];
+const SUPPLIES: Supply[] = ["dropi", "dropea"];
 
 export function SupplyTabs({
   value,

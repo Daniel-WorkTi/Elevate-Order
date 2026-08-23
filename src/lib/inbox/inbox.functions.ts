@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { operationalOrderToInboxItem } from "@/lib/inbox/order-to-inbox";
 import type { InboxItem } from "@/lib/inbox/inbox-types";
 import { getOrderSupply, type OperationalOrder } from "@/lib/order-domain";
+import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 export type InboxQueueResult = {
   dropi: InboxItem[];
@@ -48,22 +49,35 @@ function toOrder(row: Record<string, unknown>): OperationalOrder {
 
 export const queryInboxQueue = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<InboxQueueResult> => {
+  .validator((data: unknown) => {
+    const raw = (data ?? {}) as Record<string, unknown>;
+    return { workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "" };
+  })
+  .handler(async ({ data }): Promise<InboxQueueResult> => {
+    const workspaceId = parseWorkspaceId(data.workspaceId);
+    if (!workspaceId) return { dropi: [], dropea: [], error: null };
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const full = await supabaseAdmin
         .from("orders")
         .select(COLUMNS_FULL)
+        .eq("workspace_id", workspaceId)
         .order("last_event_at", { ascending: false, nullsFirst: false })
         .limit(800);
 
       let rows = full.data as Record<string, unknown>[] | null;
       let error = full.error;
 
+      if (error && isMissingWorkspaceColumn(error.message)) {
+        return { dropi: [], dropea: [], error: null };
+      }
+
       if (error && /column|schema cache|does not exist/i.test(error.message ?? "")) {
         const legacy = await supabaseAdmin
           .from("orders")
           .select(COLUMNS_LEGACY)
+          .eq("workspace_id", workspaceId)
           .order("last_event_at", { ascending: false, nullsFirst: false })
           .limit(800);
         rows = legacy.data as Record<string, unknown>[] | null;
@@ -82,8 +96,8 @@ export const queryInboxQueue = createServerFn({ method: "GET" })
         const item = operationalOrderToInboxItem(order);
         if (!item) continue;
         const supply = getOrderSupply(order);
-        if (supply === "dropi") dropi.push(item);
-        else if (supply === "dropea") dropea.push(item);
+        if (supply === "dropea") dropea.push(item);
+        else if (supply === "dropi" || supply === "shopify") dropi.push(item);
       }
 
       return { dropi, dropea, error: null };

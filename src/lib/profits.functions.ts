@@ -11,6 +11,7 @@ import {
   type ProfitPeriod,
   type ProfitsSupplyFilter,
 } from "@/lib/profits/profits-search";
+import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 type OrdersRow = {
   id: string;
@@ -85,12 +86,16 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
       period: ProfitPeriod;
       from?: string;
       to?: string;
+      workspaceId?: string;
     } = {
       supply: parseSupplyFilter(raw["supply"]),
       period: parsePeriod(raw["period"]),
     };
     if (typeof raw["from"] === "string" && raw["from"].trim()) parsed.from = raw["from"].trim();
     if (typeof raw["to"] === "string" && raw["to"].trim()) parsed.to = raw["to"].trim();
+    if (typeof raw["workspaceId"] === "string" && raw["workspaceId"].trim()) {
+      parsed.workspaceId = raw["workspaceId"].trim();
+    }
     return parsed;
   })
   .handler(async ({ data }): Promise<ProfitsQueryResult> => {
@@ -99,6 +104,10 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
       from: data.from,
       to: data.to,
     });
+    const workspaceId = parseWorkspaceId(data.workspaceId);
+    if (!workspaceId) {
+      return emptyResult(data.supply, data.period, data.from, data.to, "");
+    }
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -106,8 +115,13 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
       const { data: rows, error } = await supabaseAdmin
         .from("orders")
         .select("id, order_id, total, source, status_name, last_event_at, created_at")
+        .eq("workspace_id", workspaceId)
         .order("last_event_at", { ascending: false })
         .limit(5000);
+
+      if (error && isMissingWorkspaceColumn(error.message)) {
+        return emptyResult(data.supply, data.period, data.from, data.to, "");
+      }
 
       if (error) {
         console.error("queryProfitsOrders supabase error", error);

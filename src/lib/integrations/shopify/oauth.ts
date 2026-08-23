@@ -135,6 +135,7 @@ export type ShopifyOauthCookie = {
   state: string;
   shop: string;
   userId: string;
+  workspaceId?: string;
 };
 
 export function encodeOauthCookie(value: ShopifyOauthCookie): string {
@@ -150,7 +151,12 @@ export function decodeOauthCookie(raw: string | undefined): ShopifyOauthCookie |
       typeof parsed.shop === "string" &&
       typeof parsed.userId === "string"
     ) {
-      return { state: parsed.state, shop: parsed.shop, userId: parsed.userId };
+      return {
+        state: parsed.state,
+        shop: parsed.shop,
+        userId: parsed.userId,
+        ...(typeof parsed.workspaceId === "string" ? { workspaceId: parsed.workspaceId } : {}),
+      };
     }
     return null;
   } catch {

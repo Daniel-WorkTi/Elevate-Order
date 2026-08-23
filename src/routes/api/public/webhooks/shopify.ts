@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import {
-  findShopifyTokenForShop,
+  findShopifyStoreForShop,
   markShopifyShopUninstalled,
 } from "@/lib/integrations/shopify/oauth.functions";
 import { getShopifyAppConfig, verifyShopifyWebhookHmac } from "@/lib/integrations/shopify/oauth";
@@ -45,8 +45,8 @@ export const Route = createFileRoute("/api/public/webhooks/shopify")({
           return json({ ok: true, ignored: topic });
         }
 
-        const token = await findShopifyTokenForShop(shop);
-        if (!token) {
+        const store = await findShopifyStoreForShop(shop);
+        if (!store) {
           console.error("[shopify] webhook for unknown shop");
           return json({ error: "Unknown shop" }, 404);
         }
@@ -63,7 +63,7 @@ export const Route = createFileRoute("/api/public/webhooks/shopify")({
           return json({ error: "Unrecognized order payload" }, 422);
         }
 
-        await persistShopifyNormalizedOrders([normalized]);
+        await persistShopifyNormalizedOrders([normalized], store.workspaceId);
         return json({ ok: true, imported: 1 });
       },
     },

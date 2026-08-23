@@ -53,7 +53,7 @@ export function dateRangeFromSearch(search: Pick<OrdersSearch, "date" | "from" |
 export function searchToQuery(search: OrdersSearch): OrdersQueryInput {
   const range = dateRangeFromSearch(search);
   const query: OrdersQueryInput = {
-    supply: search.supply,
+    supply: search.supply === "shopify" ? "dropi" : search.supply,
     page: search.page,
     pageSize: search.pageSize,
     sort: search.sort,

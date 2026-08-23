@@ -1,5 +1,6 @@
 import { SHOPIFY_SOURCE, type ShopifyNormalizedOrder } from "@/lib/integrations/shopify/shopify-normalize";
 import { coalesceStatic } from "@/lib/integrations/dropi/dropi-webhook-normalize";
+import { parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 export type ShopifyPersistResult = {
   imported: number;
@@ -7,10 +8,15 @@ export type ShopifyPersistResult = {
   warning: string | null;
 };
 
-function toOrderRow(order: ShopifyNormalizedOrder, nowIso: string) {
+function toOrderRow(
+  order: ShopifyNormalizedOrder,
+  nowIso: string,
+  workspaceId: string | null,
+) {
   return {
     order_id: order.order_id,
     shopify_order_id: order.shopify_order_id,
+    ...(workspaceId ? { workspace_id: workspaceId } : {}),
     status_id: null,
     status_name: order.status_name,
     details: order.details,
@@ -36,6 +42,7 @@ function toOrderRow(order: ShopifyNormalizedOrder, nowIso: string) {
 
 export async function persistShopifyNormalizedOrders(
   normalized: ShopifyNormalizedOrder[],
+  workspaceId?: string | null,
 ): Promise<ShopifyPersistResult> {
   if (normalized.length === 0) {
     return { imported: 0, enriched: 0, warning: null };
@@ -43,47 +50,69 @@ export async function persistShopifyNormalizedOrders(
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const nowIso = new Date().toISOString();
-  const orderRows = normalized.map((order) => toOrderRow(order, nowIso));
+  const scopedWorkspaceId = parseWorkspaceId(workspaceId ?? "") ?? null;
+  const shopifyIds = normalized.map((order) => order.shopify_order_id);
 
-  const { error: upsertError } = await supabaseAdmin
+  const { data: existingRows } = await supabaseAdmin
     .from("orders")
-    .upsert(orderRows, { onConflict: "order_id" });
+    .select("order_id, shopify_order_id, source")
+    .in("shopify_order_id", shopifyIds);
 
-  if (upsertError) {
-    if (/product_summary|customer_name|snapshot|column/i.test(upsertError.message ?? "")) {
-      const logistics = orderRows.map(
-        ({
-          customer_name: _c,
-          phone: _p,
-          email: _e,
-          city: _city,
-          postal_code: _pc,
-          address: _a,
-          country: _co,
-          product_summary: _pr,
-          currency: _cu,
-          snapshot: _s,
-          ...rest
-        }) => rest,
-      );
-      const { error: fallbackError } = await supabaseAdmin
-        .from("orders")
-        .upsert(logistics, { onConflict: "order_id" });
-      if (fallbackError) {
-        console.error("Shopify upsert failed", fallbackError);
-        throw new Error("Failed to store Shopify orders.");
+  const supplyShopifyIds = new Set(
+    (existingRows ?? [])
+      .filter((row) => !String(row.source ?? "").toLowerCase().includes("shopify"))
+      .map((row) => Number(row.shopify_order_id)),
+  );
+
+  const fresh = normalized.filter((order) => !supplyShopifyIds.has(order.shopify_order_id));
+  const orderRows = fresh.map((order) => toOrderRow(order, nowIso, scopedWorkspaceId));
+
+  if (orderRows.length > 0) {
+    const { error: upsertError } = await supabaseAdmin
+      .from("orders")
+      .upsert(orderRows, { onConflict: "order_id" });
+
+    if (upsertError) {
+      if (/workspace_id/i.test(upsertError.message ?? "")) {
+        console.error("Shopify upsert failed", upsertError);
+        throw new Error(
+          "workspace_id column missing — run migration 20260823180000_shopify_stores_workspace.sql",
+        );
       }
-      return {
-        imported: logistics.length,
-        enriched: 0,
-        warning: "Static columns missing — run migration 20260813220000_orders_static_fields",
-      };
+      if (/product_summary|customer_name|snapshot|column/i.test(upsertError.message ?? "")) {
+        const logistics = orderRows.map(
+          ({
+            customer_name: _c,
+            phone: _p,
+            email: _e,
+            city: _city,
+            postal_code: _pc,
+            address: _a,
+            country: _co,
+            product_summary: _pr,
+            currency: _cu,
+            snapshot: _s,
+            ...rest
+          }) => rest,
+        );
+        const { error: fallbackError } = await supabaseAdmin
+          .from("orders")
+          .upsert(logistics, { onConflict: "order_id" });
+        if (fallbackError) {
+          console.error("Shopify upsert failed", fallbackError);
+          throw new Error("Failed to store Shopify orders.");
+        }
+        return {
+          imported: logistics.length,
+          enriched: 0,
+          warning: "Static columns missing — run migration 20260813220000_orders_static_fields",
+        };
+      }
+      console.error("Shopify upsert failed", upsertError);
+      throw new Error("Failed to store Shopify orders.");
     }
-    console.error("Shopify upsert failed", upsertError);
-    throw new Error("Failed to store Shopify orders.");
   }
 
-  const shopifyIds = normalized.map((order) => order.shopify_order_id);
   const { data: linkedRows } = await supabaseAdmin
     .from("orders")
     .select(
@@ -108,10 +137,19 @@ export async function persistShopifyNormalizedOrders(
         country: coalesceStatic(match.country, row.country),
         product_summary: coalesceStatic(match.product_summary, row.product_summary),
         currency: coalesceStatic(match.currency, row.currency),
+        ...(scopedWorkspaceId ? { workspace_id: scopedWorkspaceId } : {}),
         updated_at: nowIso,
       })
       .eq("order_id", row.order_id);
     if (!error) enriched += 1;
+  }
+
+  if (scopedWorkspaceId) {
+    await supabaseAdmin
+      .from("orders")
+      .update({ workspace_id: scopedWorkspaceId, updated_at: nowIso })
+      .in("shopify_order_id", shopifyIds)
+      .is("workspace_id", null);
   }
 
   const eventRows = normalized.map((order) => ({
@@ -126,6 +164,7 @@ export async function persistShopifyNormalizedOrders(
     shipping_company: order.shipping_company,
     total: order.total,
     source: SHOPIFY_SOURCE,
+    ...(scopedWorkspaceId ? { workspace_id: scopedWorkspaceId } : {}),
     raw: order.snapshot as import("@/integrations/supabase/types").Json,
   }));
 

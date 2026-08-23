@@ -9,7 +9,6 @@ import {
 import { formatDayMonth } from "@/lib/i18n/date-locale";
 
 import {
-  getOrderCurrency,
   getOrderStatus,
   getOrderSupply,
   type OrderStatusKey,
@@ -67,6 +66,8 @@ export type RecoverySnapshot = {
   atRisk: number;
   recovered: number;
   confirmed: number;
+  /** Classified Dropi/Dropea orders in the selected period. 0 = no real data. */
+  orderCount: number;
   platforms: Record<RecoverySupply, PlatformRecovery>;
   chart: RecoveryChartPoint[];
   recent: RecoveredOrderRow[];
@@ -104,6 +105,7 @@ export function emptyRecoverySnapshot(chartDays = 7): RecoverySnapshot {
     atRisk: 0,
     recovered: 0,
     confirmed: 0,
+    orderCount: 0,
     platforms: {
       dropi: emptyPlatform("dropi"),
       dropea: emptyPlatform("dropea"),
@@ -150,7 +152,7 @@ function classify(order: RecoveryOrderInput): Classified | null {
   return {
     supply,
     total,
-    currency: getOrderCurrency({ currency: order.currency }),
+    currency: order.currency?.trim() || "",
     atRisk: current.key === "incident",
     recovered,
     enteredWorkflow,
@@ -278,6 +280,7 @@ export function aggregateRecovery(
     atRisk,
     recovered,
     confirmed,
+    orderCount: classified.length,
     platforms,
     chart: fillChartDays(
       [...chartMap.values()],

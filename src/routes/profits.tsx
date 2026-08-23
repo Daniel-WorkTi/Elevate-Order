@@ -13,6 +13,7 @@ import { SupplyBreakdown } from "@/components/profits/supply-breakdown";
 import { Button } from "@/components/ui/button";
 import { useCurrencyPreference } from "@/hooks/use-currency-preference";
 import { useProfitExchangeRates } from "@/hooks/use-profit-exchange-rates";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { formatRelativeTimestamp } from "@/lib/format-relative-time";
 import { queryProfitsOrders } from "@/lib/profits.functions";
 import {
@@ -39,18 +40,22 @@ function ProfitsPage() {
   const { locale, t } = useI18n();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/profits" });
+  const { workspaceId } = useWorkspaceId();
 
   const query = useQuery({
-    queryKey: ["profits", search.supply, search.period, search.from, search.to],
+    queryKey: ["profits", search.supply, search.period, search.from, search.to, workspaceId],
+    enabled: Boolean(workspaceId),
     queryFn: () => {
       const payload: {
         supply: typeof search.supply;
         period: typeof search.period;
         from?: string;
         to?: string;
+        workspaceId: string;
       } = {
         supply: search.supply,
         period: search.period,
+        workspaceId,
       };
       if (search.from) payload.from = search.from;
       if (search.to) payload.to = search.to;

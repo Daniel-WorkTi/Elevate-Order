@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import type { DropeaConnectCredentials } from "@/hooks/use-dropea-connection-preference";
 import { useT } from "@/lib/i18n/locale-context";
 
-/** Minimal Dropea setup: credentials + unique webhook URL. */
+/** Minimal Dropea setup: credentials + webhook URL. */
 export function DropeaSetupPanel({
   linked,
   apiTokenConfigured,
@@ -50,64 +50,50 @@ export function DropeaSetupPanel({
   }
 
   const webhookBlock = (
-    <div className="space-y-1.5">
-      <p className="text-[12px] font-medium text-[#667085]">{t("connections.yourWebhookUrl")}</p>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Input
-          readOnly
-          value={loadingUrl ? t("connections.generatingWebhookUrl") : webhookUrl}
-          onFocus={(event) => event.currentTarget.select()}
-          className="h-10 flex-1 rounded-[10px] border-[#E6E8EC] bg-[#F7F8FA] font-mono text-[12px] shadow-none"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!webhookUrl || Boolean(loadingUrl)}
-          onClick={() => void copyWebhook()}
-          className="h-10 shrink-0 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
-        >
-          {copied ? (
-            <Check className="size-3.5 text-emerald-600" strokeWidth={1.75} />
-          ) : (
-            <Copy className="size-3.5" strokeWidth={1.75} />
-          )}
-          {copied ? t("connections.copied") : t("connections.copy")}
-        </Button>
-      </div>
-      {urlError ? <p className="text-[12px] font-medium text-red-600">{urlError}</p> : null}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Input
+        readOnly
+        value={loadingUrl ? t("connections.generatingWebhookUrl") : webhookUrl}
+        onFocus={(event) => event.currentTarget.select()}
+        className="h-10 flex-1 rounded-[10px] border-[#E6E8EC] bg-[#F7F8FA] font-mono text-[12px] shadow-none"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        disabled={!webhookUrl || Boolean(loadingUrl)}
+        onClick={() => void copyWebhook()}
+        className="h-10 shrink-0 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
+      >
+        {copied ? (
+          <Check className="size-3.5 text-emerald-600" strokeWidth={1.75} />
+        ) : (
+          <Copy className="size-3.5" strokeWidth={1.75} />
+        )}
+        {copied ? t("connections.copied") : t("connections.copy")}
+      </Button>
     </div>
   );
 
   if (fullyLinked) {
     return (
-      <section className="space-y-4 rounded-[16px] border border-[#E6E8EC] bg-white p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-[15px] font-semibold text-[#0A0C10]">{t("connections.dropeaConnected")}</h2>
-            <p className="mt-1 text-[13px] text-[#667085]">{t("connections.credentialsSaved")}</p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onDisconnect}
-            className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
-          >
-            <Unplug className="size-3.5" strokeWidth={1.75} />
-            {t("connections.disconnect")}
-          </Button>
-        </div>
+      <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
         {webhookBlock}
+        {urlError ? <p className="text-[12px] font-medium text-red-600">{urlError}</p> : null}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onDisconnect}
+          className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
+        >
+          <Unplug className="size-3.5" strokeWidth={1.75} />
+          {t("connections.disconnect")}
+        </Button>
       </section>
     );
   }
 
   return (
-    <section className="space-y-4 rounded-[16px] border border-[#E6E8EC] bg-white p-5">
-      <div>
-        <h2 className="text-[15px] font-semibold text-[#0A0C10]">{t("connections.connectDropea")}</h2>
-        <p className="mt-1 text-[13px] text-[#667085]">{t("connections.connectDropeaHint")}</p>
-      </div>
-
+    <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
       <SecretField
         id="dropea-api-token"
         label={t("connections.apiToken")}
@@ -135,6 +121,7 @@ export function DropeaSetupPanel({
       />
 
       {webhookBlock}
+      {urlError ? <p className="text-[12px] font-medium text-red-600">{urlError}</p> : null}
 
       <Button
         type="button"

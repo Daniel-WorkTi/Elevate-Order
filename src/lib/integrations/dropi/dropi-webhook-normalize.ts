@@ -53,6 +53,47 @@ export const dropiWebhookPayloadSchema = z.union([
 
 export type DropiWebhookEvent = z.infer<typeof dropiWebhookEventSchema>;
 
+const WRAPPER_KEYS = ["data", "payload", "result", "order", "pedido", "notification", "body"] as const;
+
+function unwrapDropiWebhookBody(raw: unknown): unknown {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object") return raw;
+  const record = raw as Record<string, unknown>;
+  for (const key of WRAPPER_KEYS) {
+    const nested = record[key];
+    if (nested && typeof nested === "object") return nested;
+  }
+  return raw;
+}
+
+function coerceDropiWebhookEvent(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const record = raw as Record<string, unknown>;
+  const orderId =
+    record["order_id"] ??
+    record["orderId"] ??
+    record["id_pedido"] ??
+    record["pedido_id"] ??
+    record["id"];
+  const eventDate =
+    record["event_date"] ??
+    record["eventDate"] ??
+    record["fecha"] ??
+    record["date"] ??
+    record["created_at"] ??
+    record["updated_at"] ??
+    record["timestamp"] ??
+    new Date().toISOString();
+  return { ...record, order_id: orderId, event_date: eventDate };
+}
+
+/** Unwrap Dropi wrappers and fill official field names before schema parse. */
+export function prepareDropiWebhookBody(raw: unknown): unknown {
+  const unwrapped = unwrapDropiWebhookBody(raw);
+  if (Array.isArray(unwrapped)) return unwrapped.map(coerceDropiWebhookEvent);
+  return coerceDropiWebhookEvent(unwrapped);
+}
+
 function asTrimmedString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();

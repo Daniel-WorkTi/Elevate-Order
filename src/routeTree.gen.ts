@@ -33,6 +33,7 @@ import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as AuthShopifyCallbackRouteImport } from './routes/auth.shopify.callback'
 import { Route as ApiPublicWebhooksOrdersRouteImport } from './routes/api/public/webhooks/orders'
 import { Route as ApiPublicWebhooksShopifyRouteImport } from './routes/api/public/webhooks/shopify'
+import { Route as ApiPublicWebhooksOrdersTokenRouteImport } from './routes/api/public/webhooks/orders.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -155,6 +156,12 @@ const ApiPublicWebhooksShopifyRoute =
     path: '/api/public/webhooks/shopify',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWebhooksOrdersTokenRoute =
+  ApiPublicWebhooksOrdersTokenRouteImport.update({
+    id: '/$token',
+    path: '/$token',
+    getParentRoute: () => ApiPublicWebhooksOrdersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -179,8 +186,9 @@ export interface FileRoutesByFullPath {
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
-  '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
+  '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
+  '/api/public/webhooks/orders/$token': typeof ApiPublicWebhooksOrdersTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -204,8 +212,9 @@ export interface FileRoutesByTo {
   '/orders/$id': typeof OrdersIdRoute
   '/connections': typeof ConnectionsIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
-  '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
+  '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
+  '/api/public/webhooks/orders/$token': typeof ApiPublicWebhooksOrdersTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -231,8 +240,9 @@ export interface FileRoutesById {
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
-  '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
+  '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
+  '/api/public/webhooks/orders/$token': typeof ApiPublicWebhooksOrdersTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
+    | '/api/public/webhooks/orders/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
+    | '/api/public/webhooks/orders/$token'
   id:
     | '__root__'
     | '/'
@@ -312,6 +324,7 @@ export interface FileRouteTypes {
     | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
+    | '/api/public/webhooks/orders/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -331,7 +344,7 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthGoogleRoute: typeof AuthGoogleRoute
   AuthShopifyRoute: typeof AuthShopifyRouteWithChildren
-  ApiPublicWebhooksOrdersRoute: typeof ApiPublicWebhooksOrdersRoute
+  ApiPublicWebhooksOrdersRoute: typeof ApiPublicWebhooksOrdersRouteWithChildren
   ApiPublicWebhooksShopifyRoute: typeof ApiPublicWebhooksShopifyRoute
 }
 
@@ -505,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksShopifyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/webhooks/orders/$token': {
+      id: '/api/public/webhooks/orders/$token'
+      path: '/$token'
+      fullPath: '/api/public/webhooks/orders/$token'
+      preLoaderRoute: typeof ApiPublicWebhooksOrdersTokenRouteImport
+      parentRoute: typeof ApiPublicWebhooksOrdersRoute
+    }
   }
 }
 
@@ -549,6 +569,20 @@ const AuthShopifyRouteWithChildren = AuthShopifyRoute._addFileChildren(
   AuthShopifyRouteChildren,
 )
 
+interface ApiPublicWebhooksOrdersRouteChildren {
+  ApiPublicWebhooksOrdersTokenRoute: typeof ApiPublicWebhooksOrdersTokenRoute
+}
+
+const ApiPublicWebhooksOrdersRouteChildren: ApiPublicWebhooksOrdersRouteChildren =
+  {
+    ApiPublicWebhooksOrdersTokenRoute: ApiPublicWebhooksOrdersTokenRoute,
+  }
+
+const ApiPublicWebhooksOrdersRouteWithChildren =
+  ApiPublicWebhooksOrdersRoute._addFileChildren(
+    ApiPublicWebhooksOrdersRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdsRoute: AdsRoute,
@@ -566,7 +600,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   AuthGoogleRoute: AuthGoogleRoute,
   AuthShopifyRoute: AuthShopifyRouteWithChildren,
-  ApiPublicWebhooksOrdersRoute: ApiPublicWebhooksOrdersRoute,
+  ApiPublicWebhooksOrdersRoute: ApiPublicWebhooksOrdersRouteWithChildren,
   ApiPublicWebhooksShopifyRoute: ApiPublicWebhooksShopifyRoute,
 }
 export const routeTree = rootRouteImport

@@ -8,6 +8,7 @@ export function LanguageBadge({
   language: LanguageMeta | null;
   className?: string;
 }) {
+  if (!language) return null;
   const { compact, label } = formatLanguageBadge(language);
   return (
     <span

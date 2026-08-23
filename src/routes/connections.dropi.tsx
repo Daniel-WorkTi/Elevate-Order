@@ -20,14 +20,16 @@ import { getWorkspaceWebhookUrl } from "@/lib/integrations/workspace-webhook.fun
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
 
-const dropiDashboardQuery = queryOptions({
-  queryKey: ["connections", "dropi", "dashboard"],
-  queryFn: () => getDropiDashboard(),
-  placeholderData: keepPreviousData,
-});
+function dropiDashboardQuery(workspaceId: string) {
+  return queryOptions({
+    queryKey: ["connections", "dropi", "dashboard", workspaceId],
+    queryFn: () => getDropiDashboard({ data: { workspaceId } }),
+    enabled: Boolean(workspaceId),
+    placeholderData: keepPreviousData,
+  });
+}
 
 export const Route = createFileRoute("/connections/dropi")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(dropiDashboardQuery),
   head: () => ({
     meta: [
       { title: metaT("meta.dropiTitle") },
@@ -39,9 +41,9 @@ export const Route = createFileRoute("/connections/dropi")({
 
 function DropiConnectionPage() {
   const t = useT();
-  const query = useQuery(dropiDashboardQuery);
   const { linked, connect, disconnect } = useDropiConnectionPreference();
   const { workspaceId } = useWorkspaceId();
+  const query = useQuery(dropiDashboardQuery(workspaceId));
   const data = query.data;
   const loading = query.isPending && !data;
 
@@ -72,7 +74,7 @@ function DropiConnectionPage() {
   }));
 
   return (
-    <AppShell title={t("connections.title")} subtitle="Dropi Pro">
+    <AppShell title={t("connections.title")}>
       <div className="space-y-5">
         {loading || !summary ? (
           <div className="space-y-3">
@@ -81,17 +83,13 @@ function DropiConnectionPage() {
           </div>
         ) : (
           <>
-            <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
-              <ConnectionHero
-                supply="dropi"
-                title="Dropi Pro"
-                subtitle={t("connections.dropiSubtitle")}
-                statusLabel={t(dropiStatusLabelKey(summary.status))}
-                statusClass={dropiStatusClass(summary.status)}
-                statusDotClass={dropiStatusDotClass(summary.status)}
-                methodLabel={t("connections.methodWebhook")}
-              />
-            </section>
+            <ConnectionHero
+              supply="dropi"
+              title="Dropi"
+              statusLabel={t(dropiStatusLabelKey(summary.status))}
+              statusClass={dropiStatusClass(summary.status)}
+              statusDotClass={dropiStatusDotClass(summary.status)}
+            />
 
             <DropiSetupPanel
               webhookUrl={webhookQuery.data?.webhookUrl ?? ""}
@@ -105,7 +103,7 @@ function DropiConnectionPage() {
               onDisconnect={disconnect}
             />
 
-            {linked ? (
+            {linked && activity.length > 0 ? (
               <ConnectionActivity
                 items={activity}
                 emptyLabel={t("connections.emptyDropiActivity")}

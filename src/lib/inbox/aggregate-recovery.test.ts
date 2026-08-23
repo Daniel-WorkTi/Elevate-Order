@@ -34,6 +34,7 @@ test("unknown and Shopify sources are excluded", () => {
   ]);
   assert.equal(snapshot.revenue, 0);
   assert.equal(snapshot.atRisk, 0);
+  assert.equal(snapshot.orderCount, 0);
 });
 
 test("incident counts as at-risk revenue and workflow", () => {
@@ -52,6 +53,7 @@ test("incident counts as at-risk revenue and workflow", () => {
   ]);
   assert.equal(snapshot.revenue, 128.5);
   assert.equal(snapshot.atRisk, 128.5);
+  assert.equal(snapshot.orderCount, 1);
   assert.equal(snapshot.recovered, 0);
   assert.equal(snapshot.platforms.dropi.workflow, 1);
   assert.equal(snapshot.platforms.dropi.rate, 0);

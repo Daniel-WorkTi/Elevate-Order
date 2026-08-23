@@ -5,10 +5,13 @@ export type Money = {
 
 const ISO = /^[A-Z]{3}$/;
 
-export function normalizeCurrency(code: string | null | undefined, fallback = "EUR"): string {
+export function readIsoCurrency(code: string | null | undefined): string | null {
   const value = code?.trim().toUpperCase();
-  if (value && ISO.test(value)) return value;
-  return fallback;
+  return value && ISO.test(value) ? value : null;
+}
+
+export function normalizeCurrency(code: string | null | undefined, fallback = "EUR"): string {
+  return readIsoCurrency(code) ?? fallback;
 }
 
 export function formatMoney(

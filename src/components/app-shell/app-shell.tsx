@@ -9,6 +9,7 @@ import type { Workspace } from "@/components/app-shell/workspace-switcher";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import type { AuthUser } from "@/lib/auth/session.functions";
 import { queryInboxQueue } from "@/lib/inbox/inbox.functions";
 import { useT } from "@/lib/i18n/locale-context";
@@ -88,9 +89,11 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const store = useStoreConnectionPreference();
+  const { workspaceId } = useWorkspaceId();
   const inboxQuery = useQuery({
-    queryKey: ["inbox", "queue"],
-    queryFn: () => queryInboxQueue(),
+    queryKey: ["inbox", "queue", workspaceId],
+    queryFn: () => queryInboxQueue({ data: { workspaceId } }),
+    enabled: Boolean(workspaceId),
     staleTime: 30_000,
   });
   const liveInboxCount =

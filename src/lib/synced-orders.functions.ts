@@ -9,6 +9,7 @@ import {
   type PageSize,
   type Supply,
 } from "@/lib/order-domain";
+import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 export type SyncedOrder = {
   order_id: number;
@@ -43,6 +44,7 @@ export type OrdersQueryInput = {
   to?: string | undefined;
   shipping?: string | undefined;
   hasTracking?: "yes" | "no" | undefined;
+  workspaceId?: string | undefined;
   page: number;
   pageSize: PageSize;
   sort: OrderSortField;
@@ -175,21 +177,22 @@ export function parseOrdersQuery(data: unknown): OrdersQueryInput {
 
   if (hasTracking) parsed.hasTracking = hasTracking;
 
+  const workspaceId = typeof raw["workspaceId"] === "string" ? raw["workspaceId"].trim() : "";
+  if (workspaceId) parsed.workspaceId = workspaceId;
+
   return parsed;
 }
 
 function applySupplyFilter<
   T extends {
     ilike: (column: string, pattern: string) => T;
+    or: (filters: string) => T;
     not: (column: string, operator: string, value: string) => T;
   },
 >(query: T, supply: Supply): T {
   if (supply === "dropea") return query.ilike("source", "%dropea%");
   if (supply === "shopify") return query.ilike("source", "%shopify%");
-  return query
-    .ilike("source", "%dropi%")
-    .not("source", "ilike", "%dropea%")
-    .not("source", "ilike", "%shopify%");
+  return query.or("source.ilike.%dropi%,source.ilike.%shopify%");
 }
 
 function applyDateFilter<
@@ -283,15 +286,22 @@ export const listSyncedOrders = createServerFn({ method: "GET" })
   }
 });
 
-export const querySyncedOrders = createServerFn({ method: "GET" })
+export const querySyncedOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => parseOrdersQuery(data))
   .handler(async ({ data }): Promise<OrdersQueryResult> => {
+    const workspaceId = parseWorkspaceId(data.workspaceId);
+    if (!workspaceId) return emptyResult(null, data);
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       const applyBase = <Q>(query: Q) => {
-        let next = applySupplyFilter(query as never, data.supply) as Q;
+        let next = (query as { eq: (column: string, value: string) => Q }).eq(
+          "workspace_id",
+          workspaceId,
+        );
+        next = applySupplyFilter(next as never, data.supply) as Q;
         next = applyDateFilter(next as never, data.from, data.to) as Q;
         next = applySearchFilter(next as never, data.search) as Q;
         return next;
@@ -309,6 +319,7 @@ export const querySyncedOrders = createServerFn({ method: "GET" })
         let next = applyBase(query);
         if (data.status) next = next.eq("status_name", data.status);
         if (data.shipping) next = next.eq("shipping_company", data.shipping);
+        if (data.country) next = next.eq("country", data.country);
         if (data.hasTracking === "yes") next = next.not("tracking_code", "is", null);
         if (data.hasTracking === "no") next = next.is("tracking_code", null);
         return next;
@@ -327,6 +338,10 @@ export const querySyncedOrders = createServerFn({ method: "GET" })
       const to = from + data.pageSize - 1;
       let { data: rows, error, count } = await listQuery.range(from, to);
 
+      if (error && isMissingWorkspaceColumn(error.message)) {
+        return emptyResult(null, data);
+      }
+
       if (error && isMissingColumnError(error)) {
         listQuery = applyListFilters(
           supabaseAdmin.from("orders").select(ORDER_COLUMNS_LEGACY, { count: "exact" }),
@@ -340,7 +355,7 @@ export const querySyncedOrders = createServerFn({ method: "GET" })
 
       if (error) {
         console.error("querySyncedOrders failed", error);
-        return emptyResult("Unable to load orders.", data);
+        return emptyResult(syncedOrdersErrorMessage(error), data);
       }
 
       const total = count ?? 0;
@@ -384,24 +399,39 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
     if (!Number.isInteger(orderId) || orderId <= 0) {
       throw new Error("Invalid order id");
     }
-    return { orderId };
+    return {
+      orderId,
+      workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "",
+    };
   })
   .handler(async ({ data }): Promise<{ order: OperationalOrder | null; error: string | null }> => {
+    const workspaceId = parseWorkspaceId(data.workspaceId);
+    if (!workspaceId) return { order: null, error: null };
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: row, error } = await supabaseAdmin
         .from("orders")
         .select(ORDER_COLUMNS_FULL)
         .eq("order_id", data.orderId)
+        .eq("workspace_id", workspaceId)
         .maybeSingle();
+
+      if (error && isMissingWorkspaceColumn(error.message)) {
+        return { order: null, error: null };
+      }
 
       if (error && isMissingColumnError(error)) {
         const fallback = await supabaseAdmin
           .from("orders")
           .select(ORDER_COLUMNS_LEGACY)
           .eq("order_id", data.orderId)
+          .eq("workspace_id", workspaceId)
           .maybeSingle();
         if (fallback.error) {
+          if (isMissingWorkspaceColumn(fallback.error.message)) {
+            return { order: null, error: null };
+          }
           console.error("getSyncedOrder failed", fallback.error);
           return { order: null, error: "Unable to load this order." };
         }
@@ -446,9 +476,15 @@ export const listOrderEvents = createServerFn({ method: "GET" })
     if (!Number.isInteger(orderId) || orderId <= 0) {
       throw new Error("Invalid order id");
     }
-    return { orderId };
+    return {
+      orderId,
+      workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "",
+    };
   })
   .handler(async ({ data }): Promise<{ events: OrderEventRow[]; error: string | null }> => {
+    const workspaceId = parseWorkspaceId(data.workspaceId);
+    if (!workspaceId) return { events: [], error: null };
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: rows, error } = await supabaseAdmin
@@ -457,7 +493,12 @@ export const listOrderEvents = createServerFn({ method: "GET" })
           "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at",
         )
         .eq("order_id", data.orderId)
+        .eq("workspace_id", workspaceId)
         .order("event_date", { ascending: true });
+
+      if (error && isMissingWorkspaceColumn(error.message)) {
+        return { events: [], error: null };
+      }
 
       if (error) {
         console.error("listOrderEvents failed", error);

@@ -1,17 +1,10 @@
 import { countryToFlagCode } from "@/lib/inbox/country-code";
 import type { InboxItem, InboxPriority } from "@/lib/inbox/inbox-types";
-import {
-  getOrderCurrency,
-  getOrderStatus,
-  getOrderSupply,
-  type OperationalOrder,
-} from "@/lib/order-domain";
-
-const ATTENTION = new Set(["incident", "waiting", "messaged"]);
+import { getOrderStatus, getOrderSupply, type OperationalOrder } from "@/lib/order-domain";
 
 function priorityFromStatus(key: string): InboxPriority | null {
   if (key === "incident") return "critical";
-  if (key === "waiting") return "waiting";
+  if (key === "waiting" || key === "confirmed") return "waiting";
   if (key === "messaged") return "followup";
   return null;
 }
@@ -19,7 +12,7 @@ function priorityFromStatus(key: string): InboxPriority | null {
 /** Maps a synced order into the inbox queue. Returns null when no operator action is needed. */
 export function operationalOrderToInboxItem(order: OperationalOrder): InboxItem | null {
   const supply = getOrderSupply(order);
-  if (supply !== "dropi" && supply !== "dropea") return null;
+  if (supply !== "dropi" && supply !== "dropea" && supply !== "shopify") return null;
 
   const status = getOrderStatus(order);
   const priority = priorityFromStatus(status.key);
@@ -31,13 +24,13 @@ export function operationalOrderToInboxItem(order: OperationalOrder): InboxItem 
 
   return {
     id: String(order.order_id),
-    supply,
+    supply: supply === "shopify" ? "dropi" : supply,
     customer: order.customer_name?.trim() || "—",
     country,
     countryCode,
     phone: order.phone?.trim() || "",
     total,
-    currency: getOrderCurrency(order),
+    currency: order.currency?.trim() || "",
     product: order.product_summary?.trim() || "—",
     issueLabel: status.label,
     issueDetail: order.details?.trim() || status.label,

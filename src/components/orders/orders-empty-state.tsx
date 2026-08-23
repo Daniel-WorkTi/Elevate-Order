@@ -20,7 +20,9 @@ export function OrdersEmptyState({
       <p className="text-[15px] font-medium text-foreground">
         {t("orders.emptyTitle", { supply: SUPPLY_LABEL[supply] })}
       </p>
-      <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">{t("orders.emptyHint")}</p>
+      <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
+        {supply === "dropi" && !filtered ? t("orders.emptyHintDropi") : t("orders.emptyHint")}
+      </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
         {filtered ? (
           <Button
@@ -33,7 +35,7 @@ export function OrdersEmptyState({
           </Button>
         ) : null}
         <Button asChild className="h-9 rounded-[10px] text-[13px] shadow-none">
-          <Link to="/connections" search={{ source: supply }}>
+          <Link to={supply === "dropea" ? "/connections/dropea" : "/connections"}>
             {t("orders.checkConnection")}
           </Link>
         </Button>

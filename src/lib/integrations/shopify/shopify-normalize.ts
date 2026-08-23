@@ -189,6 +189,7 @@ export const shopifySyncInputSchema = z.object({
   storeDomain: z.string().min(3),
   accessToken: z.string().min(8),
   limit: z.number().int().min(1).max(250).optional(),
+  workspaceId: z.string().uuid().optional(),
 });
 
 export type ShopifySyncInput = z.infer<typeof shopifySyncInputSchema>;

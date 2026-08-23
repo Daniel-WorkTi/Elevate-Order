@@ -64,7 +64,7 @@ export const getWorkspaceWebhookUrl = createServerFn({ method: "POST" })
       }
     }
 
-    const webhookRelativeUrl = `${DROPI_WEBHOOK_PATH}?token=${encodeURIComponent(token)}`;
+    const webhookRelativeUrl = `${DROPI_WEBHOOK_PATH}/${encodeURIComponent(token)}`;
     return {
       workspaceId: data.workspaceId,
       supply: data.supply,

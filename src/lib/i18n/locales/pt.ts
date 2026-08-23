@@ -135,7 +135,8 @@ export const pt: TranslationDict = {
   "connections.connectDropiHint":
     "Copie o URL único, cole no Dropi e depois ligue. Cada workspace tem o seu link.",
   "connections.dropiPastOrdersNote":
-    "Os pedidos só aparecem depois de o Dropi enviar webhooks a partir de agora. Pedidos antigos do Dropi não são importados automaticamente — altere um estado no Dropi (ou aguarde um novo evento) e atualize Pedidos.",
+    "Ligar aqui só prepara o ELEVATE. Cole este URL nas notificações da Dropi. Compras novas aparecem quando a Dropi enviar um webhook — pedidos confirmados vão para Pedidos; a Inbox só lista incidências e follow-up.",
+  "connections.waitingFirstWebhook": "À espera do primeiro webhook",
   "connections.generatingWebhookUrl": "A gerar o URL do webhook…",
   "connections.webhookUrlError":
     "Não foi possível criar o URL do webhook. Aplique a migration do workspace no Supabase.",
@@ -343,9 +344,14 @@ export const pt: TranslationDict = {
   "orders.subtitle": "Todos os pedidos sincronizados.",
   "orders.detailSubtitle": "Detalhe do pedido",
   "orders.refresh": "Atualizar",
+  "orders.syncedNone": "Nenhum pedido novo na Shopify.",
+  "orders.refreshNeedsShopify":
+    "Ligue a Shopify em Conexões para importar os pedidos da loja. A Dropi só envia por webhook.",
   "orders.searchPlaceholder": "Pesquisar ID do pedido, Shopify ou tracking...",
   "orders.emptyTitle": "Nenhum pedido {{supply}} encontrado.",
   "orders.emptyHint": "Tente alterar os filtros ou verifique a conexão.",
+  "orders.emptyHintDropi":
+    "Atualizar importa da Shopify. A Dropi só envia pedidos por webhook — confirme o URL em Conexões.",
   "orders.loadError": "Não foi possível carregar os pedidos.",
   "orders.backToOrders": "Voltar a Pedidos",
   "orders.notFound": "Pedido não encontrado",
@@ -616,7 +622,7 @@ export const pt: TranslationDict = {
   "inbox.emptyTitle": "Nenhum pedido precisa de atenção",
   "inbox.emptyHint": "Tente outro separador de supply ou limpe os filtros.",
   "inbox.emptyQueueHint":
-    "A fila mostra incidências, espera e mensagens sem resposta dos pedidos sincronizados Dropi e Dropea.",
+    "A fila mostra incidências, espera e mensagens sem resposta. Compras novas na Dropi que estão só confirmadas aparecem em Pedidos, não aqui.",
   "inbox.loadingQueue": "A carregar a fila…",
   "inbox.loadError": "Não foi possível carregar a fila.",
   "inbox.today": "Hoje",
@@ -654,6 +660,13 @@ export const pt: TranslationDict = {
   "inbox.recovery.updatedJustNow": "Dados atualizados há alguns segundos",
   "inbox.recovery.updatedSeconds": "Dados atualizados há alguns segundos",
   "inbox.recovery.days7": "7 dias",
+  "inbox.recovery.emptyTitle": "Sem dados de recuperação neste período",
+  "inbox.recovery.emptyHint":
+    "Estes números só aparecem com pedidos reais sincronizados. Ligue a Dropi ou a Dropea para começar a receber webhooks.",
+  "inbox.recovery.emptyHintLinked":
+    "Não há pedidos sincronizados neste período. Compras novas na Dropi aparecem depois de colar o webhook na Dropi e chegar um evento.",
+  "inbox.recovery.viewConnections": "Abrir conexões",
+  "inbox.recovery.viewOrders": "Abrir pedidos",
   "inbox.demo.addressIncomplete": "Morada incompleta",
   "inbox.demo.waitingForReply": "À espera de resposta",
   "inbox.demo.deliveryFailed": "Entrega falhada",
