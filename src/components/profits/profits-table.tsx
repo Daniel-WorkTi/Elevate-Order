@@ -19,6 +19,7 @@ import {
 import { formatMoney } from "@/lib/money/format-money";
 import { convertMoney } from "@/lib/money/format-money";
 import { SupplyName } from "@/components/supply-logo";
+import { useI18n } from "@/lib/i18n/locale-context";
 import type { OrderFinancials } from "@/lib/profits/normalize-order-financials";
 import { formatRelativeTimestamp } from "@/lib/format-relative-time";
 
@@ -44,6 +45,9 @@ export function ProfitsTable({
   costsAvailable: boolean;
   feesAvailable: boolean;
 }) {
+  const { locale, t } = useI18n();
+  const unavailableLabel = t("profits.unavailable");
+
   const rows = useMemo<RowView[]>(() => {
     return orders.map((order) => {
       const revenue =
@@ -95,24 +99,24 @@ export function ProfitsTable({
                 }),
                 displayCurrency,
               )
-            : "Unavailable",
+            : unavailableLabel,
         currency: order.revenue?.currency ?? "EUR",
       };
     });
-  }, [orders, displayCurrency, rateMap, costsAvailable, feesAvailable]);
+  }, [orders, displayCurrency, rateMap, costsAvailable, feesAvailable, unavailableLabel]);
 
   const columns = useMemo<ColumnDef<RowView>[]>(
     () => [
       {
         id: "order",
-        header: "Order",
+        header: t("profits.table.order"),
         cell: ({ row }) => (
           <span className="font-medium tabular-nums">{row.original.order.orderLabel}</span>
         ),
       },
       {
         id: "supply",
-        header: "Supply",
+        header: t("profits.supply"),
         cell: ({ row }) => {
           const supply = row.original.order.supply;
           return supply ? (
@@ -124,9 +128,9 @@ export function ProfitsTable({
       },
       {
         id: "date",
-        header: "Date",
+        header: t("profits.table.date"),
         cell: ({ row }) => {
-          const stamp = formatRelativeTimestamp(row.original.order.date);
+          const stamp = formatRelativeTimestamp(row.original.order.date, { locale, t });
           return (
             <span className="text-muted-foreground" title={stamp?.exact}>
               {stamp?.exact ?? "—"}
@@ -136,14 +140,14 @@ export function ProfitsTable({
       },
       {
         id: "revenue",
-        header: () => <span className="block text-right">Revenue</span>,
+        header: () => <span className="block text-right">{t("profits.revenue")}</span>,
         cell: ({ row }) => (
           <span className="block text-right tabular-nums">{row.original.revenueDisplay}</span>
         ),
       },
       {
         id: "costs",
-        header: () => <span className="block text-right">Known costs</span>,
+        header: () => <span className="block text-right">{t("profits.knownCosts")}</span>,
         cell: ({ row }) => (
           <span className="block text-right tabular-nums text-muted-foreground">
             {row.original.costsDisplay}
@@ -152,7 +156,7 @@ export function ProfitsTable({
       },
       {
         id: "fees",
-        header: () => <span className="block text-right">Fees</span>,
+        header: () => <span className="block text-right">{t("profits.fees")}</span>,
         cell: ({ row }) => (
           <span className="block text-right tabular-nums text-muted-foreground">
             {row.original.feesDisplay}
@@ -161,20 +165,20 @@ export function ProfitsTable({
       },
       {
         id: "profit",
-        header: () => <span className="block text-right">Profit</span>,
+        header: () => <span className="block text-right">{t("profits.profit")}</span>,
         cell: ({ row }) => (
           <span className="block text-right tabular-nums">{row.original.profitDisplay}</span>
         ),
       },
       {
         id: "currency",
-        header: "Currency",
+        header: t("profits.currency"),
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">{row.original.currency}</span>
         ),
       },
     ],
-    [],
+    [locale, t],
   );
 
   const table = useReactTable({
@@ -189,14 +193,15 @@ export function ProfitsTable({
     <section className="rounded-[16px] border border-border bg-card">
       <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-[15px] font-semibold text-foreground">Orders</h2>
+          <h2 className="text-[15px] font-semibold text-foreground">{t("profits.orders")}</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            {orders.length} synchronized order{orders.length === 1 ? "" : "s"}
+            {t(orders.length === 1 ? "profits.syncedOrdersOne" : "profits.syncedOrders", {
+              count: orders.length,
+            })}
           </p>
         </div>
       </div>
 
-      {/* Desktop table */}
       <div className="hidden md:block">
         <Table>
           <TableHeader>
@@ -226,7 +231,6 @@ export function ProfitsTable({
         </Table>
       </div>
 
-      {/* Mobile cards */}
       <div className="space-y-2 p-3 md:hidden">
         {table.getRowModel().rows.map((row) => {
           const item = row.original;
@@ -243,15 +247,15 @@ export function ProfitsTable({
               </div>
               <dl className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
                 <div>
-                  <dt className="text-muted-foreground">Revenue</dt>
+                  <dt className="text-muted-foreground">{t("profits.revenue")}</dt>
                   <dd className="tabular-nums">{item.revenueDisplay}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Costs</dt>
+                  <dt className="text-muted-foreground">{t("profits.table.costs")}</dt>
                   <dd className="tabular-nums">{item.costsDisplay}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Profit</dt>
+                  <dt className="text-muted-foreground">{t("profits.profit")}</dt>
                   <dd className="tabular-nums">{item.profitDisplay}</dd>
                 </div>
               </dl>
@@ -262,7 +266,10 @@ export function ProfitsTable({
 
       <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
         <p className="text-[12px] text-muted-foreground">
-          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
+          {t("profits.pageOf", {
+            page: table.getState().pagination.pageIndex + 1,
+            total: table.getPageCount() || 1,
+          })}
         </p>
         <div className="flex gap-2">
           <Button
@@ -272,7 +279,7 @@ export function ProfitsTable({
             disabled={!table.getCanPreviousPage()}
             onClick={() => table.previousPage()}
           >
-            Previous
+            {t("common.previous")}
           </Button>
           <Button
             type="button"
@@ -281,7 +288,7 @@ export function ProfitsTable({
             disabled={!table.getCanNextPage()}
             onClick={() => table.nextPage()}
           >
-            Next
+            {t("common.next")}
           </Button>
         </div>
       </div>

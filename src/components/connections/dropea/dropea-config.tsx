@@ -4,6 +4,7 @@ import {
 } from "@/lib/integrations/dropea/dropea-format";
 import type { DropeaConnectionSummary } from "@/lib/integrations/dropea/dropea-types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n/locale-context";
 
 export function DropeaStatusSummary({
   summary,
@@ -12,6 +13,8 @@ export function DropeaStatusSummary({
   summary: DropeaConnectionSummary | null;
   loading?: boolean;
 }) {
+  const { locale, t } = useI18n();
+
   if (loading || !summary) {
     return (
       <div className="grid gap-3 sm:grid-cols-3">
@@ -26,9 +29,12 @@ export function DropeaStatusSummary({
   }
 
   const items = [
-    { label: "Last sync activity", value: formatDropeaRelative(summary.lastSyncAt) },
-    { label: "Orders synchronized", value: formatDropeaMetric(summary.orderCount) },
-    { label: "Events today", value: formatDropeaMetric(summary.eventsToday) },
+    {
+      label: t("connections.lastSyncActivity"),
+      value: formatDropeaRelative(summary.lastSyncAt, locale),
+    },
+    { label: t("connections.ordersSynchronized"), value: formatDropeaMetric(summary.orderCount) },
+    { label: t("connections.eventsToday"), value: formatDropeaMetric(summary.eventsToday) },
   ];
 
   return (

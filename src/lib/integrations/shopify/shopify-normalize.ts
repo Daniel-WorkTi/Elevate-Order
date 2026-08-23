@@ -1,7 +1,36 @@
 import { z } from "zod";
 
-export const SHOPIFY_API_VERSION = "2025-01";
+export const SHOPIFY_API_VERSION = "2026-07";
 export const SHOPIFY_SOURCE = "Shopify";
+
+/** Admin API host only. Public storefront domains (www.shop.es) are rejected. */
+export function normalizeShopifyDomain(value: string): string | null {
+  const trimmed = value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  if (!trimmed) return null;
+
+  const adminStore = trimmed.match(/^(?:admin\.shopify\.com\/store\/)([a-z0-9][a-z0-9-]*)(?:\/|$)/);
+  if (adminStore?.[1]) return `${adminStore[1]}.myshopify.com`;
+
+  const host = (trimmed.split("/")[0] ?? "").replace(/^www\./, "");
+  if (!host) return null;
+
+  if (host.endsWith(".myshopify.com")) {
+    const slug = host.slice(0, -".myshopify.com".length);
+    return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? host : null;
+  }
+
+  if (/^[a-z0-9][a-z0-9-]*$/.test(host) && !host.includes(".")) {
+    return `${host}.myshopify.com`;
+  }
+
+  return null;
+}
+
+export function shopifyDomainError(value: string): string | null {
+  if (!value.trim()) return "Enter the shop domain (example.myshopify.com).";
+  if (normalizeShopifyDomain(value)) return null;
+  return "Use the Admin domain ending in .myshopify.com, not the public website. Shopify Admin → Settings → Domains.";
+}
 
 export type ShopifyNormalizedOrder = {
   order_id: number;

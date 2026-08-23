@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      shopify_stores: {
+        Row: {
+          access_token: string
+          id: string
+          installed_at: string
+          last_sync_at: string | null
+          scope: string | null
+          shop_domain: string
+          uninstalled_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          id?: string
+          installed_at?: string
+          last_sync_at?: string | null
+          scope?: string | null
+          shop_domain: string
+          uninstalled_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          id?: string
+          installed_at?: string
+          last_sync_at?: string | null
+          scope?: string | null
+          shop_domain?: string
+          uninstalled_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workspace_webhook_endpoints: {
+        Row: {
+          created_at: string
+          id: string
+          supply: string
+          token: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          supply: string
+          token: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          supply?: string
+          token?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       message_templates: {
         Row: {
           id: string
@@ -63,6 +120,7 @@ export type Database = {
           total: number | null
           tracking_code: string | null
           tracking_url: string | null
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
@@ -79,6 +137,7 @@ export type Database = {
           total?: number | null
           tracking_code?: string | null
           tracking_url?: string | null
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
@@ -95,6 +154,7 @@ export type Database = {
           total?: number | null
           tracking_code?: string | null
           tracking_url?: string | null
+          workspace_id?: string | null
         }
         Relationships: []
       }
@@ -124,6 +184,7 @@ export type Database = {
           tracking_code: string | null
           tracking_url: string | null
           updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           address?: string | null
@@ -150,6 +211,7 @@ export type Database = {
           tracking_code?: string | null
           tracking_url?: string | null
           updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           address?: string | null
@@ -176,6 +238,7 @@ export type Database = {
           tracking_code?: string | null
           tracking_url?: string | null
           updated_at?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }

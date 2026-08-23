@@ -99,9 +99,10 @@ export function withSupply(search: OrdersSearch, supply: Supply): OrdersSearch {
   return { ...search, supply, page: 1 };
 }
 
-export const DATE_PRESET_LABEL: Record<NonNullable<OrdersSearch["date"]>, string> = {
-  today: "Today",
-  "7d": "Last 7 days",
-  "30d": "Last 30 days",
-  custom: "Custom",
+/** i18n keys for date presets — translate with `t(DATE_PRESET_I18N_KEY[date])`. */
+export const DATE_PRESET_I18N_KEY: Record<NonNullable<OrdersSearch["date"]>, string> = {
+  today: "orders.today",
+  "7d": "orders.last7Days",
+  "30d": "orders.last30Days",
+  custom: "orders.custom",
 };

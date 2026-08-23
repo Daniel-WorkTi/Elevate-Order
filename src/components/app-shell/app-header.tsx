@@ -6,6 +6,7 @@ import {
   type Workspace,
 } from "@/components/app-shell/workspace-switcher";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 type AppHeaderProps = {
@@ -23,6 +24,8 @@ export function AppHeader({
   onOpenMobileNav,
   className,
 }: AppHeaderProps) {
+  const t = useT();
+
   return (
     <header
       className={cn(
@@ -38,7 +41,7 @@ export function AppHeader({
             size="icon"
             className="rounded-[10px] md:hidden"
             onClick={onOpenMobileNav}
-            aria-label="Open navigation"
+            aria-label={t("shell.openNav")}
           >
             <Menu className="size-5" strokeWidth={1.5} />
           </Button>

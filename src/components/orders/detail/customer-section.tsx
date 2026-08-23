@@ -1,52 +1,40 @@
 import { Copy, MapPin, Phone, User } from "lucide-react";
 import { toast } from "sonner";
 
+import { LanguageBadge } from "@/components/i18n/language-badge";
 import { Button } from "@/components/ui/button";
+import { languageFromCountry } from "@/lib/i18n/languages";
+import { useT } from "@/lib/i18n/locale-context";
 import type { OperationalOrder } from "@/lib/order-domain";
 
-async function copyText(label: string, value: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    toast.success(`${label} copied`);
-  } catch {
-    toast.error(`Unable to copy ${label.toLowerCase()}`);
-  }
-}
-
-function CopyButton({ label, value }: { label: string; value: string }) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-7 rounded-[8px] text-muted-foreground"
-      onClick={() => void copyText(label, value)}
-      aria-label={`Copy ${label}`}
-    >
-      <Copy className="size-3.5" strokeWidth={1.5} />
-    </Button>
-  );
-}
-
 export function CustomerSection({ order }: { order: OperationalOrder }) {
+  const t = useT();
   const name = order.customer_name?.trim();
   const phone = order.phone?.trim();
   const country = order.country?.trim();
   const hasAny = Boolean(name || phone || country);
+  const phoneLabel = t("orders.detail.phone");
+
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(t("common.copiedLabel", { label }));
+    } catch {
+      toast.error(t("common.copyFailedLabel", { label: label.toLowerCase() }));
+    }
+  }
 
   return (
     <section aria-labelledby="customer-heading" className="space-y-4">
       <div className="flex items-center gap-2">
         <User className="size-4 text-muted-foreground" strokeWidth={1.5} aria-hidden />
         <h2 id="customer-heading" className="text-[15px] font-semibold text-foreground">
-          Customer
+          {t("orders.detail.customer")}
         </h2>
       </div>
 
       {!hasAny ? (
-        <p className="text-[13px] text-muted-foreground">
-          Customer details are not available for this synchronized order yet.
-        </p>
+        <p className="text-[13px] text-muted-foreground">{t("orders.detail.customerUnavailable")}</p>
       ) : (
         <div className="space-y-3 text-[14px] text-foreground">
           {name ? (
@@ -57,18 +45,34 @@ export function CustomerSection({ order }: { order: OperationalOrder }) {
 
           {phone ? (
             <div className="flex items-center gap-1.5">
-              <Phone className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden />
+              <Phone
+                className="size-3.5 shrink-0 text-muted-foreground"
+                strokeWidth={1.5}
+                aria-hidden
+              />
               <span>{phone}</span>
-              <CopyButton label="Phone" value={phone} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 rounded-[8px] text-muted-foreground"
+                onClick={() => void copyText(phoneLabel, phone)}
+                aria-label={t("common.copyLabel", { label: phoneLabel })}
+              >
+                <Copy className="size-3.5" strokeWidth={1.5} />
+              </Button>
             </div>
           ) : null}
 
           {country ? (
-            <div className="flex items-start gap-1.5 text-muted-foreground">
-              <MapPin className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <MapPin className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
               <span>{country}</span>
+              <LanguageBadge language={languageFromCountry(country)} />
             </div>
-          ) : null}
+          ) : (
+            <LanguageBadge language={null} />
+          )}
         </div>
       )}
     </section>

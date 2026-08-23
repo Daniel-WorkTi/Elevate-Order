@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, type ReactNode } from "react";
+import { getRouteApi, useRouterState } from "@tanstack/react-router";
 
 import { AppHeader } from "@/components/app-shell/app-header";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
@@ -8,14 +9,13 @@ import type { Workspace } from "@/components/app-shell/workspace-switcher";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
-import { orders } from "@/lib/orders";
+import type { AuthUser } from "@/lib/auth/session.functions";
+import { queryInboxQueue } from "@/lib/inbox/inbox.functions";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
+const rootRoute = getRouteApi("__root__");
 const SIDEBAR_COLLAPSED_KEY = "elevate.sidebar.collapsed";
-
-function attentionFromOrders() {
-  return orders.filter((o) => o.status === "incident" || o.status === "unanswered").length;
-}
 
 const DEFAULT_WORKSPACE: Workspace = {
   name: "Erono Store",
@@ -23,10 +23,27 @@ const DEFAULT_WORKSPACE: Workspace = {
 };
 
 const DEFAULT_OPERATOR: Operator = {
-  name: "Rocío M.",
+  name: "Operator",
   role: "Operator",
-  initials: "RM",
+  initials: "OP",
 };
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "OP";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+}
+
+function operatorFromUser(user: AuthUser | null | undefined): Operator {
+  if (!user) return DEFAULT_OPERATOR;
+  const name = user.fullName?.trim() || user.email?.trim() || "Operator";
+  return {
+    name,
+    role: "Operator",
+    initials: initialsFromName(name),
+  };
+}
 
 function readCollapsedPreference(): boolean {
   if (typeof window === "undefined") return false;
@@ -37,11 +54,19 @@ function readCollapsedPreference(): boolean {
   }
 }
 
+function writeCollapsedPreference(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export type AppShellProps = {
   title: string;
   subtitle?: string | undefined;
   children: ReactNode;
-  /** Optional attention count for Inbox badge. Omit to use mock attention count. */
+  /** Optional attention count for Inbox badge. Omit to use the live inbox queue. */
   inboxCount?: number | undefined;
   workspace?: Workspace | undefined;
   operator?: Operator | undefined;
@@ -54,14 +79,29 @@ export function AppShell({
   children,
   inboxCount,
   workspace: workspaceProp,
-  operator = DEFAULT_OPERATOR,
+  operator: operatorProp,
   className,
 }: AppShellProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user } = rootRoute.useRouteContext();
+  const t = useT();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const store = useStoreConnectionPreference();
-  const resolvedInboxCount = inboxCount ?? attentionFromOrders();
+  const inboxQuery = useQuery({
+    queryKey: ["inbox", "queue"],
+    queryFn: () => queryInboxQueue(),
+    staleTime: 30_000,
+  });
+  const liveInboxCount =
+    (inboxQuery.data?.dropi.length ?? 0) + (inboxQuery.data?.dropea.length ?? 0);
+  const resolvedInboxCount = inboxCount ?? liveInboxCount;
+  const operator =
+    operatorProp ??
+    (() => {
+      const base = operatorFromUser(user);
+      return { ...base, role: t("shell.operatorRole") };
+    })();
 
   const workspace = useMemo((): Workspace => {
     if (workspaceProp) return workspaceProp;
@@ -74,34 +114,22 @@ export function AppShell({
     return DEFAULT_WORKSPACE;
   }, [workspaceProp, store.linked, store.storeName, store.storeDomain]);
 
-  useEffect(() => {
-    setCollapsed(readCollapsedPreference());
-  }, []);
-
   function toggleCollapsed() {
     setCollapsed((current) => {
       const next = !current;
-      try {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        // ignore storage failures
-      }
+      writeCollapsedPreference(next);
       return next;
     });
   }
+
+  const sidebarWidth = collapsed ? "w-[72px]" : "w-[264px]";
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("flex min-h-dvh w-full bg-background", className)}>
         {/* Desktop / tablet: fixed full-height sidebar */}
-        <div
-          className={cn(
-            "relative hidden shrink-0 md:block",
-            collapsed ? "w-[72px]" : "w-[264px]",
-          )}
-          aria-hidden={false}
-        >
-          <div className="fixed inset-y-0 left-0 z-40 hidden md:block">
+        <div className={cn("relative hidden shrink-0 md:block", sidebarWidth)} aria-hidden={false}>
+          <div className={cn("fixed inset-y-0 left-0 z-40 hidden md:block", sidebarWidth)}>
             <AppSidebar
               pathname={pathname}
               operator={operator}
@@ -132,7 +160,7 @@ export function AppShell({
             className="h-dvh w-[280px] max-w-[85vw] border-r-0 bg-[color:var(--elevate-sidebar)] p-0 text-sidebar-foreground [&>button]:text-white"
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>Navigation</SheetTitle>
+              <SheetTitle>{t("shell.navigation")}</SheetTitle>
             </SheetHeader>
             <AppSidebar
               pathname={pathname}

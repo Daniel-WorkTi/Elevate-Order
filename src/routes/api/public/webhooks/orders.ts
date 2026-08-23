@@ -1,11 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { normalizeDropeaOrder } from "@/lib/integrations/dropea/normalize-dropea-order";
+import { normalizeDropiOrder } from "@/lib/integrations/dropi/normalize-dropi-order";
 import {
   coalesceStatic,
   dropiWebhookPayloadSchema,
   normalizeDropiWebhookEvent,
   type NormalizedDropiEvent,
 } from "@/lib/integrations/dropi/dropi-webhook-normalize";
+import { sourceFromWebhookAuth } from "@/lib/integrations/dropi/source";
+import { resolvePublicWebhookAuth } from "@/lib/integrations/webhook-auth";
+
+function logisticsFromEvent(event: NormalizedDropiEvent) {
+  const source = (event.source ?? "").toLowerCase();
+  if (source.includes("dropea")) return normalizeDropeaOrder(event.raw);
+  return normalizeDropiOrder(event.raw);
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -32,15 +42,18 @@ export const Route = createFileRoute("/api/public/webhooks/orders")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expectedKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
-        const providedKey =
-          request.headers.get("apikey") ??
-          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-          "";
-
-        if (!expectedKey || providedKey !== expectedKey) {
+        const auth = await resolvePublicWebhookAuth(request);
+        if (!auth.ok) {
           return json({ error: "Unauthorized" }, 401);
         }
+        const workspaceId = auth.workspaceId;
+        console.info(
+          "[webhook] orders accepted",
+          JSON.stringify({
+            supply: auth.supply,
+            workspace: workspaceId ? "set" : "none",
+          }),
+        );
 
         let raw: unknown;
         try {
@@ -70,20 +83,24 @@ export const Route = createFileRoute("/api/public/webhooks/orders")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        const eventRows = events.map((e) => ({
+        const eventRows = events.map((e) => {
+          const logistics = logisticsFromEvent(e);
+          return {
           order_id: e.order_id,
           event_date: e.event_date,
           status_id: e.status_id,
           status_name: e.status_name,
           details: e.details,
-          tracking_code: e.tracking_code,
-          tracking_url: e.tracking_url,
+          tracking_code: logistics.trackingCode ?? e.tracking_code,
+          tracking_url: logistics.trackingUrl ?? e.tracking_url,
           shopify_order_id: e.shopify_order_id,
-          shipping_company: e.shipping_company,
+          shipping_company: logistics.shippingCompany ?? e.shipping_company,
           total: e.total,
-          source: e.source,
+          source: sourceFromWebhookAuth(e.source, auth.supply),
+          workspace_id: workspaceId,
           raw: e.raw as import("@/integrations/supabase/types").Json,
-        }));
+          };
+        });
 
         const { error: eventsError } = await supabaseAdmin
           .from("order_events")
@@ -121,17 +138,19 @@ export const Route = createFileRoute("/api/public/webhooks/orders")({
         const nowIso = new Date().toISOString();
         const orderRows = [...latest.values()].map((row) => {
           const existing = existingById.get(row.order_id);
+          const logistics = logisticsFromEvent(row);
           return {
             order_id: row.order_id,
             shopify_order_id: row.shopify_order_id,
             status_id: row.status_id,
             status_name: row.status_name,
             details: row.details,
-            tracking_code: row.tracking_code,
-            tracking_url: row.tracking_url,
-            shipping_company: row.shipping_company,
+            tracking_code: logistics.trackingCode ?? row.tracking_code,
+            tracking_url: logistics.trackingUrl ?? row.tracking_url,
+            shipping_company: logistics.shippingCompany ?? row.shipping_company,
             total: row.total,
-            source: row.source,
+            source: sourceFromWebhookAuth(row.source, auth.supply),
+            workspace_id: workspaceId,
             last_event_at: row.event_date,
             updated_at: nowIso,
             customer_name: coalesceStatic(row.customer_name, existing?.customer_name),

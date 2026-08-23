@@ -1,11 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { startOfDay } from "date-fns";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   DROPEA_API_BASE,
   type DropeaConnectionStatus,
   type DropeaDashboardResult,
 } from "@/lib/integrations/dropea/dropea-types";
+import { buildWebhookRelativeUrl } from "@/lib/integrations/webhook-auth";
 
 function envPresent(name: string) {
   return Boolean(process.env[name]?.trim());
@@ -22,10 +24,13 @@ function deriveInfraStatus(input: {
   return "configured";
 }
 
-export const getDropeaDashboard = createServerFn({ method: "GET" }).handler(
+export const getDropeaDashboard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
   async (): Promise<DropeaDashboardResult> => {
     const serverConfigured =
       envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
+    const webhookRelativeUrl = buildWebhookRelativeUrl();
 
     const empty = {
       status: deriveInfraStatus({
@@ -35,6 +40,7 @@ export const getDropeaDashboard = createServerFn({ method: "GET" }).handler(
       }),
       method: "api" as const,
       apiBaseUrl: DROPEA_API_BASE,
+      webhookRelativeUrl,
       serverConfigured,
       lastSyncAt: null,
       orderCount: null,
@@ -116,6 +122,7 @@ export const getDropeaDashboard = createServerFn({ method: "GET" }).handler(
           }),
           method: "api",
           apiBaseUrl: DROPEA_API_BASE,
+          webhookRelativeUrl,
           serverConfigured,
           lastSyncAt,
           orderCount,

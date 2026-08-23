@@ -1,31 +1,39 @@
-import { format, formatDistanceToNow, isValid, parseISO } from "date-fns";
-
+import { formatIsoDateTime, formatIsoRelative } from "@/lib/i18n/date-locale";
+import type { Locale } from "@/lib/i18n/types";
 import type { DropeaConnectionStatus } from "@/lib/integrations/dropea/dropea-types";
 
-export function formatDropeaRelative(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const date = parseISO(iso);
-  if (!isValid(date)) return "—";
-  return formatDistanceToNow(date, { addSuffix: true });
+export function formatDropeaRelative(iso: string | null | undefined, locale: Locale = "pt"): string {
+  return formatIsoRelative(iso, locale);
 }
 
-export function formatDropeaDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const date = parseISO(iso);
-  if (!isValid(date)) return "—";
-  return format(date, "d MMM yyyy · HH:mm");
+export function formatDropeaDateTime(iso: string | null | undefined, locale: Locale = "pt"): string {
+  return formatIsoDateTime(iso, locale);
 }
 
+export function dropeaStatusLabelKey(status: DropeaConnectionStatus): string {
+  switch (status) {
+    case "connected":
+      return "connections.connected";
+    case "configured":
+      return "connections.configured";
+    case "error":
+      return "connections.error";
+    case "not_configured":
+      return "connections.notConfigured";
+  }
+}
+
+/** @deprecated Prefer dropeaStatusLabelKey + useT() */
 export function dropeaStatusLabel(status: DropeaConnectionStatus): string {
   switch (status) {
     case "connected":
-      return "Connected";
+      return "Conectado";
     case "configured":
-      return "Configured";
+      return "Configurado";
     case "error":
-      return "Error";
+      return "Erro";
     case "not_configured":
-      return "Not configured";
+      return "Não configurado";
   }
 }
 

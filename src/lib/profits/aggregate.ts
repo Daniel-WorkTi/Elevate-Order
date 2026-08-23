@@ -1,11 +1,11 @@
 import { calculateMargin } from "@/lib/money/calculate-profit";
 import { formatMoney, sumConverted } from "@/lib/money/format-money";
 import type { OrderFinancials } from "@/lib/profits/normalize-order-financials";
+import type { Locale } from "@/lib/i18n/types";
 import {
   chartBucketKey,
   chartBucketLabel,
   type ProfitPeriod,
-  type ProfitCurrency,
 } from "@/lib/profits/profits-search";
 import type { Supply } from "@/lib/order-domain";
 
@@ -25,7 +25,7 @@ export type FinancialSummary = {
 
 export function aggregateFinancials(
   orders: OrderFinancials[],
-  displayCurrency: ProfitCurrency,
+  displayCurrency: string,
   rateMap: Record<string, number>,
   options?: { costsAvailable?: boolean; feesAvailable?: boolean },
 ): FinancialSummary {
@@ -85,8 +85,9 @@ export type ChartPoint = {
 export function buildRevenueChart(
   orders: OrderFinancials[],
   period: ProfitPeriod,
-  displayCurrency: ProfitCurrency,
+  displayCurrency: string,
   rateMap: Record<string, number>,
+  locale: Locale = "pt",
 ): ChartPoint[] {
   const buckets = new Map<string, Array<{ amount: number; currency: string }>>();
 
@@ -102,7 +103,7 @@ export function buildRevenueChart(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, items]) => ({
       key,
-      label: chartBucketLabel(key, period),
+      label: chartBucketLabel(key, period, locale),
       revenue: sumConverted(items, displayCurrency, rateMap).total,
     }));
 }
@@ -113,7 +114,7 @@ export type SupplyBreakdownRow = FinancialSummary & {
 
 export function buildSupplyBreakdown(
   orders: OrderFinancials[],
-  displayCurrency: ProfitCurrency,
+  displayCurrency: string,
   rateMap: Record<string, number>,
   options?: { costsAvailable?: boolean; feesAvailable?: boolean },
 ): SupplyBreakdownRow[] {

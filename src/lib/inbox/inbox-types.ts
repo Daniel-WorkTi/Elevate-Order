@@ -49,3 +49,15 @@ export function sortInboxPriority(items: InboxItem[]): InboxItem[] {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 }
+
+export function sortInboxItems(
+  items: InboxItem[],
+  sort: "priority" | "recent" = "priority",
+): InboxItem[] {
+  if (sort === "recent") {
+    return [...items].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  }
+  return sortInboxPriority(items);
+}

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { ChevronDown, ChevronRight, Settings } from "lucide-react";
 
+import { useT } from "@/lib/i18n/locale-context";
+
 export function ConnectionAdvancedRow({
   open,
   onToggle,
@@ -10,6 +12,8 @@ export function ConnectionAdvancedRow({
   onToggle: () => void;
   children: ReactNode;
 }) {
+  const t = useT();
+
   return (
     <div className="space-y-3">
       <button
@@ -22,9 +26,11 @@ export function ConnectionAdvancedRow({
             <Settings className="size-4" strokeWidth={1.75} aria-hidden />
           </span>
           <span>
-            <span className="block text-[14px] font-semibold text-[#0A0C10]">Advanced settings</span>
+            <span className="block text-[14px] font-semibold text-[#0A0C10]">
+              {t("connections.advancedSettings")}
+            </span>
             <span className="mt-0.5 block text-[13px] text-[#667085]">
-              Webhook URL, authentication, events, and field mapping
+              {t("connections.advancedSettingsHint")}
             </span>
           </span>
         </span>

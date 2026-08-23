@@ -10,25 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
-const delivery = [
-  { day: "Mon", sent: 320, replied: 214 },
-  { day: "Tue", sent: 412, replied: 288 },
-  { day: "Wed", sent: 386, replied: 251 },
-  { day: "Thu", sent: 468, replied: 342 },
-  { day: "Fri", sent: 502, replied: 371 },
-  { day: "Sat", sent: 288, replied: 190 },
-  { day: "Sun", sent: 214, replied: 132 },
-];
-
-const response = [
-  { day: "Mon", minutes: 24 },
-  { day: "Tue", minutes: 19 },
-  { day: "Wed", minutes: 22 },
-  { day: "Thu", minutes: 16 },
-  { day: "Fri", minutes: 14 },
-  { day: "Sat", minutes: 21 },
-  { day: "Sun", minutes: 27 },
-];
+import { useT } from "@/lib/i18n/locale-context";
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -50,9 +32,31 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function AnalyticsCharts() {
+  const t = useT();
+
+  const delivery = [
+    { day: t("analytics.day.mon"), sent: 320, replied: 214 },
+    { day: t("analytics.day.tue"), sent: 412, replied: 288 },
+    { day: t("analytics.day.wed"), sent: 386, replied: 251 },
+    { day: t("analytics.day.thu"), sent: 468, replied: 342 },
+    { day: t("analytics.day.fri"), sent: 502, replied: 371 },
+    { day: t("analytics.day.sat"), sent: 288, replied: 190 },
+    { day: t("analytics.day.sun"), sent: 214, replied: 132 },
+  ];
+
+  const response = [
+    { day: t("analytics.day.mon"), minutes: 24 },
+    { day: t("analytics.day.tue"), minutes: 19 },
+    { day: t("analytics.day.wed"), minutes: 22 },
+    { day: t("analytics.day.thu"), minutes: 16 },
+    { day: t("analytics.day.fri"), minutes: 14 },
+    { day: t("analytics.day.sat"), minutes: 21 },
+    { day: t("analytics.day.sun"), minutes: 27 },
+  ];
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <ChartCard title="Messages sent vs replied">
+      <ChartCard title={t("analytics.chartMessages")}>
         <BarChart data={delivery}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={12} />
@@ -73,7 +77,7 @@ export default function AnalyticsCharts() {
         </BarChart>
       </ChartCard>
 
-      <ChartCard title="Average response time (minutes)">
+      <ChartCard title={t("analytics.chartResponse")}>
         <AreaChart data={response}>
           <defs>
             <linearGradient id="respFill" x1="0" y1="0" x2="0" y2="1">

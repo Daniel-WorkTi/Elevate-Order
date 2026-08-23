@@ -1,15 +1,9 @@
-import { format } from "date-fns";
 import { Clock } from "lucide-react";
 
+import { formatDateTime } from "@/lib/i18n/date-locale";
+import { useI18n } from "@/lib/i18n/locale-context";
 import type { OrderEventRow } from "@/lib/synced-orders.functions";
 import { cn } from "@/lib/utils";
-
-function eventTitle(event: OrderEventRow): string {
-  const name = event.status_name?.trim();
-  if (name) return name;
-  if (event.details?.trim()) return "Status updated";
-  return "Order event";
-}
 
 function nodeTone(statusName: string | null): string {
   const s = (statusName ?? "").toLowerCase();
@@ -26,19 +20,28 @@ export function OrderTimeline({
   events: OrderEventRow[];
   error: string | null;
 }) {
+  const { t, locale } = useI18n();
+
+  function eventTitle(event: OrderEventRow): string {
+    const name = event.status_name?.trim();
+    if (name) return name;
+    if (event.details?.trim()) return t("orders.detail.statusUpdated");
+    return t("orders.detail.orderEvent");
+  }
+
   return (
     <section aria-labelledby="timeline-heading" className="space-y-4">
       <div className="flex items-center gap-2">
         <Clock className="size-4 text-muted-foreground" strokeWidth={1.5} aria-hidden />
         <h2 id="timeline-heading" className="text-[15px] font-semibold text-foreground">
-          Timeline
+          {t("orders.detail.timeline")}
         </h2>
       </div>
 
       {error ? <p className="text-[13px] text-muted-foreground">{error}</p> : null}
 
       {!error && events.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">No timeline events recorded yet.</p>
+        <p className="text-[13px] text-muted-foreground">{t("orders.detail.noTimeline")}</p>
       ) : null}
 
       {events.length > 0 ? (
@@ -47,7 +50,7 @@ export function OrderTimeline({
             const at = new Date(event.event_date);
             const stamp = Number.isNaN(at.getTime())
               ? event.event_date
-              : format(at, "d MMM yyyy · HH:mm");
+              : formatDateTime(at, locale);
             return (
               <li key={event.id} className="relative pb-5 last:pb-0">
                 <span

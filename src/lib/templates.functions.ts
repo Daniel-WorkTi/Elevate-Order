@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { defaultContentFor } from "@/lib/templates/default-templates";
 import {
   mergeTemplateOverrides,
@@ -52,7 +53,9 @@ function defaultList(): MessageTemplateRecord[] {
   return sortTemplates(mergeTemplateOverrides([]));
 }
 
-export const listMessageTemplates = createServerFn({ method: "GET" }).handler(
+export const listMessageTemplates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
   async (): Promise<{ templates: MessageTemplateRecord[]; error: string | null }> => {
     const fallback = defaultList();
 
@@ -87,6 +90,7 @@ export const listMessageTemplates = createServerFn({ method: "GET" }).handler(
 );
 
 export const saveMessageTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => {
     const raw = (data ?? {}) as Record<string, unknown>;
     const kind = parseKind(raw["kind"]);
@@ -165,6 +169,7 @@ export const saveMessageTemplate = createServerFn({ method: "POST" })
   );
 
 export const resetMessageTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => {
     const raw = (data ?? {}) as Record<string, unknown>;
     return { kind: parseKind(raw["kind"]) };

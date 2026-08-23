@@ -2,31 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/app-shell";
 import { InboxPageContent } from "@/components/inbox/inbox-page";
-import { inboxItemsForSupply } from "@/lib/inbox/inbox-demo";
+import { metaT } from "@/lib/i18n/meta";
+import { useT } from "@/lib/i18n/locale-context";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Inbox — ELEVATE" },
-      {
-        name: "description",
-        content: "Operational inbox for orders that need WhatsApp attention.",
-      },
+      { title: metaT("meta.inboxTitle") },
+      { name: "description", content: metaT("meta.inboxDescription") },
     ],
   }),
   component: InboxPage,
 });
 
 function InboxPage() {
-  const inboxCount =
-    inboxItemsForSupply("dropi").length + inboxItemsForSupply("dropea").length;
+  const t = useT();
 
   return (
-    <AppShell
-      title="Inbox"
-      subtitle="Orders that need your attention"
-      inboxCount={inboxCount}
-    >
+    <AppShell title={t("inbox.title")} subtitle={t("inbox.subtitle")}>
       <InboxPageContent />
     </AppShell>
   );

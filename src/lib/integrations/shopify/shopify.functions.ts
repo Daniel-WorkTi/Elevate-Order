@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   SHOPIFY_API_VERSION,
   SHOPIFY_SOURCE,
+  normalizeShopifyDomain,
   normalizeShopifyRestOrder,
   shopifySyncInputSchema,
   type ShopifyNormalizedOrder,
@@ -28,29 +30,67 @@ export type ShopifyDashboardResult = {
   error: string | null;
 };
 
-function shopifyOrdersUrl(domain: string, limit: number) {
-  const host = domain.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+function requireAdminDomain(domain: string): string {
+  const host = normalizeShopifyDomain(domain);
+  if (!host) {
+    throw new Error(
+      "Use the Admin domain ending in .myshopify.com, not the public website (e.g. www.eronostore.es). Find it in Shopify Admin → Settings → Domains.",
+    );
+  }
+  return host;
+}
+
+function requireAdminToken(accessToken: string): string {
+  const token = accessToken.trim();
+  if (token.startsWith("shpat_")) return token;
+  if (token.startsWith("shpss_") || token.startsWith("shpca_")) {
+    throw new Error(
+      "That looks like the API secret, not the Admin API access token. Open the custom app → API credentials and copy the token that starts with shpat_.",
+    );
+  }
+  throw new Error(
+    "Paste the Admin API access token (starts with shpat_). Client ID / Client Secret will not work.",
+  );
+}
+
+function shopifyAdminUrl(host: string, path: string) {
+  return `https://${host}/admin/api/${SHOPIFY_API_VERSION}/${path}`;
+}
+
+async function shopifyGet(host: string, token: string, path: string) {
+  return fetch(shopifyAdminUrl(host, path), {
+    headers: {
+      "X-Shopify-Access-Token": token,
+      Accept: "application/json",
+    },
+  });
+}
+
+function authError(status: number, body: string, kind: "shop" | "orders"): Error {
+  const hint =
+    kind === "orders"
+      ? "Token reached Shopify, but read_orders is missing. Custom app → Configuration → Admin API scopes → read_orders. Save, reinstall, then copy the new shpat_ token."
+      : "Shopify rejected this token. Install the custom app on the store, then copy Admin API access token (starts with shpat_) from API credentials — shown only once.";
+  const snippet = body.replace(/\s+/g, " ").slice(0, 120);
+  return new Error(
+    snippet ? `${hint} (HTTP ${status}: ${snippet})` : `${hint} (HTTP ${status})`,
+  );
+}
+
+async function fetchShopifyOrders(domain: string, accessToken: string, limit: number) {
+  const host = requireAdminDomain(domain);
+  const token = requireAdminToken(accessToken);
   const params = new URLSearchParams({
     status: "any",
     limit: String(limit),
     order: "updated_at desc",
   });
-  return `https://${host}/admin/api/${SHOPIFY_API_VERSION}/orders.json?${params}`;
-}
-
-async function fetchShopifyOrders(domain: string, accessToken: string, limit: number) {
-  const response = await fetch(shopifyOrdersUrl(domain, limit), {
-    headers: {
-      "X-Shopify-Access-Token": accessToken,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-  });
+  const response = await shopifyGet(host, token, `orders.json?${params}`);
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     if (response.status === 401 || response.status === 403) {
-      throw new Error("Shopify rejected the Admin API token. Check domain and token scopes (read_orders).");
+      throw authError(response.status, body, "orders");
     }
     throw new Error(`Shopify API error ${response.status}${body ? `: ${body.slice(0, 180)}` : ""}`);
   }
@@ -91,6 +131,7 @@ function toOrderRow(order: ShopifyNormalizedOrder, nowIso: string) {
  * into `orders`, and enrich Dropi/Dropea rows that share the same shopify_order_id.
  */
 export const syncShopifyOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => shopifySyncInputSchema.parse(data))
   .handler(async ({ data }): Promise<ShopifySyncResult> => {
     try {
@@ -212,7 +253,44 @@ export const syncShopifyOrders = createServerFn({ method: "POST" })
     }
   });
 
-export const getShopifyDashboard = createServerFn({ method: "GET" }).handler(
+export type ShopifyTestResult = {
+  ok: boolean;
+  shop: string | null;
+  error: string | null;
+};
+
+export const testShopifyConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) =>
+    shopifySyncInputSchema.pick({ storeDomain: true, accessToken: true }).parse(data),
+  )
+  .handler(async ({ data }): Promise<ShopifyTestResult> => {
+    try {
+      const host = requireAdminDomain(data.storeDomain);
+      const token = requireAdminToken(data.accessToken);
+      const shopRes = await shopifyGet(host, token, "shop.json");
+      if (!shopRes.ok) {
+        const body = await shopRes.text().catch(() => "");
+        throw authError(shopRes.status, body, "shop");
+      }
+      const ordersRes = await shopifyGet(host, token, "orders.json?status=any&limit=1");
+      if (!ordersRes.ok) {
+        const body = await ordersRes.text().catch(() => "");
+        throw authError(ordersRes.status, body, "orders");
+      }
+      return { ok: true, shop: host, error: null };
+    } catch (error) {
+      return {
+        ok: false,
+        shop: null,
+        error: error instanceof Error ? error.message : "Unable to reach Shopify.",
+      };
+    }
+  });
+
+export const getShopifyDashboard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
   async (): Promise<ShopifyDashboardResult> => {
     const serverConfigured =
       Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim()) &&

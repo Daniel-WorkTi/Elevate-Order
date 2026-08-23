@@ -3,9 +3,11 @@ import { ChevronLeft } from "lucide-react";
 
 import { SupplyName } from "@/components/supply-logo";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import { useT } from "@/lib/i18n/locale-context";
 import { formatOrderId, getOrderSupply, type OperationalOrder } from "@/lib/order-domain";
 
 export function OrderDetailHeader({ order }: { order: OperationalOrder }) {
+  const t = useT();
   const supply = getOrderSupply(order);
 
   return (
@@ -15,7 +17,7 @@ export function OrderDetailHeader({ order }: { order: OperationalOrder }) {
         className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)] focus-visible:ring-offset-2"
       >
         <ChevronLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
-        Orders
+        {t("orders.detail.back")}
       </Link>
 
       <div className="flex flex-wrap items-center gap-2.5">

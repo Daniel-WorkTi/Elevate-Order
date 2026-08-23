@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
@@ -8,66 +9,105 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
+import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
+import {
+  useWhatsAppSettings,
+  type WhatsAppSettings,
+} from "@/hooks/use-whatsapp-settings";
+import { useT } from "@/lib/i18n/locale-context";
+import { metaT } from "@/lib/i18n/meta";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — ELEVATE" },
-      {
-        name: "description",
-        content:
-          "Configure your WhatsApp Business API credentials, message templates and Dropi Pro / Dropea sync.",
-      },
-      { property: "og:title", content: "Settings — ELEVATE" },
-      {
-        property: "og:description",
-        content: "WhatsApp Business API keys, templates and integration sync settings.",
-      },
+      { title: metaT("meta.settingsTitle") },
+      { name: "description", content: metaT("meta.appDescription") },
+      { property: "og:title", content: metaT("meta.settingsTitle") },
+      { property: "og:description", content: metaT("meta.appDescription") },
     ],
   }),
   component: SettingsPage,
 });
 
 function SettingsPage() {
+  const t = useT();
+  const { settings, save } = useWhatsAppSettings();
+  const dropi = useDropiConnectionPreference();
+  const dropea = useDropeaConnectionPreference();
+  const [draft, setDraft] = useState<WhatsAppSettings>(settings);
+
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
+
+  function update<K extends keyof WhatsAppSettings>(key: K, value: WhatsAppSettings[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
   return (
-    <AppShell title="Settings" subtitle="Account and WhatsApp configuration.">
+    <AppShell title={t("settings.title")} subtitle={t("settings.subtitle")}>
       <form
         className="grid gap-5 lg:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
-          toast.success("Settings saved");
+          save({
+            ...draft,
+            defaultIncidentTemplate:
+              draft.defaultIncidentTemplate.trim() || t("settings.defaultTemplateValue"),
+          });
+          toast.success(t("settings.saved"));
         }}
       >
         <section className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] lg:col-span-2">
           <div>
-            <h2 className="text-[24px] font-bold">WhatsApp Business API</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Credentials are stored encrypted and used only to deliver your messages.
-            </p>
+            <h2 className="text-[24px] font-bold">{t("settings.whatsappApi")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("settings.whatsappApiHint")}</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="phone-id">Phone number ID</Label>
-              <Input id="phone-id" placeholder="109876543210987" className="rounded-xl" />
+              <Label htmlFor="phone-id">{t("settings.phoneNumberId")}</Label>
+              <Input
+                id="phone-id"
+                value={draft.phoneNumberId}
+                onChange={(event) => update("phoneNumberId", event.target.value)}
+                placeholder="109876543210987"
+                className="rounded-xl"
+                autoComplete="off"
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="waba-id">Business account ID</Label>
-              <Input id="waba-id" placeholder="204567891234567" className="rounded-xl" />
+              <Label htmlFor="waba-id">{t("settings.businessAccountId")}</Label>
+              <Input
+                id="waba-id"
+                value={draft.businessAccountId}
+                onChange={(event) => update("businessAccountId", event.target.value)}
+                placeholder="204567891234567"
+                className="rounded-xl"
+                autoComplete="off"
+              />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="token">Permanent access token</Label>
-              <Input id="token" type="password" placeholder="••••••••••••••••" className="rounded-xl" />
+              <Label htmlFor="token">{t("settings.permanentToken")}</Label>
+              <Input
+                id="token"
+                type="password"
+                value={draft.permanentToken}
+                onChange={(event) => update("permanentToken", event.target.value)}
+                placeholder="••••••••••••••••"
+                className="rounded-xl"
+                autoComplete="off"
+              />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="template">Default incident template</Label>
+              <Label htmlFor="template">{t("settings.defaultIncidentTemplate")}</Label>
               <Textarea
                 id="template"
                 rows={5}
                 className="rounded-xl"
-                defaultValue={
-                  "Hi {{customer}}! This is ELEVATE support about your order {{order_id}}. We noticed an incident with your delivery — could you confirm your address?"
-                }
+                value={draft.defaultIncidentTemplate || t("settings.defaultTemplateValue")}
+                onChange={(event) => update("defaultIncidentTemplate", event.target.value)}
               />
             </div>
           </div>
@@ -76,49 +116,65 @@ function SettingsPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button type="submit" className="rounded-xl gradient-cta border-0">
-              Save configuration
+              {t("settings.saveConfiguration")}
             </Button>
             <Button
               type="button"
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("Test message sent")}
+              onClick={() =>
+                toast.message(t("settings.testMessageUnavailable"), {
+                  description: t("settings.testMessageUnavailableDesc"),
+                })
+              }
             >
-              Send test message
+              {t("settings.sendTestMessage")}
             </Button>
           </div>
         </section>
 
         <section className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <div>
-            <h2 className="text-[18px] font-semibold">Integrations</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Real-time order status sync.</p>
+            <h2 className="text-[18px] font-semibold">{t("settings.integrations")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("settings.integrationsHint")}</p>
           </div>
 
           {[
-            { name: "Dropi Pro", detail: "Connected · syncs every 2 min" },
-            { name: "Dropea", detail: "Connected · syncs every 5 min" },
+            { name: "Dropi", linked: dropi.linked, to: "/connections/dropi" as const },
+            { name: "Dropea", linked: dropea.linked, to: "/connections/dropea" as const },
           ].map((integration) => (
             <div
               key={integration.name}
-              className="flex items-center justify-between rounded-xl border border-border bg-secondary/60 p-4"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/60 p-4"
             >
               <div>
                 <p className="font-medium">{integration.name}</p>
-                <p className="text-xs text-muted-foreground">{integration.detail}</p>
+                <p className="text-xs text-muted-foreground">
+                  {integration.linked ? t("connections.connected") : t("connections.notConnected")}
+                </p>
               </div>
-              <Switch defaultChecked aria-label={`Toggle ${integration.name}`} />
+              <Button asChild variant="outline" size="sm" className="rounded-[10px] shadow-none">
+                <Link to={integration.to}>{t("settings.manageConnection")}</Link>
+              </Button>
             </div>
           ))}
 
+          <Button asChild variant="outline" className="w-full rounded-[10px] shadow-none">
+            <Link to="/connections">{t("settings.openConnections")}</Link>
+          </Button>
+
           <Separator />
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-medium">Auto-message incidents</p>
-              <p className="text-xs text-muted-foreground">Send template on new incident</p>
+              <p className="font-medium">{t("settings.autoMessage")}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.autoMessageHint")}</p>
             </div>
-            <Switch defaultChecked aria-label="Toggle auto-message" />
+            <Switch
+              checked={draft.autoMessage}
+              onCheckedChange={(checked) => update("autoMessage", checked)}
+              aria-label={t("settings.toggleAutoMessage")}
+            />
           </div>
         </section>
       </form>

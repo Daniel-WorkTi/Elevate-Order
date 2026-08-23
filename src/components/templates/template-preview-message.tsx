@@ -1,5 +1,7 @@
 import { Phone, Video } from "lucide-react";
 
+import { useT } from "@/lib/i18n/locale-context";
+
 export function TemplatePreviewMessage({
   customerName,
   message,
@@ -9,6 +11,7 @@ export function TemplatePreviewMessage({
   message: string;
   timeLabel: string;
 }) {
+  const t = useT();
   const initials = customerName
     .split(/\s+/)
     .filter(Boolean)
@@ -19,7 +22,7 @@ export function TemplatePreviewMessage({
   return (
     <div
       className="overflow-hidden rounded-[16px] border border-border bg-white"
-      aria-label="WhatsApp-style message preview"
+      aria-label={t("templates.previewAria")}
     >
       <div className="flex items-center gap-2.5 border-b border-border bg-[#F7F8FA] px-3 py-2.5">
         <div
@@ -30,7 +33,7 @@ export function TemplatePreviewMessage({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold text-foreground">{customerName}</p>
-          <p className="text-[11px] text-emerald-600">Online</p>
+          <p className="text-[11px] text-emerald-600">{t("templates.online")}</p>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground" aria-hidden>
           <Video className="size-3.5" strokeWidth={1.5} />

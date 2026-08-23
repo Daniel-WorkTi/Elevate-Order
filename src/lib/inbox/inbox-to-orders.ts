@@ -23,6 +23,7 @@ export function inboxItemToOperationalOrder(item: InboxItem): OperationalOrder {
     source: item.supply === "dropi" ? "Dropi Pro" : "Dropea",
     last_event_at: item.updatedAt,
     created_at: item.updatedAt,
+    product_summary: item.product,
   };
 }
 

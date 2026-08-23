@@ -4,12 +4,16 @@ import { ArrowLeft } from "lucide-react";
 import { SupplyMark } from "@/components/supply-logo";
 import {
   dropiStatusClass,
-  dropiStatusLabel,
+  dropiStatusDotClass,
+  dropiStatusLabelKey,
 } from "@/lib/integrations/dropi/dropi-format";
 import type { DropiConnectionStatus } from "@/lib/integrations/dropi/dropi-types";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export function DropiHeader({ status }: { status: DropiConnectionStatus }) {
+  const t = useT();
+
   return (
     <div className="space-y-3">
       <Link
@@ -17,7 +21,7 @@ export function DropiHeader({ status }: { status: DropiConnectionStatus }) {
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#667085] hover:text-[#0A0C10]"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        Connections
+        {t("connections.back")}
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -25,7 +29,7 @@ export function DropiHeader({ status }: { status: DropiConnectionStatus }) {
           <SupplyMark supply="dropi" size={40} className="rounded-[10px]" />
           <div>
             <h1 className="text-[22px] font-semibold tracking-tight text-[#0A0C10]">Dropi Pro</h1>
-            <p className="mt-1 text-[13px] text-[#667085]">Webhook synchronization</p>
+            <p className="mt-1 text-[13px] text-[#667085]">{t("connections.webhookSync")}</p>
           </div>
         </div>
         <span
@@ -34,8 +38,11 @@ export function DropiHeader({ status }: { status: DropiConnectionStatus }) {
             dropiStatusClass(status),
           )}
         >
-          <span className="size-1.5 rounded-full bg-current opacity-80" aria-hidden />
-          {dropiStatusLabel(status)}
+          <span
+            className={cn("size-2 shrink-0 rounded-full", dropiStatusDotClass(status))}
+            aria-hidden
+          />
+          {t(dropiStatusLabelKey(status))}
         </span>
       </div>
     </div>

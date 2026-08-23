@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 
 import { SupplyMark } from "@/components/supply-logo";
+import { useT } from "@/lib/i18n/locale-context";
 import type { Supply } from "@/lib/order-domain";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,7 @@ export function ConnectionHero({
   subtitle,
   statusLabel,
   statusClass,
+  statusDotClass,
   methodLabel,
 }: {
   supply: Supply;
@@ -18,8 +20,11 @@ export function ConnectionHero({
   subtitle: string;
   statusLabel: string;
   statusClass: string;
+  statusDotClass?: string;
   methodLabel: string;
 }) {
+  const t = useT();
+
   return (
     <div className="space-y-4">
       <Link
@@ -27,7 +32,7 @@ export function ConnectionHero({
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#667085] hover:text-[#0A0C10]"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        Connections
+        {t("connections.back")}
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -46,10 +51,18 @@ export function ConnectionHero({
               statusClass,
             )}
           >
-            <span className="size-1.5 rounded-full bg-current opacity-80" aria-hidden />
+            <span
+              className={cn(
+                "size-2 shrink-0 rounded-full",
+                statusDotClass ?? "bg-current opacity-70",
+              )}
+              aria-hidden
+            />
             {statusLabel}
           </span>
-          <span className="text-[12px] text-[#667085]">Method: {methodLabel}</span>
+          <span className="text-[12px] text-[#667085]">
+            {t("connections.method", { method: methodLabel })}
+          </span>
         </div>
       </div>
     </div>

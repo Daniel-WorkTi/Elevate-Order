@@ -29,6 +29,7 @@ export type OperationalOrder = {
   source: string;
   last_event_at: string | null;
   created_at: string | null;
+  product_summary: string | null;
 };
 
 export const SUPPLY_LABEL: Record<Supply, string> = {
@@ -37,6 +38,7 @@ export const SUPPLY_LABEL: Record<Supply, string> = {
   shopify: "Shopify",
 };
 
+/** English fallback labels (templates / non-UI). Prefer `ORDER_STATUS_I18N_KEY` + `t()` in UI. */
 const STATUS_LABEL: Record<Exclude<OrderStatusKey, "unknown">, string> = {
   incident: "Incident",
   waiting: "Waiting",
@@ -45,6 +47,18 @@ const STATUS_LABEL: Record<Exclude<OrderStatusKey, "unknown">, string> = {
   delivered: "Delivered",
   confirmed: "Confirmed",
   cancelled: "Cancelled",
+};
+
+/** i18n keys for canonical status labels — translate with `t(ORDER_STATUS_I18N_KEY[key])`. */
+export const ORDER_STATUS_I18N_KEY: Record<OrderStatusKey, string> = {
+  incident: "orders.status.incident",
+  waiting: "orders.status.waiting",
+  messaged: "orders.status.messaged",
+  shipped: "orders.status.shipped",
+  delivered: "orders.status.delivered",
+  confirmed: "orders.status.confirmed",
+  cancelled: "orders.status.cancelled",
+  unknown: "orders.status.unknown",
 };
 
 const STATUS_RULES: Array<{ key: Exclude<OrderStatusKey, "unknown">; pattern: RegExp }> = [

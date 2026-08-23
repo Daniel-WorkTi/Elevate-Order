@@ -15,18 +15,24 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as IntegracaoApiRouteImport } from './routes/integracao-api'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfitsRouteImport } from './routes/profits'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AuthGoogleRouteImport } from './routes/auth.google'
+import { Route as AuthShopifyRouteImport } from './routes/auth.shopify'
 import { Route as ConnectionsIndexRouteImport } from './routes/connections.index'
 import { Route as ConnectionsDropeaRouteImport } from './routes/connections.dropea'
 import { Route as ConnectionsDropiRouteImport } from './routes/connections.dropi'
 import { Route as ConnectionsShopifyRouteImport } from './routes/connections.shopify'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
+import { Route as AuthShopifyCallbackRouteImport } from './routes/auth.shopify.callback'
 import { Route as ApiPublicWebhooksOrdersRouteImport } from './routes/api/public/webhooks/orders'
+import { Route as ApiPublicWebhooksShopifyRouteImport } from './routes/api/public/webhooks/shopify'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -56,6 +62,11 @@ const HelpRoute = HelpRouteImport.update({
 const IntegracaoApiRoute = IntegracaoApiRouteImport.update({
   id: '/integracao-api',
   path: '/integracao-api',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -88,6 +99,21 @@ const TemplatesRoute = TemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthGoogleRoute = AuthGoogleRouteImport.update({
+  id: '/auth/google',
+  path: '/auth/google',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthShopifyRoute = AuthShopifyRouteImport.update({
+  id: '/auth/shopify',
+  path: '/auth/shopify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConnectionsIndexRoute = ConnectionsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -113,11 +139,22 @@ const OrdersIdRoute = OrdersIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => OrdersRoute,
 } as any)
+const AuthShopifyCallbackRoute = AuthShopifyCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthShopifyRoute,
+} as any)
 const ApiPublicWebhooksOrdersRoute = ApiPublicWebhooksOrdersRouteImport.update({
   id: '/api/public/webhooks/orders',
   path: '/api/public/webhooks/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWebhooksShopifyRoute =
+  ApiPublicWebhooksShopifyRouteImport.update({
+    id: '/api/public/webhooks/shopify',
+    path: '/api/public/webhooks/shopify',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -126,18 +163,24 @@ export interface FileRoutesByFullPath {
   '/connections': typeof ConnectionsRouteWithChildren
   '/help': typeof HelpRoute
   '/integracao-api': typeof IntegracaoApiRoute
+  '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/orders': typeof OrdersRouteWithChildren
   '/pricing': typeof PricingRoute
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/google': typeof AuthGoogleRoute
+  '/auth/shopify': typeof AuthShopifyRouteWithChildren
   '/connections/dropea': typeof ConnectionsDropeaRoute
   '/connections/dropi': typeof ConnectionsDropiRoute
   '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
+  '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
+  '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -145,18 +188,24 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/help': typeof HelpRoute
   '/integracao-api': typeof IntegracaoApiRoute
+  '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/orders': typeof OrdersRouteWithChildren
   '/pricing': typeof PricingRoute
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/google': typeof AuthGoogleRoute
+  '/auth/shopify': typeof AuthShopifyRouteWithChildren
   '/connections/dropea': typeof ConnectionsDropeaRoute
   '/connections/dropi': typeof ConnectionsDropiRoute
   '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections': typeof ConnectionsIndexRoute
+  '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
+  '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -166,18 +215,24 @@ export interface FileRoutesById {
   '/connections': typeof ConnectionsRouteWithChildren
   '/help': typeof HelpRoute
   '/integracao-api': typeof IntegracaoApiRoute
+  '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/orders': typeof OrdersRouteWithChildren
   '/pricing': typeof PricingRoute
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/google': typeof AuthGoogleRoute
+  '/auth/shopify': typeof AuthShopifyRouteWithChildren
   '/connections/dropea': typeof ConnectionsDropeaRoute
   '/connections/dropi': typeof ConnectionsDropiRoute
   '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
+  '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRoute
+  '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -188,18 +243,24 @@ export interface FileRouteTypes {
     | '/connections'
     | '/help'
     | '/integracao-api'
+    | '/login'
     | '/onboarding'
     | '/orders'
     | '/pricing'
     | '/profits'
     | '/settings'
     | '/templates'
+    | '/auth/callback'
+    | '/auth/google'
+    | '/auth/shopify'
     | '/connections/dropea'
     | '/connections/dropi'
     | '/connections/shopify'
     | '/orders/$id'
     | '/connections/'
+    | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
+    | '/api/public/webhooks/shopify'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -207,18 +268,24 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/help'
     | '/integracao-api'
+    | '/login'
     | '/onboarding'
     | '/orders'
     | '/pricing'
     | '/profits'
     | '/settings'
     | '/templates'
+    | '/auth/callback'
+    | '/auth/google'
+    | '/auth/shopify'
     | '/connections/dropea'
     | '/connections/dropi'
     | '/connections/shopify'
     | '/orders/$id'
     | '/connections'
+    | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
+    | '/api/public/webhooks/shopify'
   id:
     | '__root__'
     | '/'
@@ -227,18 +294,24 @@ export interface FileRouteTypes {
     | '/connections'
     | '/help'
     | '/integracao-api'
+    | '/login'
     | '/onboarding'
     | '/orders'
     | '/pricing'
     | '/profits'
     | '/settings'
     | '/templates'
+    | '/auth/callback'
+    | '/auth/google'
+    | '/auth/shopify'
     | '/connections/dropea'
     | '/connections/dropi'
     | '/connections/shopify'
     | '/orders/$id'
     | '/connections/'
+    | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
+    | '/api/public/webhooks/shopify'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -248,13 +321,18 @@ export interface RootRouteChildren {
   ConnectionsRoute: typeof ConnectionsRouteWithChildren
   HelpRoute: typeof HelpRoute
   IntegracaoApiRoute: typeof IntegracaoApiRoute
+  LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   OrdersRoute: typeof OrdersRouteWithChildren
   PricingRoute: typeof PricingRoute
   ProfitsRoute: typeof ProfitsRoute
   SettingsRoute: typeof SettingsRoute
   TemplatesRoute: typeof TemplatesRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthGoogleRoute: typeof AuthGoogleRoute
+  AuthShopifyRoute: typeof AuthShopifyRouteWithChildren
   ApiPublicWebhooksOrdersRoute: typeof ApiPublicWebhooksOrdersRoute
+  ApiPublicWebhooksShopifyRoute: typeof ApiPublicWebhooksShopifyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -301,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntegracaoApiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding': {
       id: '/onboarding'
       path: '/onboarding'
@@ -343,6 +428,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/google': {
+      id: '/auth/google'
+      path: '/auth/google'
+      fullPath: '/auth/google'
+      preLoaderRoute: typeof AuthGoogleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/shopify': {
+      id: '/auth/shopify'
+      path: '/auth/shopify'
+      fullPath: '/auth/shopify'
+      preLoaderRoute: typeof AuthShopifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/connections/': {
       id: '/connections/'
       path: '/'
@@ -378,11 +484,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersIdRouteImport
       parentRoute: typeof OrdersRoute
     }
+    '/auth/shopify/callback': {
+      id: '/auth/shopify/callback'
+      path: '/callback'
+      fullPath: '/auth/shopify/callback'
+      preLoaderRoute: typeof AuthShopifyCallbackRouteImport
+      parentRoute: typeof AuthShopifyRoute
+    }
     '/api/public/webhooks/orders': {
       id: '/api/public/webhooks/orders'
       path: '/api/public/webhooks/orders'
       fullPath: '/api/public/webhooks/orders'
       preLoaderRoute: typeof ApiPublicWebhooksOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/webhooks/shopify': {
+      id: '/api/public/webhooks/shopify'
+      path: '/api/public/webhooks/shopify'
+      fullPath: '/api/public/webhooks/shopify'
+      preLoaderRoute: typeof ApiPublicWebhooksShopifyRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -417,6 +537,18 @@ const OrdersRouteChildren: OrdersRouteChildren = {
 const OrdersRouteWithChildren =
   OrdersRoute._addFileChildren(OrdersRouteChildren)
 
+interface AuthShopifyRouteChildren {
+  AuthShopifyCallbackRoute: typeof AuthShopifyCallbackRoute
+}
+
+const AuthShopifyRouteChildren: AuthShopifyRouteChildren = {
+  AuthShopifyCallbackRoute: AuthShopifyCallbackRoute,
+}
+
+const AuthShopifyRouteWithChildren = AuthShopifyRoute._addFileChildren(
+  AuthShopifyRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdsRoute: AdsRoute,
@@ -424,13 +556,18 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectionsRoute: ConnectionsRouteWithChildren,
   HelpRoute: HelpRoute,
   IntegracaoApiRoute: IntegracaoApiRoute,
+  LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   OrdersRoute: OrdersRouteWithChildren,
   PricingRoute: PricingRoute,
   ProfitsRoute: ProfitsRoute,
   SettingsRoute: SettingsRoute,
   TemplatesRoute: TemplatesRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  AuthGoogleRoute: AuthGoogleRoute,
+  AuthShopifyRoute: AuthShopifyRouteWithChildren,
   ApiPublicWebhooksOrdersRoute: ApiPublicWebhooksOrdersRoute,
+  ApiPublicWebhooksShopifyRoute: ApiPublicWebhooksShopifyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
+import { CarrierIdentity } from "@/components/carriers/carrier-identity";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
+import { formatOrderDisplayTotal } from "@/lib/currency/display-amount";
 import { formatRelativeTimestamp } from "@/lib/format-relative-time";
+import { useI18n } from "@/lib/i18n/locale-context";
 import {
-  formatConvertedTotal,
   formatOrderId,
   formatOrderTotal,
   safeTrackingHref,
@@ -16,11 +18,12 @@ export function MobileOrderRow({
   fx,
 }: {
   order: OperationalOrder;
-  fx?: { to: string; rate: number | null } | undefined;
+  fx?: { to: string; rateMap: Record<string, number> } | undefined;
 }) {
+  const { locale, t } = useI18n();
   const total = formatOrderTotal(order);
-  const converted = fx ? formatConvertedTotal(order, fx.to, fx.rate) : null;
-  const updated = formatRelativeTimestamp(order.last_event_at);
+  const converted = fx ? formatOrderDisplayTotal(order, fx.to, fx.rateMap) : null;
+  const updated = formatRelativeTimestamp(order.last_event_at, { locale, t });
   const trackingHref = safeTrackingHref(order.tracking_url);
   const tracking = order.tracking_code?.trim() || null;
 
@@ -64,7 +67,11 @@ export function MobileOrderRow({
       </div>
 
       <p className="mt-2 text-[12px] text-muted-foreground">
-        {order.shipping_company ?? "—"}
+        <CarrierIdentity
+          carrier={order.shipping_company}
+          size="sm"
+          unknownLabel={t("carriers.noInfo")}
+        />
         {tracking ? (
           <>
             {" · "}
@@ -91,7 +98,7 @@ export function MobileOrderRow({
         params={{ id: String(order.order_id) }}
         className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-[color:var(--elevate-blue)] hover:text-[color:var(--elevate-blue-hover)]"
       >
-        Open
+        {t("orders.open")}
         <ArrowRight className="size-3.5" strokeWidth={1.5} />
       </Link>
     </article>

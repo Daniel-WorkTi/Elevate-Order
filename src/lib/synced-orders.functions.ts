@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   ORDER_SORT_FIELDS,
   PAGE_SIZES,
@@ -111,6 +112,7 @@ function mapOrder(row: OrdersRow): OperationalOrder {
     source: row.source,
     last_event_at: row.last_event_at,
     created_at: row.created_at,
+    product_summary: row.product_summary ?? null,
   };
 }
 
@@ -256,7 +258,9 @@ function syncedOrdersErrorMessage(error: unknown): string {
   return "Não foi possível carregar os pedidos sincronizados.";
 }
 
-export const listSyncedOrders = createServerFn({ method: "GET" }).handler(async () => {
+export const listSyncedOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
@@ -280,6 +284,7 @@ export const listSyncedOrders = createServerFn({ method: "GET" }).handler(async 
 });
 
 export const querySyncedOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => parseOrdersQuery(data))
   .handler(async ({ data }): Promise<OrdersQueryResult> => {
     try {
@@ -372,6 +377,7 @@ export const querySyncedOrders = createServerFn({ method: "GET" })
   });
 
 export const getSyncedOrder = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => {
     const raw = (data ?? {}) as Record<string, unknown>;
     const orderId = typeof raw["orderId"] === "number" ? raw["orderId"] : Number(raw["orderId"]);
@@ -433,6 +439,7 @@ export type OrderEventRow = {
 };
 
 export const listOrderEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => {
     const raw = (data ?? {}) as Record<string, unknown>;
     const orderId = typeof raw["orderId"] === "number" ? raw["orderId"] : Number(raw["orderId"]);

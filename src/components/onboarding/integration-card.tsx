@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
 import type { IntegrationOption } from "@/components/onboarding/types";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 type IntegrationCardProps = {
@@ -10,6 +11,7 @@ type IntegrationCardProps = {
 };
 
 export function IntegrationCard({ integration, className }: IntegrationCardProps) {
+  const t = useT();
   const { Icon } = integration;
 
   return (
@@ -30,7 +32,7 @@ export function IntegrationCard({ integration, className }: IntegrationCardProps
         {integration.name}
       </h3>
       <p className="mt-2 flex-1 text-[14px] leading-relaxed text-muted-foreground">
-        {integration.description}
+        {t(`onboarding.integration.${integration.id}`)}
       </p>
 
       <Link
@@ -41,9 +43,9 @@ export function IntegrationCard({ integration, className }: IntegrationCardProps
           "hover:border-[color:var(--elevate-blue)]/40 hover:bg-[color:var(--elevate-blue-soft)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40",
         )}
-        aria-label={`Connect ${integration.name}`}
+        aria-label={t("onboarding.connectAria", { name: integration.name })}
       >
-        Connect
+        {t("onboarding.connect")}
         <ArrowRight className="size-4" strokeWidth={1.5} />
       </Link>
     </article>

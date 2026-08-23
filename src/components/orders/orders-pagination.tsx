@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useT } from "@/lib/i18n/locale-context";
 import { PAGE_SIZES, type PageSize } from "@/lib/order-domain";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export function OrdersPagination({
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: PageSize) => void;
 }) {
+  const t = useT();
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
   const items = pageItems(page, pageCount);
@@ -47,11 +49,7 @@ export function OrdersPagination({
   return (
     <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-[13px] text-muted-foreground">
-        Showing{" "}
-        <span className="font-medium text-foreground">
-          {from}–{to}
-        </span>{" "}
-        of <span className="font-medium text-foreground">{total}</span>
+        {t("orders.showing", { from, to, total })}
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -60,7 +58,7 @@ export function OrdersPagination({
           onValueChange={(value) => onPageSizeChange(Number(value) as PageSize)}
         >
           <SelectTrigger
-            aria-label="Rows per page"
+            aria-label={t("orders.rowsPerPage")}
             className="h-9 w-[88px] rounded-[10px] border-border bg-card text-[13px] shadow-none"
           >
             <SelectValue />
@@ -74,13 +72,13 @@ export function OrdersPagination({
           </SelectContent>
         </Select>
 
-        <nav aria-label="Pagination" className="flex items-center gap-1">
+        <nav aria-label={t("orders.pagination")} className="flex items-center gap-1">
           <Button
             type="button"
             variant="outline"
             size="icon"
             className="size-9 rounded-[10px] border-border bg-card shadow-none"
-            aria-label="Previous page"
+            aria-label={t("orders.previousPage")}
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
           >
@@ -101,7 +99,7 @@ export function OrdersPagination({
                   item === page &&
                     "border-[color:var(--elevate-blue)]/20 bg-[color:var(--elevate-blue-soft)] text-[color:var(--elevate-blue)]",
                 )}
-                aria-label={`Page ${item}`}
+                aria-label={t("orders.pageN", { n: item })}
                 aria-current={item === page ? "page" : undefined}
                 onClick={() => onPageChange(item)}
               >
@@ -114,7 +112,7 @@ export function OrdersPagination({
             variant="outline"
             size="icon"
             className="size-9 rounded-[10px] border-border bg-card shadow-none"
-            aria-label="Next page"
+            aria-label={t("orders.nextPage")}
             disabled={page >= pageCount}
             onClick={() => onPageChange(page + 1)}
           >

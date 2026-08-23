@@ -18,35 +18,35 @@ export function ConnectionStatCards({ cards }: { cards: ConnectionStatCard[] }) 
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <div
+          <article
             key={card.key}
-            className="flex items-center justify-between gap-3 rounded-[14px] border border-[#E6E8EC] bg-white px-4 py-3.5"
+            className="rounded-[14px] border border-[#E6E8EC] bg-white px-4 py-3.5"
           >
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <span
                 className={cn(
-                  "inline-flex size-9 shrink-0 items-center justify-center rounded-full",
+                  "inline-flex size-8 shrink-0 items-center justify-center rounded-full",
                   card.tone,
                 )}
               >
-                <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+                <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
               </span>
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium text-[#667085]">{card.label}</p>
-                {card.hint ? (
-                  <p className="mt-0.5 truncate text-[11px] text-[#667085]">{card.hint}</p>
-                ) : null}
-              </div>
+              <p className="min-w-0 text-[13px] font-medium leading-5 text-[#667085]">
+                {card.label}
+              </p>
             </div>
-            <span
+            <p
               className={cn(
-                "shrink-0 text-right text-[18px] font-semibold tabular-nums tracking-tight text-[#0A0C10]",
+                "mt-2 text-[15px] font-semibold leading-6 tracking-tight text-[#0A0C10] break-words",
                 card.valueClass,
               )}
             >
               {card.value}
-            </span>
-          </div>
+            </p>
+            {card.hint ? (
+              <p className="mt-0.5 text-[11px] leading-4 text-[#667085] break-words">{card.hint}</p>
+            ) : null}
+          </article>
         );
       })}
     </div>

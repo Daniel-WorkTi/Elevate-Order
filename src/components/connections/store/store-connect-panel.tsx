@@ -4,6 +4,8 @@ import { Eye, EyeOff, KeyRound, Link2, Store, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { StoreConnectInput } from "@/hooks/use-store-connection-preference";
+import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
+import { useT } from "@/lib/i18n/locale-context";
 
 export function StoreConnectPanel({
   linked,
@@ -12,6 +14,10 @@ export function StoreConnectPanel({
   accessTokenConfigured,
   onConnect,
   onDisconnect,
+  oauthConfigured = false,
+  oauthShop = null,
+  oauthError = false,
+  onOauthInstall,
 }: {
   linked: boolean;
   storeName: string | null;
@@ -19,34 +25,53 @@ export function StoreConnectPanel({
   accessTokenConfigured: boolean;
   onConnect: (input: StoreConnectInput) => boolean;
   onDisconnect: () => void;
+  oauthConfigured?: boolean;
+  oauthShop?: string | null;
+  oauthError?: boolean;
+  onOauthInstall?: (shop: string) => void;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [oauthShopInput, setOauthShopInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const oauthLinked = Boolean(oauthShop);
 
   if (linked) {
     return (
       <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-semibold text-[#0A0C10]">Store linked to this workspace</h2>
-            <p className="mt-1 text-[13px] text-[#667085]">
-              Shopify is connected. Use Sync now to pull orders with customer, product and tracking
-              data into ELEVATE.
-            </p>
+            <h2 className="text-[15px] font-semibold text-[#0A0C10]">{t("connections.storeLinked")}</h2>
+            <p className="mt-1 text-[13px] text-[#667085]">{t("connections.storeLinkedHint")}</p>
             <div className="mt-3 space-y-2">
-              <InfoRow label="Store name" value={storeName} />
-              <InfoRow label="Domain" value={storeDomain} mono />
-              <div className="flex items-center gap-2 rounded-[10px] border border-[#E6E8EC] bg-[#F7F8FA] px-3 py-2 text-[13px]">
-                <KeyRound className="size-3.5 text-[#667085]" strokeWidth={1.75} />
-                <span className="font-medium text-[#0A0C10]">Admin API token</span>
-                <span className="tabular-nums text-[#667085]">••••••••••••••••</span>
-                <span className="ml-auto text-[11px] font-semibold text-emerald-700">
-                  {accessTokenConfigured ? "Configured" : "Missing"}
-                </span>
-              </div>
+              {storeName ? <InfoRow label={t("connections.storeName")} value={storeName} /> : null}
+              <InfoRow
+                label={t("connections.shopifyConnectedStore")}
+                value={oauthShop ?? storeDomain}
+                mono
+              />
+              {storeDomain && !oauthLinked && !normalizeShopifyDomain(storeDomain) ? (
+                <p className="rounded-[10px] border border-red-100 bg-red-50 px-3 py-2 text-[12px] font-medium text-red-700">
+                  {t("connections.wrongDomainHint")}
+                </p>
+              ) : null}
+              {oauthLinked ? (
+                <p className="rounded-[10px] border border-emerald-100 bg-emerald-50 px-3 py-2 text-[13px] font-medium text-emerald-800">
+                  {t("connections.authorizedViaShopify")}
+                </p>
+              ) : (
+                <div className="flex items-center gap-2 rounded-[10px] border border-[#E6E8EC] bg-[#F7F8FA] px-3 py-2 text-[13px]">
+                  <KeyRound className="size-3.5 text-[#667085]" strokeWidth={1.75} />
+                  <span className="font-medium text-[#0A0C10]">{t("connections.adminApiToken")}</span>
+                  <span className="tabular-nums text-[#667085]">••••••••••••••••</span>
+                  <span className="ml-auto text-[11px] font-semibold text-emerald-700">
+                    {accessTokenConfigured ? t("connections.configured") : t("connections.missing")}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <Button
@@ -56,7 +81,7 @@ export function StoreConnectPanel({
             className="h-9 shrink-0 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
           >
             <Unplug className="size-3.5" strokeWidth={1.75} />
-            Disconnect
+            {t("connections.disconnect")}
           </Button>
         </div>
       </section>
@@ -67,104 +92,152 @@ export function StoreConnectPanel({
     <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
       <div className="flex items-center gap-2">
         <Store className="size-4 text-[#2563EB]" strokeWidth={1.75} />
-        <h2 className="text-[15px] font-semibold text-[#0A0C10]">Connect your store</h2>
+        <h2 className="text-[15px] font-semibold text-[#0A0C10]">{t("connections.connectStore")}</h2>
       </div>
-      <p className="mt-1 max-w-xl text-[13px] text-[#667085]">
-        Connect Shopify with an Admin API access token so ELEVATE can fetch complete orders
-        (customer, phone, address, products, tracking) — same data model as Dropi / Dropea.
-      </p>
+      <p className="mt-1 max-w-xl text-[13px] text-[#667085]">{t("connections.connectStoreHint")}</p>
 
-      <div className="mt-4 space-y-3">
-        <div>
-          <label htmlFor="store-name" className="text-[12px] font-medium text-[#667085]">
-            Store name
+      {oauthError ? (
+        <p className="mt-3 rounded-[10px] border border-red-100 bg-red-50 px-3 py-2 text-[12px] font-medium text-red-700">
+          {t("connections.shopifyOauthError")}
+        </p>
+      ) : null}
+
+      {onOauthInstall ? (
+        <div className="mt-4 space-y-3">
+          <label htmlFor="shopify-shop" className="text-[12px] font-medium text-[#667085]">
+            {t("connections.shopifyDomain")}
           </label>
           <Input
-            id="store-name"
-            value={name}
+            id="shopify-shop"
+            value={oauthShopInput}
             onChange={(event) => {
-              setName(event.target.value);
+              setOauthShopInput(event.target.value);
               setError(null);
             }}
-            placeholder="Erono Store"
-            className="mt-1.5 h-10 rounded-[10px] border-[#E6E8EC] shadow-none"
+            placeholder={t("connections.shopifyShopPlaceholder")}
+            className="h-10 rounded-[10px] border-[#E6E8EC] font-mono text-[13px] shadow-none"
+            disabled={!oauthConfigured}
           />
+          <p className="text-[12px] text-[#667085]">{t("connections.shopifyAdminUrlHint")}</p>
+          {!oauthConfigured ? (
+            <p className="text-[12px] font-medium text-amber-800">{t("connections.shopifyOauthMissing")}</p>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => {
+                const host = normalizeShopifyDomain(oauthShopInput);
+                if (!host) {
+                  setError(t("connections.domainInvalid"));
+                  return;
+                }
+                onOauthInstall(host);
+              }}
+              className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
+            >
+              <Link2 className="size-3.5" strokeWidth={1.75} />
+              {t("connections.installShopify")}
+            </Button>
+          )}
         </div>
+      ) : null}
 
-        <div>
-          <label htmlFor="store-domain" className="text-[12px] font-medium text-[#667085]">
-            Shopify domain
-          </label>
-          <Input
-            id="store-domain"
-            value={domain}
-            onChange={(event) => {
-              setDomain(event.target.value);
-              setError(null);
-            }}
-            placeholder="your-shop.myshopify.com"
-            className="mt-1.5 h-10 rounded-[10px] border-[#E6E8EC] font-mono text-[13px] shadow-none"
-          />
-        </div>
+      {error ? <p className="mt-3 text-[12px] font-medium text-red-600">{error}</p> : null}
 
-        <div>
-          <label htmlFor="store-token" className="text-[12px] font-medium text-[#667085]">
-            Admin API access token
-          </label>
-          <div className="relative mt-1.5">
+      <details className="mt-5 rounded-[12px] border border-[#E6E8EC] bg-[#F7F8FA] p-4">
+        <summary className="cursor-pointer text-[13px] font-medium text-[#667085]">
+          {t("connections.advancedTokenOption")}
+        </summary>
+        <p className="mt-2 text-[12px] text-[#667085]">{t("connections.advancedTokenHint")}</p>
+        <div className="mt-3 space-y-3">
+          <div>
+            <label htmlFor="store-name" className="text-[12px] font-medium text-[#667085]">
+              {t("connections.storeName")}
+            </label>
             <Input
-              id="store-token"
-              type={showToken ? "text" : "password"}
-              autoComplete="off"
-              spellCheck={false}
-              value={accessToken}
+              id="store-name"
+              value={name}
               onChange={(event) => {
-                setAccessToken(event.target.value);
+                setName(event.target.value);
                 setError(null);
               }}
-              placeholder="shpat_…"
-              className="h-10 rounded-[10px] border-[#E6E8EC] pr-10 font-mono text-[13px] shadow-none"
+              placeholder="Erono Store"
+              className="mt-1.5 h-10 rounded-[10px] border-[#E6E8EC] bg-white shadow-none"
             />
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#667085] hover:text-[#0A0C10]"
-              onClick={() => setShowToken((value) => !value)}
-              aria-label={showToken ? "Hide token" : "Show token"}
-            >
-              {showToken ? (
-                <EyeOff className="size-4" strokeWidth={1.5} />
-              ) : (
-                <Eye className="size-4" strokeWidth={1.5} />
-              )}
-            </button>
           </div>
-          <p className="mt-1.5 text-[11px] text-[#667085]">
-            Create a custom app in Shopify Admin → Settings → Apps → Develop apps. Needs{" "}
-            <code className="text-[10px]">read_orders</code> (and ideally{" "}
-            <code className="text-[10px]">read_customers</code>).
-          </p>
+          <div>
+            <label htmlFor="store-domain" className="text-[12px] font-medium text-[#667085]">
+              {t("connections.shopifyDomain")}
+            </label>
+            <Input
+              id="store-domain"
+              value={domain}
+              onChange={(event) => {
+                setDomain(event.target.value);
+                setError(null);
+              }}
+              placeholder="loja.myshopify.com"
+              className="mt-1.5 h-10 rounded-[10px] border-[#E6E8EC] bg-white font-mono text-[13px] shadow-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="store-token" className="text-[12px] font-medium text-[#667085]">
+              {t("connections.adminApiAccessToken")}
+            </label>
+            <div className="relative mt-1.5">
+              <Input
+                id="store-token"
+                type={showToken ? "text" : "password"}
+                autoComplete="off"
+                spellCheck={false}
+                value={accessToken}
+                onChange={(event) => {
+                  setAccessToken(event.target.value);
+                  setError(null);
+                }}
+                placeholder="shpat_…"
+                className="h-10 rounded-[10px] border-[#E6E8EC] bg-white pr-10 font-mono text-[13px] shadow-none"
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#667085] hover:text-[#0A0C10]"
+                onClick={() => setShowToken((value) => !value)}
+                aria-label={showToken ? t("connections.hideToken") : t("connections.showToken")}
+              >
+                {showToken ? (
+                  <EyeOff className="size-4" strokeWidth={1.5} />
+                ) : (
+                  <Eye className="size-4" strokeWidth={1.5} />
+                )}
+              </button>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (!domain.trim()) {
+                setError(t("connections.domainRequired"));
+                return;
+              }
+              if (!normalizeShopifyDomain(domain)) {
+                setError(t("connections.domainInvalid"));
+                return;
+              }
+              const ok = onConnect({ storeName: name, storeDomain: domain, accessToken });
+              if (!ok) {
+                setError(t("connections.enterStoreFields"));
+                return;
+              }
+              setName("");
+              setDomain("");
+              setAccessToken("");
+            }}
+            className="h-10 rounded-[10px] border-[#E6E8EC] bg-white text-[13px] shadow-none"
+          >
+            {t("connections.connectStoreCta")}
+          </Button>
         </div>
-
-        <Button
-          type="button"
-          onClick={() => {
-            const ok = onConnect({ storeName: name, storeDomain: domain, accessToken });
-            if (!ok) {
-              setError("Enter store name, domain, and Admin API access token.");
-              return;
-            }
-            setName("");
-            setDomain("");
-            setAccessToken("");
-          }}
-          className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
-        >
-          <Link2 className="size-3.5" strokeWidth={1.75} />
-          Connect store
-        </Button>
-
-        {error ? <p className="text-[12px] font-medium text-red-600">{error}</p> : null}
-      </div>
+      </details>
     </section>
   );
 }

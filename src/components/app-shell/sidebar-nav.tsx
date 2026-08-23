@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { APP_NAVIGATION, isNavActive, type AppNavItem } from "@/components/app-shell/navigation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 type SidebarNavProps = {
@@ -17,12 +18,18 @@ export function SidebarNav({
   collapsed = false,
   onNavigate,
 }: SidebarNavProps) {
+  const t = useT();
+
   return (
-    <nav aria-label="Main" className={cn("flex flex-1 flex-col gap-1", collapsed ? "px-2" : "px-3")}>
+    <nav
+      aria-label={t("nav.mainAria")}
+      className={cn("flex flex-1 flex-col gap-1", collapsed ? "px-2" : "px-3")}
+    >
       {APP_NAVIGATION.map((item) => (
         <NavLink
           key={item.href}
           item={item}
+          label={t(item.labelKey)}
           active={isNavActive(pathname, item.href)}
           badge={item.showBadge ? inboxCount : undefined}
           collapsed={collapsed}
@@ -35,12 +42,14 @@ export function SidebarNav({
 
 function NavLink({
   item,
+  label,
   active,
   badge,
   collapsed,
   onNavigate,
 }: {
   item: AppNavItem;
+  label: string;
   active: boolean;
   badge?: number | undefined;
   collapsed: boolean;
@@ -74,7 +83,7 @@ function NavLink({
       />
       {!collapsed ? (
         <>
-          <span className="flex-1 tracking-[-0.01em]">{item.label}</span>
+          <span className="flex-1 tracking-[-0.01em]">{label}</span>
           {showBadge ? (
             <span className="min-w-6 rounded-full bg-[color:var(--elevate-blue)] px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums text-white">
               {badge}
@@ -93,7 +102,7 @@ function NavLink({
     <Tooltip delayDuration={0}>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
       <TooltipContent side="right" className="rounded-[8px] border-border bg-card text-foreground">
-        {item.label}
+        {label}
         {showBadge ? ` (${badge})` : ""}
       </TooltipContent>
     </Tooltip>

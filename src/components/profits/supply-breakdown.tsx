@@ -1,4 +1,5 @@
 import { SupplyMark } from "@/components/supply-logo";
+import { useT } from "@/lib/i18n/locale-context";
 import { SUPPLY_LABEL } from "@/lib/order-domain";
 import { formatMargin } from "@/lib/money/calculate-profit";
 import { formatSummaryMoney, type SupplyBreakdownRow } from "@/lib/profits/aggregate";
@@ -10,12 +11,12 @@ export function SupplyBreakdown({
   rows: SupplyBreakdownRow[];
   maxRevenue: number;
 }) {
+  const t = useT();
+
   return (
     <section className="rounded-[16px] border border-border bg-card p-5">
-      <h2 className="text-[15px] font-semibold text-foreground">Supply breakdown</h2>
-      <p className="mt-0.5 text-[12px] text-muted-foreground">
-        Dropi and Dropea can be compared here.
-      </p>
+      <h2 className="text-[15px] font-semibold text-foreground">{t("profits.supplyBreakdown")}</h2>
+      <p className="mt-0.5 text-[12px] text-muted-foreground">{t("profits.supplyBreakdownHint")}</p>
 
       <div className="mt-4 space-y-4">
         {rows.map((row) => {
@@ -31,7 +32,9 @@ export function SupplyBreakdown({
                   {SUPPLY_LABEL[row.supply]}
                 </span>
                 <span className="text-[12px] tabular-nums text-muted-foreground">
-                  {row.orderCount} orders
+                  {t(row.orderCount === 1 ? "profits.ordersCountOne" : "profits.ordersCount", {
+                    count: row.orderCount,
+                  })}
                 </span>
               </div>
 
@@ -43,9 +46,12 @@ export function SupplyBreakdown({
               </div>
 
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12px]">
-                <Stat label="Revenue" value={formatSummaryMoney(row.revenue, row.currency)} />
                 <Stat
-                  label="Known costs"
+                  label={t("profits.revenue")}
+                  value={formatSummaryMoney(row.revenue, row.currency)}
+                />
+                <Stat
+                  label={t("profits.knownCosts")}
                   value={
                     row.costsAvailable
                       ? formatSummaryMoney(row.knownCosts, row.currency)
@@ -53,15 +59,15 @@ export function SupplyBreakdown({
                   }
                 />
                 <Stat
-                  label="Profit"
+                  label={t("profits.profit")}
                   value={
                     row.profitAvailable
                       ? formatSummaryMoney(row.profit, row.currency)
-                      : "Unavailable"
+                      : t("profits.unavailable")
                   }
                 />
                 <Stat
-                  label="Margin"
+                  label={t("profits.margin")}
                   value={row.profitAvailable ? formatMargin(row.margin) : "—"}
                 />
               </dl>

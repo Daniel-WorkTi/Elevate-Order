@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-table";
 
 import { MobileOrderRow } from "@/components/orders/mobile-order-row";
-import { ordersColumns, type OrdersTableMeta } from "@/components/orders/orders-columns";
+import { useOrdersColumns, type OrdersTableMeta } from "@/components/orders/orders-columns";
 import { OrdersEmptyState } from "@/components/orders/orders-empty-state";
 import { OrdersPagination } from "@/components/orders/orders-pagination";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { OperationalOrder, PageSize } from "@/lib/order-domain";
+import { useT } from "@/lib/i18n/locale-context";
+import { SUPPLY_LABEL, type OperationalOrder, type PageSize } from "@/lib/order-domain";
 import { clearFiltersSearch, hasActiveFilters, type OrdersSearch } from "@/lib/orders-search";
 
 export function OrdersTable({
@@ -38,12 +39,14 @@ export function OrdersTable({
   search: OrdersSearch;
   total: number;
   pageCount: number;
-  fx?: { to: string; rate: number | null } | undefined;
+  fx?: { to: string; rateMap: Record<string, number> } | undefined;
   error: string | null;
   onRetry: () => void;
   onSearchChange: (next: OrdersSearch) => void;
 }) {
+  const t = useT();
   const navigate = useNavigate();
+  const columns = useOrdersColumns();
   const sorting = useMemo<SortingState>(
     () => [{ id: search.sort, desc: search.dir === "desc" }],
     [search.sort, search.dir],
@@ -53,7 +56,7 @@ export function OrdersTable({
 
   const table = useReactTable({
     data: orders,
-    columns: ordersColumns,
+    columns,
     state: { sorting },
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
@@ -86,13 +89,7 @@ export function OrdersTable({
       <div className="overflow-hidden rounded-[16px] border border-border bg-card">
         <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
           <p className="text-[15px] font-medium text-foreground">
-            Unable to load{" "}
-            {search.supply === "dropea"
-              ? "Dropea"
-              : search.supply === "shopify"
-                ? "Shopify"
-                : "Dropi"}{" "}
-            orders.
+            {t("orders.loadErrorSupply", { supply: SUPPLY_LABEL[search.supply] })}
           </p>
           <p className="mt-1 text-[13px] text-muted-foreground">{error}</p>
           <div className="mt-5 flex gap-2">
@@ -101,7 +98,7 @@ export function OrdersTable({
               onClick={onRetry}
               className="h-9 rounded-[10px] text-[13px] shadow-none"
             >
-              Retry
+              {t("common.retry")}
             </Button>
             <Button
               asChild
@@ -117,7 +114,7 @@ export function OrdersTable({
                       : "/connections/dropi"
                 }
               >
-                Check connection
+                {t("orders.checkConnection")}
               </Link>
             </Button>
           </div>
@@ -146,7 +143,7 @@ export function OrdersTable({
           <TableBody>
             {orders.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={ordersColumns.length} className="p-0">
+                <TableCell colSpan={columns.length} className="p-0">
                   <OrdersEmptyState
                     supply={search.supply}
                     filtered={filtered}

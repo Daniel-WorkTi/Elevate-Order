@@ -5,6 +5,7 @@ import { CurrencyAmountInput } from "@/components/currency/currency-amount-input
 import { CurrencySelector } from "@/components/currency/currency-selector";
 import { ExchangeRateStatus } from "@/components/currency/exchange-rate-status";
 import { convertWithRate, formatMoney } from "@/lib/currency/convert-money";
+import { useI18n } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 const QUICK = ["EUR", "BRL", "USD", "GBP"] as const;
@@ -36,6 +37,7 @@ export function CurrencyConverterPanel({
   onSwap,
   className,
 }: CurrencyConverterPanelProps) {
+  const { t, locale } = useI18n();
   const fromId = useId();
   const toId = useId();
   const amountId = useId();
@@ -48,31 +50,32 @@ export function CurrencyConverterPanel({
     return convertWithRate({ amount, from, to, rate });
   }, [amount, from, to, rate, unavailable, loading]);
 
+  const moneyLocale = locale === "pt" ? "pt-PT" : "en-US";
   const convertedLabel =
-    converted == null ? "—" : formatMoney(converted, to, "en-US");
+    converted == null ? "—" : formatMoney(converted, to, moneyLocale);
 
   return (
     <div className={cn("space-y-5", className)}>
       <div>
         <h2 className="text-[17px] font-semibold tracking-tight text-[#0A0C10]">
-          Currency converter
+          {t("currency.converter")}
         </h2>
         <p className="mt-1 text-[13px] leading-snug text-[#667085]">
-          Convert using the latest available exchange rate.
+          {t("currency.converterHint")}
         </p>
       </div>
 
       <div className="relative space-y-3">
         <div className="space-y-1.5">
           <label htmlFor={amountId} className="text-[12px] font-medium text-[#667085]">
-            From
+            {t("currency.from")}
           </label>
           <div className="flex h-12 items-stretch overflow-hidden rounded-[12px] border border-[#E6E8EC] bg-white">
             <CurrencySelector
               id={fromId}
               value={from}
               embedded
-              aria-label="From currency"
+              aria-label={t("currency.fromAria")}
               onChange={(code) => {
                 setActiveField("from");
                 onFromChange(code);
@@ -83,7 +86,7 @@ export function CurrencyConverterPanel({
               id={amountId}
               value={amount}
               onChange={setAmount}
-              aria-label="Amount to convert"
+              aria-label={t("currency.amountAria")}
               className="h-full flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
             />
           </div>
@@ -92,7 +95,7 @@ export function CurrencyConverterPanel({
         <div className="relative z-10 -my-1 flex justify-center">
           <button
             type="button"
-            aria-label="Swap currencies"
+            aria-label={t("currency.swapAria")}
             onClick={() => {
               setSwapSpin(true);
               onSwap();
@@ -115,13 +118,13 @@ export function CurrencyConverterPanel({
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-[12px] font-medium text-[#667085]">To</span>
+          <span className="text-[12px] font-medium text-[#667085]">{t("currency.to")}</span>
           <div className="flex h-12 items-stretch overflow-hidden rounded-[12px] border border-[#E6E8EC] bg-[#F7F8FA]">
             <CurrencySelector
               id={toId}
               value={to}
               embedded
-              aria-label="To currency"
+              aria-label={t("currency.toAria")}
               className="bg-transparent"
               onChange={(code) => {
                 setActiveField("to");
@@ -154,7 +157,7 @@ export function CurrencyConverterPanel({
       />
 
       <div className="space-y-2.5">
-        <p className="text-[13px] font-semibold text-[#0A0C10]">Quick currencies</p>
+        <p className="text-[13px] font-semibold text-[#0A0C10]">{t("currency.quickCurrencies")}</p>
         <div className="flex flex-wrap gap-2">
           {QUICK.map((code) => {
             const selected =
@@ -190,7 +193,7 @@ export function CurrencyConverterPanel({
             document.getElementById(activeField === "from" ? fromId : toId)?.click();
           }}
         >
-          All currencies
+          {t("currency.allCurrencies")}
           <ArrowRight className="size-3.5" strokeWidth={1.75} />
         </button>
       </div>

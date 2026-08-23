@@ -1,6 +1,7 @@
 import { Check, RefreshCw, Activity, Unplug, Settings } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export type ConnectionCheck = {
@@ -17,7 +18,7 @@ export function ConnectionSyncPanel({
   onTest,
   onDisconnect,
   onCheckConfiguration,
-  refreshLabel = "Refresh status",
+  refreshLabel,
   showRefresh = true,
 }: {
   title: string;
@@ -25,13 +26,16 @@ export function ConnectionSyncPanel({
   checks: ConnectionCheck[];
   refreshing: boolean;
   onRefresh: () => void;
-  onTest: () => void;
+  onTest?: () => void;
   onDisconnect?: () => void;
   onCheckConfiguration?: () => void;
   refreshLabel?: string;
   /** Hide for webhook supplies where "Sync now" is misleading. */
   showRefresh?: boolean;
 }) {
+  const t = useT();
+  const resolvedRefreshLabel = refreshLabel ?? t("connections.refreshStatus");
+
   return (
     <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
       <h2 className="text-[15px] font-semibold text-[#0A0C10]">{title}</h2>
@@ -62,9 +66,10 @@ export function ConnectionSyncPanel({
             className="h-9 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
           >
             <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} strokeWidth={1.75} />
-            {refreshLabel}
+            {resolvedRefreshLabel}
           </Button>
         ) : null}
+        {onTest ? (
         <Button
           type="button"
           variant={showRefresh ? "outline" : "default"}
@@ -77,8 +82,9 @@ export function ConnectionSyncPanel({
           )}
         >
           <Activity className="size-3.5" strokeWidth={1.75} />
-          Test connection
+          {t("connections.testConnection")}
         </Button>
+        ) : null}
         {onCheckConfiguration ? (
           <Button
             type="button"
@@ -87,7 +93,7 @@ export function ConnectionSyncPanel({
             className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
           >
             <Settings className="size-3.5" strokeWidth={1.75} />
-            Check configuration
+            {t("connections.checkConfiguration")}
           </Button>
         ) : null}
         {onDisconnect ? (
@@ -98,7 +104,7 @@ export function ConnectionSyncPanel({
             className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
           >
             <Unplug className="size-3.5" strokeWidth={1.75} />
-            Disconnect
+            {t("connections.disconnect")}
           </Button>
         ) : null}
       </div>

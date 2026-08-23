@@ -124,6 +124,7 @@
 }
 
 .dark {
+  --elevate-blue-soft: #1e3a5f;
   --background: #0a0c10;
   --foreground: #f7f8fa;
   --card: #12151a;

@@ -4,6 +4,7 @@ import {
 } from "@/lib/integrations/dropi/dropi-format";
 import type { DropiConnectionSummary } from "@/lib/integrations/dropi/dropi-types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n/locale-context";
 
 export function DropiStatusSummary({
   summary,
@@ -12,6 +13,8 @@ export function DropiStatusSummary({
   summary: DropiConnectionSummary | null;
   loading?: boolean;
 }) {
+  const { locale, t } = useI18n();
+
   if (loading || !summary) {
     return (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -27,19 +30,19 @@ export function DropiStatusSummary({
 
   const items = [
     {
-      label: "Last webhook received",
-      value: formatDropiRelative(summary.lastWebhookAt),
+      label: t("connections.lastWebhookReceived"),
+      value: formatDropiRelative(summary.lastWebhookAt, locale),
     },
     {
-      label: "Orders synchronized",
+      label: t("connections.ordersSynchronized"),
       value: formatMetricNumber(summary.orderCount),
     },
     {
-      label: "Events today",
+      label: t("connections.eventsToday"),
       value: formatMetricNumber(summary.eventsToday),
     },
     {
-      label: "Failed events",
+      label: t("connections.failedEvents"),
       value: formatMetricNumber(summary.failedEventsToday),
     },
   ];

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ContactHistory } from "@/components/orders/detail/contact-history";
+import { LanguageBadge } from "@/components/i18n/language-badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,7 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { type OperationalOrder } from "@/lib/order-domain";
+import { useT } from "@/lib/i18n/locale-context";
+import { languageFromCountry } from "@/lib/i18n/languages";
+import type { OperationalOrder } from "@/lib/order-domain";
 import {
   availableMessageChips,
   buildWhatsAppLink,
@@ -24,9 +27,26 @@ import {
   templatesForOrder,
   type MessageTemplateId,
 } from "@/lib/order-message";
+import type { OrderEventRow } from "@/lib/synced-orders.functions";
 import { listMessageTemplates } from "@/lib/templates.functions";
 
-export function MessageComposer({ order }: { order: OperationalOrder }) {
+const CHIP_LABEL_KEY: Record<string, string> = {
+  order_id: "orders.detail.orderId",
+  status: "common.status",
+  reason: "orders.detail.reason",
+  tracking: "orders.detail.tracking",
+  carrier: "orders.detail.carrier",
+  total: "orders.detail.total",
+};
+
+export function MessageComposer({
+  order,
+  events = [],
+}: {
+  order: OperationalOrder;
+  events?: OrderEventRow[];
+}) {
+  const t = useT();
   const defaultId = pickDefaultTemplate(order);
   const [templateId, setTemplateId] = useState<MessageTemplateId>(defaultId);
   const [message, setMessage] = useState("");
@@ -38,16 +58,16 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
 
   const templates = useMemo(() => {
     if (templatesQuery.data?.templates?.length) {
-      return templatesQuery.data.templates.map((t) => ({
-        id: t.kind as MessageTemplateId,
-        label: t.name,
-        body: t.content,
+      return templatesQuery.data.templates.map((item) => ({
+        id: item.kind as MessageTemplateId,
+        label: item.name,
+        body: item.content,
       }));
     }
     return templatesForOrder(order);
   }, [templatesQuery.data, order]);
 
-  const template = templates.find((t) => t.id === templateId) ?? templates[0]!;
+  const template = templates.find((item) => item.id === templateId) ?? templates[0]!;
 
   useEffect(() => {
     setTemplateId(pickDefaultTemplate(order));
@@ -65,9 +85,9 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(message);
-      toast.success("Message copied");
+      toast.success(t("orders.detail.messageCopied"));
     } catch {
-      toast.error("Unable to copy message");
+      toast.error(t("orders.detail.copyMessageFailed"));
     }
   }
 
@@ -78,17 +98,18 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
     >
       <div className="space-y-1">
         <h2 id="contact-heading" className="text-[15px] font-semibold text-foreground">
-          Contact customer
+          {t("orders.detail.contactCustomer")}
         </h2>
-        <p className="text-[13px] text-muted-foreground">
-          Prepare the message using data from this order.
-        </p>
+        <p className="text-[13px] text-muted-foreground">{t("orders.detail.contactHint")}</p>
       </div>
 
       <div className="mt-5 space-y-2">
-        <Label htmlFor="order-template" className="text-[12px] text-muted-foreground">
-          Template
-        </Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor="order-template" className="text-[12px] text-muted-foreground">
+            {t("orders.detail.template")}
+          </Label>
+          <LanguageBadge language={languageFromCountry(order.country)} />
+        </div>
         <Select
           value={templateId}
           onValueChange={(value) => setTemplateId(value as MessageTemplateId)}
@@ -107,14 +128,14 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
       </div>
 
       {chips.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-1.5" aria-label="Available fields">
+        <div className="mt-4 flex flex-wrap gap-1.5" aria-label={t("orders.detail.availableFields")}>
           {chips.map((chip) => (
             <span
               key={chip.id}
               title={chip.value}
               className="inline-flex rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
             >
-              {chip.label}
+              {CHIP_LABEL_KEY[chip.id] ? t(CHIP_LABEL_KEY[chip.id]!) : chip.label}
             </span>
           ))}
         </div>
@@ -122,7 +143,7 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
 
       <div className="mt-4 space-y-2">
         <Label htmlFor="order-message" className="text-[12px] text-muted-foreground">
-          Message
+          {t("orders.detail.message")}
         </Label>
         <Textarea
           id="order-message"
@@ -134,7 +155,7 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
       </div>
 
       <div className="mt-4 space-y-2">
-        <p className="text-[12px] font-medium text-muted-foreground">Preview</p>
+        <p className="text-[12px] font-medium text-muted-foreground">{t("orders.detail.preview")}</p>
         <div className="rounded-[10px] border border-border bg-background px-3.5 py-3 text-[13px] leading-relaxed whitespace-pre-wrap text-foreground">
           {preview || "—"}
         </div>
@@ -148,7 +169,7 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
           >
             <a href={waHref} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="size-4" strokeWidth={1.5} />
-              Open WhatsApp
+              {t("orders.detail.openWhatsApp")}
             </a>
           </Button>
         ) : (
@@ -158,7 +179,7 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
             className="h-10 rounded-[10px] bg-whatsapp text-white opacity-50 shadow-none"
           >
             <MessageCircle className="size-4" strokeWidth={1.5} />
-            Open WhatsApp
+            {t("orders.detail.openWhatsApp")}
           </Button>
         )}
         <Button
@@ -168,16 +189,18 @@ export function MessageComposer({ order }: { order: OperationalOrder }) {
           onClick={() => void copyMessage()}
         >
           <Copy className="size-4" strokeWidth={1.5} />
-          Copy message
+          {t("orders.detail.copyMessage")}
         </Button>
       </div>
 
       {!phone ? (
-        <p className="mt-2 text-[12px] text-muted-foreground">Customer phone is unavailable.</p>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {t("orders.detail.phoneUnavailable")}
+        </p>
       ) : null}
 
       <div className="mt-6 border-t border-border pt-5">
-        <ContactHistory />
+        <ContactHistory events={events} />
       </div>
     </section>
   );

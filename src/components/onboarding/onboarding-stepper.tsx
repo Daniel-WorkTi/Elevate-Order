@@ -1,5 +1,6 @@
 import { ONBOARDING_STEPS } from "@/components/onboarding/integrations";
 import type { OnboardingStepId } from "@/components/onboarding/types";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 type OnboardingStepperProps = {
@@ -8,11 +9,12 @@ type OnboardingStepperProps = {
 };
 
 export function OnboardingStepper({ currentStep = "store", className }: OnboardingStepperProps) {
+  const t = useT();
   const currentIndex = ONBOARDING_STEPS.findIndex((s) => s.id === currentStep);
 
   return (
     <ol
-      aria-label="Onboarding progress"
+      aria-label={t("onboarding.progressAria")}
       className={cn(
         "mx-auto flex w-full max-w-[960px] items-start justify-between gap-2",
         className,
@@ -53,7 +55,7 @@ export function OnboardingStepper({ currentStep = "store", className }: Onboardi
                 active ? "text-[color:var(--elevate-blue)]" : "text-muted-foreground",
               )}
             >
-              {step.label}
+              {t(`onboarding.step.${step.id}`)}
             </span>
           </li>
         );

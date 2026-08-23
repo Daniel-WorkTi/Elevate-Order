@@ -1,12 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { startOfDay } from "date-fns";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { DROPI_WEBHOOK_FIELDS, DROPI_WEBHOOK_PATH } from "@/lib/integrations/dropi/dropi-fields";
 import type {
   DropiConnectionStatus,
   DropiDashboardResult,
   DropiWebhookEventRow,
 } from "@/lib/integrations/dropi/dropi-types";
+import {
+  buildWebhookRelativeUrl,
+  webhookAuthConfigured,
+} from "@/lib/integrations/webhook-auth";
 
 function envPresent(name: string) {
   const value = process.env[name]?.trim();
@@ -74,10 +79,13 @@ function deriveStatus(input: {
   return "configured";
 }
 
-export const getDropiDashboard = createServerFn({ method: "GET" }).handler(
+export const getDropiDashboard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
   async (): Promise<DropiDashboardResult> => {
-    const authConfigured = envPresent("SUPABASE_PUBLISHABLE_KEY");
+    const authConfigured = webhookAuthConfigured();
     const serverConfigured = envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
+    const webhookRelativeUrl = buildWebhookRelativeUrl();
 
     const emptySummary = {
       status: deriveStatus({
@@ -88,6 +96,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" }).handler(
       }),
       method: "webhook" as const,
       webhookPath: DROPI_WEBHOOK_PATH,
+      webhookRelativeUrl,
       authConfigured,
       serverConfigured,
       lastWebhookAt: null,
@@ -174,6 +183,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" }).handler(
           }),
           method: "webhook",
           webhookPath: DROPI_WEBHOOK_PATH,
+          webhookRelativeUrl,
           authConfigured,
           serverConfigured,
           lastWebhookAt: lastAt,

@@ -1,11 +1,13 @@
-import { PanelLeftClose } from "lucide-react";
+import { PanelLeft, PanelLeftClose } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { MouseEvent } from "react";
 
 import markUrl from "@/assets/elevate-mark.png";
+import { LanguageSwitcher } from "@/components/app-shell/language-switcher";
 import { SidebarNav } from "@/components/app-shell/sidebar-nav";
 import { UserMenu, type Operator } from "@/components/app-shell/user-menu";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 type AppSidebarProps = {
@@ -27,28 +29,30 @@ export function AppSidebar({
   onNavigate,
   onToggleCollapse,
 }: AppSidebarProps) {
+  const t = useT();
+
   function handleCollapsedClick(event: MouseEvent<HTMLElement>) {
     if (!collapsed || !onToggleCollapse) return;
-    // Ignore the collapse control itself (not present when collapsed).
     const target = event.target as HTMLElement | null;
     if (target?.closest("[data-sidebar-collapse]")) return;
+    if (target?.closest("a,button,[role='group']")) return;
     onToggleCollapse();
   }
 
   return (
     <aside
       className={cn(
-        "flex h-dvh min-h-dvh shrink-0 flex-col bg-[color:var(--elevate-sidebar)] text-sidebar-foreground",
-        collapsed ? "w-[72px] cursor-pointer" : "w-[264px]",
+        "flex h-dvh min-h-dvh w-full shrink-0 flex-col bg-[color:var(--elevate-sidebar)] text-sidebar-foreground",
+        collapsed && "cursor-pointer",
         className,
       )}
-      title={collapsed ? "Click to expand sidebar" : undefined}
+      title={collapsed ? t("shell.clickToExpand") : undefined}
       onClick={handleCollapsedClick}
     >
       <div
         className={cn(
           "flex items-start justify-between gap-2 px-6 pt-8 pb-5",
-          collapsed && "justify-center px-3 pt-6",
+          collapsed && "flex-col items-center justify-start gap-3 px-3 pt-6",
         )}
       >
         <Link
@@ -58,7 +62,7 @@ export function AppSidebar({
             "flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/50",
             collapsed && "justify-center",
           )}
-          aria-label="ELEVATE Orders home"
+          aria-label={t("shell.homeAria")}
         >
           <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-white">
             <img
@@ -74,14 +78,16 @@ export function AppSidebar({
           {!collapsed ? (
             <span className="flex min-w-0 flex-col leading-none">
               <span className="text-[15px] font-semibold tracking-tight text-white">ELEVATE</span>
-              <span className="mt-1 text-[12px] text-[color:var(--sidebar-muted)]">Orders</span>
+              <span className="mt-1 text-[12px] text-[color:var(--sidebar-muted)]">
+                {t("shell.productSubtitle")}
+              </span>
             </span>
           ) : (
-            <span className="sr-only">ELEVATE Orders</span>
+            <span className="sr-only">ELEVATE {t("shell.productSubtitle")}</span>
           )}
         </Link>
 
-        {onToggleCollapse && !collapsed ? (
+        {onToggleCollapse ? (
           <Button
             type="button"
             variant="ghost"
@@ -89,12 +95,18 @@ export function AppSidebar({
             data-sidebar-collapse=""
             className="size-8 shrink-0 rounded-[8px] text-[color:var(--sidebar-muted)] hover:bg-white/[0.06] hover:text-white"
             onClick={(event) => {
+              event.preventDefault();
               event.stopPropagation();
               onToggleCollapse();
             }}
-            aria-label="Collapse sidebar"
+            aria-label={collapsed ? t("shell.expandSidebar") : t("shell.collapseSidebar")}
+            aria-expanded={!collapsed}
           >
-            <PanelLeftClose className="size-4" strokeWidth={1.5} />
+            {collapsed ? (
+              <PanelLeft className="size-4" strokeWidth={1.5} />
+            ) : (
+              <PanelLeftClose className="size-4" strokeWidth={1.5} />
+            )}
           </Button>
         ) : null}
       </div>
@@ -110,8 +122,9 @@ export function AppSidebar({
         />
       </div>
 
-      <div className="mt-auto shrink-0 border-t border-white/[0.06] p-3">
+      <div className="mt-auto shrink-0 space-y-2 border-t border-white/[0.06] p-3">
         <UserMenu operator={operator} collapsed={collapsed} />
+        <LanguageSwitcher collapsed={collapsed} />
       </div>
     </aside>
   );

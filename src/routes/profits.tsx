@@ -11,6 +11,7 @@ import { ProfitsSkeleton } from "@/components/profits/profits-skeleton";
 import { ProfitsTable } from "@/components/profits/profits-table";
 import { SupplyBreakdown } from "@/components/profits/supply-breakdown";
 import { Button } from "@/components/ui/button";
+import { useCurrencyPreference } from "@/hooks/use-currency-preference";
 import { useProfitExchangeRates } from "@/hooks/use-profit-exchange-rates";
 import { formatRelativeTimestamp } from "@/lib/format-relative-time";
 import { queryProfitsOrders } from "@/lib/profits.functions";
@@ -20,22 +21,22 @@ import {
   buildSupplyBreakdown,
 } from "@/lib/profits/aggregate";
 import { profitsSearchSchema, type ProfitsSearch } from "@/lib/profits/profits-search";
+import { useI18n } from "@/lib/i18n/locale-context";
+import { metaT } from "@/lib/i18n/meta";
 
 export const Route = createFileRoute("/profits")({
   validateSearch: profitsSearchSchema,
   head: () => ({
     meta: [
-      { title: "Profits — ELEVATE" },
-      {
-        name: "description",
-        content: "Understand the financial result of your synchronized orders.",
-      },
+      { title: metaT("meta.profitsTitle") },
+      { name: "description", content: metaT("meta.profitsDescription") },
     ],
   }),
   component: ProfitsPage,
 });
 
 function ProfitsPage() {
+  const { locale, t } = useI18n();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/profits" });
 
@@ -58,7 +59,8 @@ function ProfitsPage() {
     placeholderData: keepPreviousData,
   });
 
-  const fx = useProfitExchangeRates(search.currency);
+  const { displayCurrency } = useCurrencyPreference();
+  const fx = useProfitExchangeRates(displayCurrency);
   const orders = query.data?.orders ?? [];
   const meta = query.data?.meta;
   const costsAvailable = meta?.hasCostData ?? false;
@@ -66,37 +68,39 @@ function ProfitsPage() {
 
   const summary = useMemo(
     () =>
-      aggregateFinancials(orders, search.currency, fx.rateMap, {
+      aggregateFinancials(orders, displayCurrency, fx.rateMap, {
         costsAvailable,
         feesAvailable,
       }),
-    [orders, search.currency, fx.rateMap, costsAvailable, feesAvailable],
+    [orders, displayCurrency, fx.rateMap, costsAvailable, feesAvailable],
   );
 
   const chartPoints = useMemo(
-    () => buildRevenueChart(orders, search.period, search.currency, fx.rateMap),
-    [orders, search.period, search.currency, fx.rateMap],
+    () => buildRevenueChart(orders, search.period, displayCurrency, fx.rateMap, locale),
+    [orders, search.period, displayCurrency, fx.rateMap, locale],
   );
 
   const breakdown = useMemo(
     () =>
-      buildSupplyBreakdown(orders, search.currency, fx.rateMap, {
+      buildSupplyBreakdown(orders, displayCurrency, fx.rateMap, {
         costsAvailable,
         feesAvailable,
       }),
-    [orders, search.currency, fx.rateMap, costsAvailable, feesAvailable],
+    [orders, displayCurrency, fx.rateMap, costsAvailable, feesAvailable],
   );
 
   const maxRevenue = Math.max(0, ...breakdown.map((row) => row.revenue ?? 0));
 
   const ratesLabel = (() => {
-    if (search.currency === "EUR") {
-      return "Amounts in EUR — no conversion needed.";
+    if (displayCurrency === "EUR") {
+      return t("profits.ratesEur");
     }
     if (fx.error) return fx.error;
-    const stamp = formatRelativeTimestamp(fx.updatedAt?.toISOString() ?? null);
-    if (stamp) return `Rates updated ${stamp.relative.toLowerCase()}`;
-    return "Exchange rates loading…";
+    const stamp = formatRelativeTimestamp(fx.updatedAt?.toISOString() ?? null, { locale, t });
+    if (stamp) {
+      return t("profits.ratesUpdated", { relative: stamp.relative.toLowerCase() });
+    }
+    return t("profits.ratesLoading");
   })();
 
   function setSearch(next: ProfitsSearch) {
@@ -120,37 +124,39 @@ function ProfitsPage() {
   }
 
   const showSkeleton = query.isPending && !query.data;
-  const loadError = query.data?.error ?? (query.isError ? "Unable to load profit data." : null);
+  const loadError = query.data?.error ?? (query.isError ? t("profits.loadError") : null);
   const empty = !showSkeleton && !loadError && orders.length === 0;
   const supplyMatchCount = query.data?.meta.supplyMatchCount ?? 0;
 
   return (
-    <AppShell
-      title="Profits"
-      subtitle="Understand the financial result of your synchronized orders."
-    >
+    <AppShell title={t("profits.title")} subtitle={t("profits.subtitle")}>
       <div className="space-y-5">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Profits</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Understand the financial result of your synchronized orders.
-          </p>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
+            {t("profits.title")}
+          </h1>
+          <p className="mt-1 text-[13px] text-muted-foreground">{t("profits.subtitle")}</p>
         </div>
 
-        <ProfitsFilters search={search} onChange={setSearch} ratesLabel={ratesLabel} />
+        <ProfitsFilters
+          search={search}
+          onChange={setSearch}
+          ratesLabel={ratesLabel}
+          displayCurrency={displayCurrency}
+        />
 
         {showSkeleton ? <ProfitsSkeleton /> : null}
 
         {!showSkeleton && loadError ? (
           <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
-            <p className="text-[15px] font-medium text-foreground">Unable to load profit data.</p>
+            <p className="text-[15px] font-medium text-foreground">{t("profits.loadError")}</p>
             <p className="mt-1 text-[13px] text-muted-foreground">{loadError}</p>
             <Button
               type="button"
               className="mt-5 h-9 rounded-[10px] text-[13px] shadow-none"
               onClick={() => void query.refetch()}
             >
-              Retry
+              {t("common.retry")}
             </Button>
           </div>
         ) : null}
@@ -168,13 +174,13 @@ function ProfitsPage() {
             <FinancialSummaryPanel summary={summary} missingCostCount={orders.length} />
 
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
-              <ProfitsChart points={chartPoints} currency={search.currency} />
+              <ProfitsChart points={chartPoints} currency={displayCurrency} />
               <SupplyBreakdown rows={breakdown} maxRevenue={maxRevenue} />
             </div>
 
             <ProfitsTable
               orders={orders}
-              displayCurrency={search.currency}
+              displayCurrency={displayCurrency}
               rateMap={fx.rateMap}
               costsAvailable={costsAvailable}
               feesAvailable={feesAvailable}

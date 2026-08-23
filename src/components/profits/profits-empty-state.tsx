@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/locale-context";
 
 export function ProfitsEmptyState({
   onClear,
@@ -9,15 +10,21 @@ export function ProfitsEmptyState({
   onShowAllTime: () => void;
   supplyMatchCount: number;
 }) {
+  const t = useT();
   const hasOutsidePeriod = supplyMatchCount > 0;
 
   return (
     <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
-      <h2 className="text-[16px] font-semibold text-foreground">No financial data found.</h2>
+      <h2 className="text-[16px] font-semibold text-foreground">{t("profits.emptyTitle")}</h2>
       <p className="mt-1 text-[13px] text-muted-foreground">
         {hasOutsidePeriod
-          ? `There ${supplyMatchCount === 1 ? "is" : "are"} ${supplyMatchCount} synchronized order${supplyMatchCount === 1 ? "" : "s"} outside this period.`
-          : "Try changing the period or supply filter — or sync orders from Dropi / Dropea first."}
+          ? t(
+              supplyMatchCount === 1
+                ? "profits.emptyOutsidePeriodOne"
+                : "profits.emptyOutsidePeriod",
+              { count: supplyMatchCount },
+            )
+          : t("profits.emptyHint")}
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
         {hasOutsidePeriod ? (
@@ -26,7 +33,7 @@ export function ProfitsEmptyState({
             className="h-9 rounded-[10px] text-[13px] shadow-none"
             onClick={onShowAllTime}
           >
-            Show all time
+            {t("profits.showAllTime")}
           </Button>
         ) : null}
         <Button
@@ -35,7 +42,7 @@ export function ProfitsEmptyState({
           className="h-9 rounded-[10px] text-[13px] shadow-none"
           onClick={onClear}
         >
-          Clear filters
+          {t("common.clearFilters")}
         </Button>
       </div>
     </div>

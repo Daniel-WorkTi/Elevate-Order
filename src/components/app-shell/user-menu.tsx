@@ -1,5 +1,6 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, LogOut, Settings } from "lucide-react";
+import { useState } from "react";
 
 import {
   DropdownMenu,
@@ -9,6 +10,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { signOutAuth } from "@/lib/auth/session.functions";
+import { signOut } from "@/lib/auth/social-login";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export type Operator = {
@@ -24,6 +28,26 @@ type UserMenuProps = {
 };
 
 export function UserMenu({ operator, collapsed = false, className }: UserMenuProps) {
+  const t = useT();
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function onSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      try {
+        await signOutAuth();
+      } catch {
+        // Browser sign-out already cleared the session; server clear is best-effort.
+      }
+      await navigate({ to: "/login", search: {} });
+    } catch {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -35,7 +59,7 @@ export function UserMenu({ operator, collapsed = false, className }: UserMenuPro
             collapsed ? "justify-center px-2 py-2" : "px-2.5 py-2",
             className,
           )}
-          aria-label={`Account menu for ${operator.name}`}
+          aria-label={`${t("shell.account")} — ${operator.name}`}
         >
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue)] text-[11px] font-semibold text-white">
             {operator.initials}
@@ -64,18 +88,25 @@ export function UserMenu({ operator, collapsed = false, className }: UserMenuPro
         className="w-[220px] rounded-[14px] border-border p-1 shadow-sm"
       >
         <DropdownMenuLabel className="px-2 py-1.5 text-[11px] font-normal text-muted-foreground">
-          Account
+          {t("shell.account")}
         </DropdownMenuLabel>
         <DropdownMenuItem asChild className="rounded-[8px] text-[13px]">
           <Link to="/settings">
             <Settings className="size-3.5" strokeWidth={1.5} />
-            Settings
+            {t("shell.settings")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="rounded-[8px] text-[13px] text-muted-foreground">
+        <DropdownMenuItem
+          className="rounded-[8px] text-[13px] text-muted-foreground"
+          disabled={signingOut}
+          onSelect={(event) => {
+            event.preventDefault();
+            void onSignOut();
+          }}
+        >
           <LogOut className="size-3.5" strokeWidth={1.5} />
-          Sign out
+          {signingOut ? t("shell.signingOut") : t("shell.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

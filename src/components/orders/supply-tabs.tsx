@@ -1,7 +1,8 @@
 import { SupplyMark } from "@/components/supply-logo";
-import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/locale-context";
 import type { Supply } from "@/lib/order-domain";
 import { SUPPLY_LABEL } from "@/lib/order-domain";
+import { cn } from "@/lib/utils";
 
 const SUPPLIES: Supply[] = ["dropi", "dropea", "shopify"];
 
@@ -12,10 +13,12 @@ export function SupplyTabs({
   value: Supply;
   onChange: (supply: Supply) => void;
 }) {
+  const t = useT();
+
   return (
     <div
       role="tablist"
-      aria-label="Supply"
+      aria-label={t("common.supply")}
       className="inline-flex h-[42px] items-center rounded-[10px] border border-border bg-card p-0.5"
     >
       {SUPPLIES.map((supply) => {

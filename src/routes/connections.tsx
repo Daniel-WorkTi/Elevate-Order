@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const connectionsSearchSchema = z.object({
   source: z.enum(["shopify", "dropi", "dropea"]).optional(),
+  error: z.enum(["oauth"]).optional(),
 });
 
 export const Route = createFileRoute("/connections")({

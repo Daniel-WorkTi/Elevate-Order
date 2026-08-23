@@ -12,18 +12,21 @@ import { SupplyInformation } from "@/components/orders/detail/supply-information
 import { TrackingSection } from "@/components/orders/detail/tracking-section";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useT } from "@/lib/i18n/locale-context";
+import { metaT } from "@/lib/i18n/meta";
 import { getDemoOrderByOrderId } from "@/lib/inbox/inbox-to-orders";
 import { formatOrderId } from "@/lib/order-domain";
 import { getSyncedOrder, listOrderEvents } from "@/lib/synced-orders.functions";
 
 export const Route = createFileRoute("/orders/$id")({
   head: ({ params }) => ({
-    meta: [{ title: `Order #${params.id} — ELEVATE` }],
+    meta: [{ title: metaT("meta.orderDetailTitle", { id: params.id }) }],
   }),
   component: OrderDetailPage,
 });
 
 function OrderDetailPage() {
+  const t = useT();
   const { id } = Route.useParams();
   const orderId = Number(id);
   const validId = Number.isInteger(orderId) && orderId > 0;
@@ -48,13 +51,14 @@ function OrderDetailPage() {
   const loadError =
     !validId || demoOrder
       ? null
-      : (orderQuery.data?.error ?? (orderQuery.isError ? "Unable to load this order." : null));
+      : (orderQuery.data?.error ??
+        (orderQuery.isError ? t("orders.detail.loadError") : null));
   const notFound = validId && !orderQuery.isPending && !loadError && !order;
 
   return (
     <AppShell
-      title={order ? formatOrderId(order) : `Order #${id}`}
-      subtitle="Order detail"
+      title={order ? formatOrderId(order) : `${t("orders.detail.order")} #${id}`}
+      subtitle={t("orders.detailSubtitle")}
     >
       {!validId ? (
         <NotFoundState />
@@ -103,7 +107,7 @@ function OrderDetailPage() {
             </div>
 
             <aside className="order-2 lg:sticky lg:top-24">
-              <MessageComposer order={order} />
+              <MessageComposer order={order} events={eventsQuery.data?.events ?? []} />
             </aside>
 
             <div className="order-3 rounded-[16px] border border-border bg-card p-5 md:p-6 lg:hidden">
@@ -120,24 +124,26 @@ function OrderDetailPage() {
 }
 
 function NotFoundState() {
+  const t = useT();
   return (
     <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
-      <h2 className="text-[18px] font-semibold tracking-tight text-foreground">Order not found</h2>
-      <p className="mt-2 text-[13px] text-muted-foreground">
-        This order may have been removed or the URL is incorrect.
-      </p>
+      <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
+        {t("orders.notFound")}
+      </h2>
+      <p className="mt-2 text-[13px] text-muted-foreground">{t("orders.detail.notFoundHint")}</p>
       <Button asChild className="mt-5 h-9 rounded-[10px] text-[13px] shadow-none">
-        <Link to="/orders">Back to Orders</Link>
+        <Link to="/orders">{t("orders.backToOrders")}</Link>
       </Button>
     </div>
   );
 }
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
       <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
-        Unable to load this order.
+        {t("orders.detail.loadError")}
       </h2>
       <p className="mt-2 text-[13px] text-muted-foreground">{message}</p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
@@ -146,10 +152,10 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
           onClick={onRetry}
           className="h-9 rounded-[10px] text-[13px] shadow-none"
         >
-          Retry
+          {t("common.retry")}
         </Button>
         <Button asChild variant="outline" className="h-9 rounded-[10px] text-[13px] shadow-none">
-          <Link to="/orders">Back to Orders</Link>
+          <Link to="/orders">{t("orders.backToOrders")}</Link>
         </Button>
       </div>
     </div>

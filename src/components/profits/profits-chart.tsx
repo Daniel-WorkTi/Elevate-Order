@@ -8,6 +8,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useI18n } from "@/lib/i18n/locale-context";
 import { formatMoney } from "@/lib/money/format-money";
 import type { ChartPoint } from "@/lib/profits/aggregate";
 
@@ -18,19 +19,22 @@ export function ProfitsChart({
   points: ChartPoint[];
   currency: string;
 }) {
+  const { t, locale } = useI18n();
+  const numberLocale = locale === "pt" ? "pt-PT" : "en-US";
+  const revenueLabel = t("profits.revenue");
+
   return (
     <section className="rounded-[16px] border border-border bg-card p-5">
       <div className="mb-4">
-        <h2 className="text-[15px] font-semibold text-foreground">Financial performance</h2>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Revenue from synchronized order totals. Cost and profit series appear when those fields
-          exist.
-        </p>
+        <h2 className="text-[15px] font-semibold text-foreground">
+          {t("profits.financialPerformance")}
+        </h2>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">{t("profits.chartHint")}</p>
       </div>
 
       {points.length === 0 ? (
         <div className="flex h-[260px] items-center justify-center text-[13px] text-muted-foreground">
-          No chart data for this period.
+          {t("profits.noChartData")}
         </div>
       ) : (
         <div className="h-[280px] w-full">
@@ -55,7 +59,7 @@ export function ProfitsChart({
                 tickLine={false}
                 width={64}
                 tickFormatter={(value: number) =>
-                  new Intl.NumberFormat("pt-PT", {
+                  new Intl.NumberFormat(numberLocale, {
                     notation: "compact",
                     maximumFractionDigits: 1,
                   }).format(value)
@@ -69,7 +73,7 @@ export function ProfitsChart({
                     <div className="rounded-[10px] border border-border bg-card px-3 py-2 text-[12px] shadow-none">
                       <p className="font-medium text-foreground">{label}</p>
                       <p className="mt-1 tabular-nums text-muted-foreground">
-                        Revenue{" "}
+                        {revenueLabel}{" "}
                         <span className="text-foreground">
                           {typeof revenue === "number"
                             ? formatMoney(revenue, currency)
@@ -83,7 +87,7 @@ export function ProfitsChart({
               <Area
                 type="monotone"
                 dataKey="revenue"
-                name="Revenue"
+                name={revenueLabel}
                 stroke="#2563EB"
                 strokeWidth={1.75}
                 fill="url(#revenueFill)"

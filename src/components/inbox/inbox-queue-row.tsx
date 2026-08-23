@@ -1,15 +1,32 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Clock, MessageCircle } from "lucide-react";
 
+import { CarrierIdentity } from "@/components/carriers/carrier-identity";
+import { LanguageBadge } from "@/components/i18n/language-badge";
 import { Button } from "@/components/ui/button";
-import {
-  formatInboxMoney,
-  formatInboxTime,
-  inboxPriorityAccent,
-} from "@/lib/inbox/inbox-format";
+import { useCurrencyPreference } from "@/hooks/use-currency-preference";
+import { useEurRateTable } from "@/hooks/use-eur-rate-table";
+import { formatInboxMoney, formatInboxTime, inboxPriorityAccent } from "@/lib/inbox/inbox-format";
 import type { InboxItem } from "@/lib/inbox/inbox-types";
+import { languageFromCountry } from "@/lib/i18n/languages";
+import { useI18n } from "@/lib/i18n/locale-context";
 import { suggestedMessage, whatsappLink } from "@/lib/orders";
 import { cn } from "@/lib/utils";
+
+function CountryFlag({ code }: { code: string }) {
+  const iso = code.trim().toLowerCase();
+  if (iso.length !== 2 || iso === "un") return null;
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${iso}.png`}
+      alt=""
+      width={16}
+      height={12}
+      className="h-3 w-4 shrink-0 rounded-[2px] object-cover"
+      loading="lazy"
+    />
+  );
+}
 
 function PriorityIcon({ priority }: { priority: InboxItem["priority"] }) {
   if (priority === "critical") return <AlertTriangle className="size-3.5" strokeWidth={1.75} />;
@@ -17,8 +34,26 @@ function PriorityIcon({ priority }: { priority: InboxItem["priority"] }) {
   return <MessageCircle className="size-3.5" strokeWidth={1.75} />;
 }
 
+function demoLabel(
+  value: string,
+  t: (key: string, params?: Record<string, string | number | null | undefined>) => string,
+) {
+  return value.startsWith("inbox.demo.") ? t(value) : value;
+}
+
 export function InboxQueueRow({ item }: { item: InboxItem }) {
+  const { locale, t } = useI18n();
+  const { displayCurrency } = useCurrencyPreference();
+  const fx = useEurRateTable();
+  const money = formatInboxMoney(item, {
+    displayCurrency,
+    rateMap: fx.rateMap,
+  });
+  const language = languageFromCountry(item.country);
   const accent = inboxPriorityAccent(item.priority);
+  const issueLabel = demoLabel(item.issueLabel, t);
+  const issueDetail = demoLabel(item.issueDetail, t);
+  const lastSync = formatInboxTime(item.updatedAt, locale);
   const waHref = whatsappLink(
     {
       id: item.id,
@@ -31,9 +66,9 @@ export function InboxQueueRow({ item }: { item: InboxItem }) {
       total: item.total,
       product: item.product,
       source: item.supply === "dropi" ? "Dropi Pro" : "Dropea",
-      lastSync: formatInboxTime(item.updatedAt),
-      reason: item.issueLabel,
-      note: item.issueDetail,
+      lastSync,
+      reason: issueLabel,
+      note: issueDetail,
     },
     suggestedMessage({
       id: item.id,
@@ -46,23 +81,99 @@ export function InboxQueueRow({ item }: { item: InboxItem }) {
       total: item.total,
       product: item.product,
       source: item.supply === "dropi" ? "Dropi Pro" : "Dropea",
-      lastSync: formatInboxTime(item.updatedAt),
-      reason: item.issueLabel,
-      note: item.issueDetail,
+      lastSync,
+      reason: issueLabel,
+      note: issueDetail,
     }),
   );
 
   return (
-    <article className="relative flex flex-col gap-4 border-b border-[#E6E8EC] py-4 last:border-b-0 md:flex-row md:items-center md:gap-5 md:py-3.5">
-      <span
-        className={cn("absolute inset-y-3 left-0 w-[3px] rounded-full", accent.bar)}
-        aria-hidden
-      />
+    <article className="rounded-[14px] border border-[#E6E8EC] bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      {/* Mobile */}
+      <div className="flex flex-col gap-3 md:hidden">
+        <div className="flex items-start gap-3">
+          <span
+            className={cn(
+              "inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]",
+              accent.icon,
+            )}
+            aria-hidden
+          >
+            <PriorityIcon priority={item.priority} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-[#0A0C10]">#{item.id}</p>
+            <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#667085]">
+              <Clock className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
+              <span className="truncate">{lastSync}</span>
+            </p>
+          </div>
+          <p className="shrink-0 text-[13px] font-semibold tabular-nums text-[#0A0C10]">{money}</p>
+        </div>
 
-      <div className="flex min-w-0 flex-1 items-start gap-3 pl-3 md:items-center">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold text-[#0A0C10]">{item.customer}</p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#667085]">
+              <CountryFlag code={item.countryCode} />
+              <LanguageBadge language={language} />
+              <span className="truncate">{item.country}</span>
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[12px] text-[#667085]">{item.product}</p>
+            <CarrierIdentity
+              carrier={item.carrier}
+              size="sm"
+              unknownLabel={t("carriers.noInfo")}
+              className="mt-1 h-5 text-[13px] font-medium text-[#0A0C10]"
+            />
+          </div>
+        </div>
+
+        <div className="min-w-0 rounded-[10px] border border-[#E6E8EC] bg-[#F7F8FA] px-3 py-2">
+          <p className={cn("flex items-center gap-1.5 text-[13px] font-semibold", accent.label)}>
+            <span className={cn("size-1.5 shrink-0 rounded-full", accent.dot)} aria-hidden />
+            <span className="truncate">{issueLabel}</span>
+          </p>
+          <p className={cn("mt-0.5 truncate text-[12px]", accent.detail)}>{issueDetail}</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button
+            asChild
+            className="h-10 rounded-[10px] bg-[#2563EB] px-3 text-[12px] font-medium text-white shadow-none hover:bg-[#1D4ED8]"
+          >
+            <a href={waHref} target="_blank" rel="noreferrer">
+              <WhatsAppGlyph className="size-3.5 text-white" />
+              {t("inbox.contactCustomer")}
+            </a>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="h-10 rounded-[10px] border-[#E6E8EC] bg-white px-3 text-[12px] font-medium text-[#0A0C10] shadow-none hover:bg-[#F7F8FA]"
+          >
+            <Link
+              to="/orders/$id"
+              params={{ id: String(Number(item.id.replace(/\D/g, "")) || item.id) }}
+            >
+              {t("inbox.viewOrder")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Desktop */}
+      <div
+        className={cn(
+          "hidden md:grid md:grid-cols-[36px_12px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,1.15fr)_minmax(0,0.95fr)_148px]",
+          "md:items-center md:gap-x-4",
+        )}
+      >
         <span
           className={cn(
-            "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full md:mt-0",
+            "inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]",
             accent.icon,
           )}
           aria-hidden
@@ -70,70 +181,84 @@ export function InboxQueueRow({ item }: { item: InboxItem }) {
           <PriorityIcon priority={item.priority} />
         </span>
 
-        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-center lg:gap-4">
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold text-[#0A0C10]">#{item.id}</p>
-            <p className="mt-0.5 text-[12px] text-[#667085]">{formatInboxTime(item.updatedAt)}</p>
-          </div>
+        <div className="h-9 w-px justify-self-center bg-[#E6E8EC]" aria-hidden />
 
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold text-[#0A0C10]">{item.customer}</p>
-            <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#667085]">
-              <img
-                src={`https://flagcdn.com/w40/${item.countryCode}.png`}
-                alt=""
-                width={16}
-                height={12}
-                className="h-3 w-4 rounded-[2px] object-cover"
-                loading="lazy"
-              />
-              {item.country}
-            </p>
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-[13px] font-semibold tabular-nums text-[#0A0C10]">
-              {formatInboxMoney(item)}
-            </p>
-            <p className="mt-0.5 truncate text-[12px] text-[#667085]">{item.product}</p>
-          </div>
-
-          <div className="min-w-0">
-            <p className={cn("text-[13px] font-semibold", accent.label)}>{item.issueLabel}</p>
-            <p className={cn("mt-0.5 truncate text-[12px]", accent.detail)}>{item.issueDetail}</p>
-          </div>
-
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium text-[#0A0C10]">
-              {item.carrier ?? "—"}
-            </p>
-            <p className="mt-0.5 truncate text-[12px] tabular-nums text-[#667085]">
-              {item.tracking ?? "—"}
-            </p>
-          </div>
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold leading-5 text-[#0A0C10]">#{item.id}</p>
+          <p className="mt-0.5 flex items-center gap-1 truncate text-[12px] leading-4 text-[#667085]">
+            <Clock className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
+            <span className="truncate">{lastSync}</span>
+          </p>
         </div>
-      </div>
 
-      <div className="flex shrink-0 flex-col gap-2 pl-3 sm:flex-row md:w-[148px] md:flex-col md:pl-0">
-        <Button
-          asChild
-          variant="outline"
-          className="h-9 rounded-[10px] border-[#2563EB]/35 bg-white px-3 text-[12px] font-medium text-[#2563EB] shadow-none hover:bg-[#EFF6FF]"
-        >
-          <a href={waHref} target="_blank" rel="noreferrer">
-            <WhatsAppGlyph className="size-3.5 text-[#16A34A]" />
-            Contact customer
-          </a>
-        </Button>
-        <Button
-          asChild
-          variant="outline"
-          className="h-9 rounded-[10px] border-[#E6E8EC] bg-white px-3 text-[12px] font-medium text-[#0A0C10] shadow-none hover:bg-[#F7F8FA]"
-        >
-          <Link to="/orders/$id" params={{ id: String(Number(item.id.replace(/\D/g, "")) || item.id) }}>
-            View order
-          </Link>
-        </Button>
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold leading-5 text-[#0A0C10]">
+            {item.customer}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-4 text-[#667085]">
+            <CountryFlag code={item.countryCode} />
+            <LanguageBadge language={language} />
+            <span className="truncate">{item.country}</span>
+          </p>
+        </div>
+
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold leading-5 tabular-nums text-[#0A0C10]">
+            {money}
+          </p>
+          <p className="mt-0.5 truncate text-[12px] leading-4 text-[#667085]">{item.product}</p>
+        </div>
+
+        <div className="min-w-0">
+          <p
+            className={cn(
+              "flex min-w-0 items-center gap-1.5 text-[13px] font-semibold leading-5",
+              accent.label,
+            )}
+          >
+            <span className={cn("size-1.5 shrink-0 rounded-full", accent.dot)} aria-hidden />
+            <span className="truncate">{issueLabel}</span>
+          </p>
+          <p className={cn("mt-0.5 truncate text-[12px] leading-4", accent.detail)}>
+            {issueDetail}
+          </p>
+        </div>
+
+        <div className="min-w-0">
+          <CarrierIdentity
+            carrier={item.carrier}
+            size="sm"
+            unknownLabel={t("carriers.noInfo")}
+            className="h-5 text-[13px] font-medium leading-5 text-[#0A0C10]"
+          />
+          <p className="mt-0.5 truncate text-[12px] leading-4 tabular-nums text-[#667085]">
+            {item.tracking ?? "—"}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Button
+            asChild
+            className="h-9 w-full rounded-[10px] bg-[#2563EB] px-3 text-[12px] font-medium text-white shadow-none hover:bg-[#1D4ED8]"
+          >
+            <a href={waHref} target="_blank" rel="noreferrer">
+              <WhatsAppGlyph className="size-3.5 text-white" />
+              {t("inbox.contactCustomer")}
+            </a>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="h-9 w-full rounded-[10px] border-[#E6E8EC] bg-white px-3 text-[12px] font-medium text-[#0A0C10] shadow-none hover:bg-[#F7F8FA]"
+          >
+            <Link
+              to="/orders/$id"
+              params={{ id: String(Number(item.id.replace(/\D/g, "")) || item.id) }}
+            >
+              {t("inbox.viewOrder")}
+            </Link>
+          </Button>
+        </div>
       </div>
     </article>
   );

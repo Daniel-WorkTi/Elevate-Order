@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
+import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
+
 export const STORE_CONNECTION_KEY = "elevate-store-connection";
 const ACCESS_TOKEN_STORAGE = "elevate-shopify-access-token";
 
@@ -100,16 +102,7 @@ export type StoreConnectInput = {
   accessToken: string;
 };
 
-/** Normalize user input into a *.myshopify.com host when possible. */
-export function normalizeShopifyDomain(value: string): string | null {
-  const trimmed = value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
-  if (!trimmed) return null;
-  const host = trimmed.split("/")[0] ?? "";
-  if (!host) return null;
-  if (host.endsWith(".myshopify.com")) return host;
-  if (/^[a-z0-9][a-z0-9-]*$/.test(host)) return `${host}.myshopify.com`;
-  return host;
-}
+export { normalizeShopifyDomain };
 
 /**
  * Per-workspace Shopify store link + Admin API token for order sync.

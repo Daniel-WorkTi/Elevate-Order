@@ -34,6 +34,8 @@ export type DropiConnectionSummary = {
   status: DropiConnectionStatus;
   method: "webhook";
   webhookPath: string;
+  /** Path + optional ?token= for paste into Dropi. */
+  webhookRelativeUrl: string;
   authConfigured: boolean;
   serverConfigured: boolean;
   lastWebhookAt: string | null;

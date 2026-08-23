@@ -19,6 +19,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/locale-context";
+import { metaT } from "@/lib/i18n/meta";
 import {
   listMessageTemplates,
   resetMessageTemplate,
@@ -37,11 +39,8 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/templates")({
   head: () => ({
     meta: [
-      { title: "Templates — ELEVATE" },
-      {
-        name: "description",
-        content: "Control the messages used for each order situation.",
-      },
+      { title: metaT("meta.templatesTitle") },
+      { name: "description", content: metaT("meta.templatesDescription") },
     ],
   }),
   component: TemplatesPage,
@@ -49,7 +48,27 @@ export const Route = createFileRoute("/templates")({
 
 type MobilePane = "templates" | "edit" | "preview";
 
+function translateValidationErrors(
+  t: (key: string, params?: Record<string, string | number | null | undefined>) => string,
+  errors: string[],
+): string[] {
+  return errors.map((error) => {
+    if (error === "Message cannot be empty.") return t("templates.errors.empty");
+    if (error.startsWith("Unknown variable:")) {
+      const match = error.match(/\{\{(.+?)\}\}/);
+      return t("templates.errors.unknownVariable", {
+        token: match ? `{{${match[1]}}}` : error,
+      });
+    }
+    if (error.includes("Malformed placeholder")) {
+      return t("templates.errors.malformed");
+    }
+    return error;
+  });
+}
+
 function TemplatesPage() {
+  const t = useT();
   const query = useQuery({
     queryKey: ["message-templates"],
     queryFn: () => listMessageTemplates(),
@@ -69,7 +88,7 @@ function TemplatesPage() {
     const list = query.data.templates;
     setTemplates(list);
     setSelectedId((current) => {
-      const stillThere = list.some((t) => t.id === current);
+      const stillThere = list.some((item) => item.id === current);
       if (stillThere && current) return current;
       const first = list[0] ?? null;
       if (first) setDraft(first.content);
@@ -78,24 +97,26 @@ function TemplatesPage() {
   }, [query.data]);
 
   const selected = useMemo(
-    () => templates.find((t) => t.id === selectedId) ?? null,
+    () => templates.find((item) => item.id === selectedId) ?? null,
     [templates, selectedId],
   );
 
   const dirty = Boolean(selected && draft !== selected.content);
   const validation = validateTemplateContent(draft);
   const variables = templateVariables();
+  const editorErrors = translateValidationErrors(t, validation.errors);
 
   const previewContext = createPreviewContext({ withTracking });
   const rendered = renderOrderTemplate({ template: draft, context: previewContext });
-  const previewWarnings = [
-    ...validation.unsupported.map((key) => `Unsupported variable: {{${key}}}`),
-    ...rendered.unsupported
-      .filter((key) => !validation.unsupported.includes(key))
-      .map((key) => `Unsupported variable: {{${key}}}`),
+  const unsupportedKeys = [
+    ...validation.unsupported,
+    ...rendered.unsupported.filter((key) => !validation.unsupported.includes(key)),
   ];
+  const previewWarnings = unsupportedKeys.map((key) =>
+    t("templates.warnings.unsupportedVariable", { token: `{{${key}}}` }),
+  );
 
-  const loadError = query.data?.error ?? (query.isError ? "Unable to load templates." : null);
+  const loadError = query.data?.error ?? (query.isError ? t("templates.loadError") : null);
   const showSkeleton = query.isPending && templates.length === 0;
   const hasTemplates = templates.length > 0;
 
@@ -104,7 +125,7 @@ function TemplatesPage() {
       setPendingTemplateId(id);
       return;
     }
-    const next = templates.find((t) => t.id === id);
+    const next = templates.find((item) => item.id === id);
     if (!next) return;
     setSelectedId(next.id);
     setDraft(next.content);
@@ -115,7 +136,7 @@ function TemplatesPage() {
     if (!pendingTemplateId) return;
     const id = pendingTemplateId;
     setPendingTemplateId(null);
-    const next = templates.find((t) => t.id === id);
+    const next = templates.find((item) => item.id === id);
     if (!next) return;
     setSelectedId(next.id);
     setDraft(next.content);
@@ -133,15 +154,17 @@ function TemplatesPage() {
         },
       });
       if (result.error || !result.template) {
-        toast.error(result.error ?? "Unable to save template.");
+        toast.error(result.error ?? t("templates.saveError"));
         return;
       }
-      setTemplates((prev) => prev.map((t) => (t.id === result.template!.id ? result.template! : t)));
+      setTemplates((prev) =>
+        prev.map((item) => (item.id === result.template!.id ? result.template! : item)),
+      );
       setDraft(result.template.content);
-      toast.success("Template saved");
+      toast.success(t("templates.saved"));
       void query.refetch();
     } catch {
-      toast.error("Unable to save template.");
+      toast.error(t("templates.saveError"));
     } finally {
       setSaving(false);
     }
@@ -155,34 +178,44 @@ function TemplatesPage() {
         data: { kind: selected.kind },
       });
       if (result.error || !result.template) {
-        toast.error(result.error ?? "Unable to reset template.");
+        toast.error(result.error ?? t("templates.resetError"));
         return;
       }
-      setTemplates((prev) => prev.map((t) => (t.id === result.template!.id ? result.template! : t)));
+      setTemplates((prev) =>
+        prev.map((item) => (item.id === result.template!.id ? result.template! : item)),
+      );
       setDraft(defaultContentFor(selected.kind));
-      toast.success("Template reset to default");
+      toast.success(t("templates.resetSuccess"));
       void query.refetch();
     } catch {
-      toast.error("Unable to reset template.");
+      toast.error(t("templates.resetError"));
     } finally {
       setSaving(false);
     }
   }
 
+  const mobileTabs = [
+    { id: "templates" as const, label: t("templates.tab.list") },
+    { id: "edit" as const, label: t("templates.tab.edit") },
+    { id: "preview" as const, label: t("templates.tab.preview") },
+  ];
+
   return (
-    <AppShell title="Templates" subtitle="Control the messages used for each order situation.">
+    <AppShell title={t("templates.title")} subtitle={t("templates.subtitle")}>
       <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col gap-4">
         <div className="shrink-0 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Templates</h1>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                One set of messages for every order — Dropi and Dropea included.
-              </p>
+              <h1 className="text-[22px] font-semibold tracking-tight text-foreground">
+                {t("templates.title")}
+              </h1>
+              <p className="mt-1 text-[13px] text-muted-foreground">{t("templates.pageHint")}</p>
             </div>
             <div className="flex items-center gap-3">
               {dirty ? (
-                <span className="text-[12px] font-medium text-muted-foreground">Unsaved changes</span>
+                <span className="text-[12px] font-medium text-muted-foreground">
+                  {t("templates.unsavedChanges")}
+                </span>
               ) : null}
               <Button
                 type="button"
@@ -190,7 +223,7 @@ function TemplatesPage() {
                 disabled={!dirty || !validation.ok || saving}
                 onClick={() => void handleSave()}
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? t("common.saving") : t("common.save")}
               </Button>
             </div>
           </div>
@@ -198,16 +231,10 @@ function TemplatesPage() {
 
         <div
           role="tablist"
-          aria-label="Templates workspace"
+          aria-label={t("templates.workspaceAria")}
           className="grid shrink-0 grid-cols-3 gap-1 rounded-[10px] border border-border bg-card p-0.5 md:hidden"
         >
-          {(
-            [
-              { id: "templates", label: "Templates" },
-              { id: "edit", label: "Edit" },
-              { id: "preview", label: "Preview" },
-            ] as const
-          ).map((tab) => (
+          {mobileTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -230,14 +257,14 @@ function TemplatesPage() {
 
         {!showSkeleton && loadError && !hasTemplates ? (
           <div className="rounded-[16px] border border-border bg-card px-6 py-14 text-center">
-            <p className="text-[15px] font-medium text-foreground">Unable to load templates.</p>
+            <p className="text-[15px] font-medium text-foreground">{t("templates.loadError")}</p>
             <p className="mt-1 text-[13px] text-muted-foreground">{loadError}</p>
             <Button
               type="button"
               className="mt-5 h-9 rounded-[10px] text-[13px] shadow-none"
               onClick={() => void query.refetch()}
             >
-              Retry
+              {t("common.retry")}
             </Button>
           </div>
         ) : null}
@@ -247,7 +274,7 @@ function TemplatesPage() {
             role="status"
             className="shrink-0 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-950"
           >
-            <p className="font-medium">Templates loaded with a warning</p>
+            <p className="font-medium">{t("templates.loadWarning")}</p>
             <p className="mt-1 text-amber-900/90">{loadError}</p>
             <Button
               type="button"
@@ -255,7 +282,7 @@ function TemplatesPage() {
               className="mt-3 h-8 rounded-[10px] text-[12px] shadow-none"
               onClick={() => void query.refetch()}
             >
-              Retry
+              {t("common.retry")}
             </Button>
           </div>
         ) : null}
@@ -287,7 +314,7 @@ function TemplatesPage() {
                   template={selected}
                   draft={draft}
                   variables={variables}
-                  errors={validation.errors}
+                  errors={editorErrors}
                   dirty={dirty}
                   canSave={dirty && validation.ok}
                   saving={saving}
@@ -298,7 +325,7 @@ function TemplatesPage() {
                 />
               ) : (
                 <div className="flex h-full items-center justify-center rounded-[16px] border border-border bg-card px-6 py-16 text-center">
-                  <p className="text-[14px] font-medium">No templates configured.</p>
+                  <p className="text-[14px] font-medium">{t("templates.noTemplates")}</p>
                 </div>
               )}
             </div>
@@ -311,7 +338,7 @@ function TemplatesPage() {
               )}
             >
               <TemplatePreview
-                customerName={previewContext.customerName ?? "Customer"}
+                customerName={previewContext.customerName ?? t("templates.customerFallback")}
                 message={rendered.text}
                 withTracking={withTracking}
                 onWithTrackingChange={setWithTracking}
@@ -330,15 +357,15 @@ function TemplatesPage() {
       >
         <AlertDialogContent className="rounded-[16px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved edits on this template. Leaving will discard them.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("templates.discardTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("templates.discardDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-[10px]">Keep editing</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-[10px]">
+              {t("templates.keepEditing")}
+            </AlertDialogCancel>
             <AlertDialogAction className="rounded-[10px]" onClick={discardAndContinue}>
-              Discard
+              {t("common.discard")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

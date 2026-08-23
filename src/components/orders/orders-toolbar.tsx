@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, forwardRef, type ComponentProps } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { endOfDay, format } from "date-fns";
+import { endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DATE_PRESET_LABEL, hasActiveFilters, type OrdersSearch } from "@/lib/orders-search";
+import { DATE_PRESET_I18N_KEY, hasActiveFilters, type OrdersSearch } from "@/lib/orders-search";
+import { formatDayMonth } from "@/lib/i18n/date-locale";
+import { useI18n } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 const filterButtonClass =
@@ -56,6 +58,7 @@ export function OrdersToolbar({
   facets: { statuses: string[]; shippingCompanies: string[]; countries: string[] };
   onChange: (next: OrdersSearch) => void;
 }) {
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState(search.q ?? "");
   const [dateOpen, setDateOpen] = useState(false);
   const [range, setRange] = useState<DateRange | undefined>(() => {
@@ -95,9 +98,9 @@ export function OrdersToolbar({
 
   const dateLabel = search.date
     ? search.date === "custom" && search.from
-      ? `${format(new Date(search.from), "d MMM")}${search.to ? ` – ${format(new Date(search.to), "d MMM")}` : ""}`
-      : DATE_PRESET_LABEL[search.date]
-    : "Date";
+      ? `${formatDayMonth(new Date(search.from), locale)}${search.to ? ` – ${formatDayMonth(new Date(search.to), locale)}` : ""}`
+      : t(DATE_PRESET_I18N_KEY[search.date])
+    : t("common.date");
 
   const moreCount = Number(Boolean(search.shipping)) + Number(Boolean(search.tracking));
 
@@ -111,8 +114,8 @@ export function OrdersToolbar({
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search order ID, Shopify ID or tracking..."
-          aria-label="Search orders"
+          placeholder={t("orders.searchPlaceholder")}
+          aria-label={t("orders.searchAria")}
           className="h-10 rounded-[10px] border-border bg-card pl-9 text-[13px] shadow-none"
         />
       </div>
@@ -121,20 +124,22 @@ export function OrdersToolbar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <FilterButton
-              label={search.status ?? "Status"}
+              label={search.status ?? t("common.status")}
               active={Boolean(search.status)}
-              aria-label="Filter by status"
+              aria-label={t("orders.filterStatusAria")}
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
             className="max-h-72 w-52 overflow-y-auto rounded-[10px]"
           >
-            <DropdownMenuItem onClick={() => patch({}, ["status"])}>All statuses</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => patch({}, ["status"])}>
+              {t("orders.allStatuses")}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             {facets.statuses.length === 0 ? (
               <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
-                No statuses in this supply yet.
+                {t("orders.noStatusesYet")}
               </p>
             ) : (
               facets.statuses.map((status) => (
@@ -151,9 +156,9 @@ export function OrdersToolbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <FilterButton
-                label={search.country ?? "Country"}
+                label={search.country ?? t("common.country")}
                 active={Boolean(search.country)}
-                aria-label="Filter by country"
+                aria-label={t("orders.filterCountryAria")}
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -161,7 +166,7 @@ export function OrdersToolbar({
               className="max-h-72 w-48 overflow-y-auto rounded-[10px]"
             >
               <DropdownMenuItem onClick={() => patch({}, ["country"])}>
-                All countries
+                {t("orders.allCountries")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {facets.countries.map((country) => (
@@ -179,7 +184,7 @@ export function OrdersToolbar({
             <FilterButton
               label={dateLabel}
               active={Boolean(search.date || search.from)}
-              aria-label="Filter by date"
+              aria-label={t("orders.filterDateAria")}
             />
           </PopoverTrigger>
           <PopoverContent align="start" className="w-auto rounded-[12px] p-3">
@@ -193,7 +198,7 @@ export function OrdersToolbar({
                   setDateOpen(false);
                 }}
               >
-                Today
+                {t("orders.today")}
               </Button>
               <Button
                 type="button"
@@ -204,7 +209,7 @@ export function OrdersToolbar({
                   setDateOpen(false);
                 }}
               >
-                Last 7 days
+                {t("orders.last7Days")}
               </Button>
               <Button
                 type="button"
@@ -215,7 +220,7 @@ export function OrdersToolbar({
                   setDateOpen(false);
                 }}
               >
-                Last 30 days
+                {t("orders.last30Days")}
               </Button>
             </div>
             <Calendar mode="range" selected={range} onSelect={setRange} />
@@ -230,7 +235,7 @@ export function OrdersToolbar({
                   setDateOpen(false);
                 }}
               >
-                Clear
+                {t("common.clear")}
               </Button>
               <Button
                 type="button"
@@ -248,7 +253,7 @@ export function OrdersToolbar({
                   setDateOpen(false);
                 }}
               >
-                Apply
+                {t("common.apply")}
               </Button>
             </div>
           </PopoverContent>
@@ -257,16 +262,22 @@ export function OrdersToolbar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <FilterButton
-              label={moreCount > 0 ? `More filters (${moreCount})` : "More filters"}
+              label={
+                moreCount > 0
+                  ? t("orders.moreFiltersCount", { count: moreCount })
+                  : t("orders.moreFilters")
+              }
               active={moreCount > 0}
-              aria-label="More filters"
+              aria-label={t("orders.moreFiltersAria")}
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 rounded-[10px]">
             <DropdownMenuLabel className="text-[12px] text-muted-foreground">
-              Shipping company
+              {t("orders.shippingCompany")}
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => patch({}, ["shipping"])}>Any</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => patch({}, ["shipping"])}>
+              {t("common.any")}
+            </DropdownMenuItem>
             {facets.shippingCompanies.map((company) => (
               <DropdownMenuItem key={company} onClick={() => patch({ shipping: company })}>
                 {search.shipping === company ? <Check className="size-3.5" /> : null}
@@ -275,16 +286,18 @@ export function OrdersToolbar({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[12px] text-muted-foreground">
-              Tracking
+              {t("orders.col.tracking")}
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => patch({}, ["tracking"])}>Any</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => patch({}, ["tracking"])}>
+              {t("common.any")}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => patch({ tracking: "yes" })}>
               {search.tracking === "yes" ? <Check className="size-3.5" /> : null}
-              Has tracking
+              {t("orders.hasTracking")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => patch({ tracking: "no" })}>
               {search.tracking === "no" ? <Check className="size-3.5" /> : null}
-              No tracking
+              {t("orders.noTracking")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -304,7 +317,7 @@ export function OrdersToolbar({
             className="inline-flex h-10 items-center gap-1 px-2 text-[13px] font-medium text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" strokeWidth={1.5} />
-            Clear filters
+            {t("orders.clearFilters")}
           </button>
         ) : null}
       </div>

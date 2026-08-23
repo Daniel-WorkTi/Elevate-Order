@@ -6,6 +6,7 @@ import {
   type OperationalOrder,
   type Supply,
 } from "@/lib/order-domain";
+import { displayCarrierName } from "@/lib/carriers";
 import {
   getTemplate,
   renderOrderTemplate,
@@ -136,7 +137,11 @@ export function availableMessageChips(order: OperationalOrder): MessageFieldChip
     chips.push({ id: "tracking", label: "Tracking", value: order.tracking_code.trim() });
   }
   if (order.shipping_company?.trim()) {
-    chips.push({ id: "carrier", label: "Carrier", value: order.shipping_company.trim() });
+    chips.push({
+      id: "carrier",
+      label: "Carrier",
+      value: displayCarrierName(order.shipping_company),
+    });
   }
   if (order.total != null) {
     chips.push({ id: "total", label: "Total", value: formatOrderTotal(order) ?? String(order.total) });

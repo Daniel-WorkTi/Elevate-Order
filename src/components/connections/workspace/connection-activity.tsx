@@ -1,6 +1,7 @@
 import { Package } from "lucide-react";
 
 import { formatRelativeTimestamp } from "@/lib/format-relative-time";
+import { useI18n } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export type ConnectionActivityItem = {
@@ -19,17 +20,19 @@ export function ConnectionActivity({
   emptyLabel: string;
   onViewAll?: () => void;
 }) {
+  const { locale, t } = useI18n();
+
   return (
     <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[15px] font-semibold text-[#0A0C10]">Recent activity</h2>
+        <h2 className="text-[15px] font-semibold text-[#0A0C10]">{t("connections.recentActivity")}</h2>
         {onViewAll && items.length > 0 ? (
           <button
             type="button"
             onClick={onViewAll}
             className="text-[13px] font-medium text-[#2563EB] hover:text-[#1D4ED8]"
           >
-            View all
+            {t("connections.viewAll")}
           </button>
         ) : null}
       </div>
@@ -39,7 +42,7 @@ export function ConnectionActivity({
       ) : (
         <ul className="mt-3 divide-y divide-[#E6E8EC]">
           {items.map((item) => {
-            const stamp = formatRelativeTimestamp(item.at);
+            const stamp = formatRelativeTimestamp(item.at, { locale, t });
             return (
               <li key={item.id} className="flex items-center gap-3 py-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
@@ -58,7 +61,7 @@ export function ConnectionActivity({
                     "border-emerald-200 bg-emerald-50 text-emerald-700",
                   )}
                 >
-                  Success
+                  {t("connections.success")}
                 </span>
               </li>
             );

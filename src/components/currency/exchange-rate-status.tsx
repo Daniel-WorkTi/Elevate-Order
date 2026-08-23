@@ -1,4 +1,5 @@
 import { formatRateLine, formatRateUpdatedAt } from "@/lib/currency/format-rate";
+import { useI18n } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export type ExchangeRateStatusProps = {
@@ -22,6 +23,8 @@ export function ExchangeRateStatus({
   unavailable,
   className,
 }: ExchangeRateStatusProps) {
+  const { locale, t } = useI18n();
+
   if (loading) {
     return (
       <div className={cn("space-y-2", className)} aria-busy="true" aria-live="polite">
@@ -34,12 +37,14 @@ export function ExchangeRateStatus({
   const statusText = formatRateUpdatedAt(updatedAt, {
     cached: Boolean(cached) && !unavailable,
     unavailable: Boolean(unavailable),
+    t,
+    locale,
   });
 
   return (
     <div className={cn("space-y-1", className)} aria-live="polite">
       <p className="text-[14px] font-semibold tabular-nums tracking-tight text-[#0A0C10]">
-        {unavailable ? `1 ${from} = — ${to}` : formatRateLine(from, to, rate)}
+        {formatRateLine(from, to, unavailable ? null : rate, t)}
       </p>
       <p className="flex items-center gap-2 text-[12px] text-[#667085]">
         <span>{statusText}</span>

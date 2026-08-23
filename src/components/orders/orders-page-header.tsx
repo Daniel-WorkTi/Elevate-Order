@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 
 import { SupplyTabs } from "@/components/orders/supply-tabs";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n/locale-context";
 import type { Supply } from "@/lib/order-domain";
 
 export function OrdersPageHeader({
@@ -15,6 +16,8 @@ export function OrdersPageHeader({
   onRefresh?: (() => void) | undefined;
   refreshing?: boolean | undefined;
 }) {
+  const t = useT();
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <SupplyTabs value={supply} onChange={onSupplyChange} />
@@ -30,7 +33,7 @@ export function OrdersPageHeader({
             className={refreshing ? "size-3.5 animate-spin" : "size-3.5"}
             strokeWidth={1.5}
           />
-          Refresh
+          {t("orders.refresh")}
         </Button>
       ) : null}
     </div>

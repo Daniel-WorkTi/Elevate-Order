@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n/locale-context";
 
 export function TemplatePreview({
   customerName,
@@ -24,16 +25,20 @@ export function TemplatePreview({
   onWithTrackingChange: (value: boolean) => void;
   warnings: string[];
 }) {
+  const { t, locale } = useI18n();
   const now = new Date();
-  const timeLabel = now.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  const timeLabel = now.toLocaleTimeString(locale === "pt" ? "pt-PT" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const waHref = `https://wa.me/?text=${encodeURIComponent(message)}`;
 
   async function copyMessage() {
     try {
       await navigator.clipboard.writeText(message);
-      toast.success("Preview message copied");
+      toast.success(t("templates.copySuccess"));
     } catch {
-      toast.error("Unable to copy message");
+      toast.error(t("templates.copyError"));
     }
   }
 
@@ -44,21 +49,21 @@ export function TemplatePreview({
     >
       <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-3.5">
         <h2 id="template-preview-heading" className="text-[14px] font-semibold text-foreground">
-          Preview
+          {t("templates.preview")}
         </h2>
         <Select
           value={withTracking ? "with" : "without"}
           onValueChange={(value) => onWithTrackingChange(value === "with")}
         >
           <SelectTrigger
-            aria-label="Preview tracking fixture"
+            aria-label={t("templates.previewTrackingAria")}
             className="h-8 w-[148px] rounded-[8px] text-[12px] shadow-none"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="with">With tracking</SelectItem>
-            <SelectItem value="without">Without tracking</SelectItem>
+            <SelectItem value="with">{t("templates.withTracking")}</SelectItem>
+            <SelectItem value="without">{t("templates.withoutTracking")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -75,7 +80,7 @@ export function TemplatePreview({
             role="status"
             className="rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900"
           >
-            <p className="font-medium">Preview warnings</p>
+            <p className="font-medium">{t("templates.previewWarnings")}</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-4">
               {warnings.map((warning) => (
                 <li key={warning}>{warning}</li>
@@ -92,7 +97,7 @@ export function TemplatePreview({
           >
             <a href={waHref} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="size-4" strokeWidth={1.5} />
-              Open WhatsApp
+              {t("templates.openWhatsApp")}
             </a>
           </Button>
           <Button
@@ -102,7 +107,7 @@ export function TemplatePreview({
             onClick={() => void copyMessage()}
           >
             <Copy className="size-4" strokeWidth={1.5} />
-            Copy message
+            {t("templates.copyMessage")}
           </Button>
 
           <div className="flex items-start gap-2 rounded-[10px] bg-[#F7F8FA] px-3 py-2.5 text-[12px] text-muted-foreground">
@@ -111,7 +116,7 @@ export function TemplatePreview({
               strokeWidth={1.5}
               aria-hidden
             />
-            <p>Make sure the variables are correct before sending the message.</p>
+            <p>{t("templates.variablesCheckHint")}</p>
           </div>
         </div>
       </div>

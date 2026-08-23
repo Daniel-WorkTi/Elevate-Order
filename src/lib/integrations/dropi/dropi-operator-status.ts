@@ -4,8 +4,9 @@ import type {
 } from "@/lib/integrations/dropi/dropi-types";
 
 /**
- * Operator-facing status: never Connected/Configured until the user links Dropi.
- * Server env readiness alone must not imply the workspace is connected.
+ * Operator-facing status.
+ * Once the operator clicks Connect (linked), show Connected — do not wait for
+ * the first webhook event.
  */
 export function resolveDropiOperatorStatus(input: {
   linked: boolean;
@@ -17,18 +18,13 @@ export function resolveDropiOperatorStatus(input: {
     return summary.status === "error" ? "error" : "not_configured";
   }
 
-  if (summary.status === "error" && summary.errorMessage) {
-    // Infrastructure errors still surface when linked; otherwise stay not configured.
-    if (linked) return "error";
-  }
-
   if (!linked) return "not_configured";
 
-  if (summary.lastWebhookAt || (summary.orderCount ?? 0) > 0) {
-    return "connected";
+  if (summary.status === "error" && summary.errorMessage) {
+    return "error";
   }
 
-  return "configured";
+  return "connected";
 }
 
 export function applyOperatorDropiSummary(

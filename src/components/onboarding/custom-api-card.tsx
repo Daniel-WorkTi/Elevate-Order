@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Code2 } from "lucide-react";
 
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 type CustomApiCardProps = {
@@ -8,6 +9,8 @@ type CustomApiCardProps = {
 };
 
 export function CustomApiCard({ className }: CustomApiCardProps) {
+  const t = useT();
+
   return (
     <div
       className={cn(
@@ -20,10 +23,10 @@ export function CustomApiCard({ className }: CustomApiCardProps) {
           <Code2 className="size-5" strokeWidth={1.5} />
         </span>
         <div className="min-w-0">
-          <p className="text-[16px] font-semibold tracking-tight text-foreground">Custom API</p>
-          <p className="mt-1 text-[14px] text-muted-foreground">
-            Connect using our webhook integration.
+          <p className="text-[16px] font-semibold tracking-tight text-foreground">
+            {t("onboarding.customApi")}
           </p>
+          <p className="mt-1 text-[14px] text-muted-foreground">{t("onboarding.customApiHint")}</p>
         </div>
       </div>
 
@@ -34,9 +37,9 @@ export function CustomApiCard({ className }: CustomApiCardProps) {
           "hover:border-[color:var(--elevate-blue)]/40 hover:bg-[color:var(--elevate-blue-soft)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40",
         )}
-        aria-label="Use webhook integration"
+        aria-label={t("onboarding.useWebhookAria")}
       >
-        Use webhook
+        {t("onboarding.useWebhook")}
         <ArrowRight className="size-4" strokeWidth={1.5} />
       </Link>
     </div>

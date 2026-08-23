@@ -16,7 +16,7 @@ export const getRouter = () => {
 
   const router = createRouter({
     routeTree,
-    context: { queryClient },
+    context: { queryClient, user: null },
     scrollRestoration: true,
     // Prefetch route chunks as soon as the user hovers/touches a link
     defaultPreload: "intent",

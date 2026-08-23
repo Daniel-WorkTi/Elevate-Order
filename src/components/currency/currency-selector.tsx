@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getCurrencyInfo, searchCurrencies } from "@/lib/currency/currency-metadata";
+import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export type CurrencySelectorProps = {
@@ -31,8 +32,10 @@ export function CurrencySelector({
   id,
   className,
   embedded = false,
-  "aria-label": ariaLabel = "Select currency",
+  "aria-label": ariaLabel,
 }: CurrencySelectorProps) {
+  const t = useT();
+  const resolvedAria = ariaLabel ?? t("currency.selectAria");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const info = getCurrencyInfo(value);
@@ -47,7 +50,7 @@ export function CurrencySelector({
           variant="ghost"
           role="combobox"
           aria-expanded={open}
-          aria-label={ariaLabel}
+          aria-label={resolvedAria}
           className={cn(
             "h-11 shrink-0 gap-1.5 px-2.5 text-[13px] font-semibold text-[#0A0C10] shadow-none",
             "hover:bg-transparent hover:text-[#0A0C10]",
@@ -72,11 +75,11 @@ export function CurrencySelector({
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Search currency..."
+            placeholder={t("currency.searchPlaceholder")}
           />
           <CommandList className="max-h-56">
             <CommandEmpty className="py-6 text-center text-[13px] text-muted-foreground">
-              No currency found.
+              {t("currency.notFound")}
             </CommandEmpty>
             <CommandGroup>
               {results.map((item) => (

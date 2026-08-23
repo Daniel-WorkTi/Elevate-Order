@@ -5,6 +5,7 @@ import { TemplateVariableChip } from "@/components/templates/template-variable-c
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/lib/i18n/locale-context";
 import type { MessageTemplateRecord, TemplateVariableDef } from "@/lib/templates";
 
 export function TemplateEditor({
@@ -28,7 +29,9 @@ export function TemplateEditor({
   onReset: () => void;
   onSave: () => void;
 }) {
+  const { t, locale } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const numberLocale = locale === "pt" ? "pt-PT" : "en-US";
 
   function insertToken(token: string) {
     const el = textareaRef.current;
@@ -61,7 +64,7 @@ export function TemplateEditor({
         <div className="flex min-h-0 flex-1 flex-col space-y-2">
           <div className="flex shrink-0 items-center justify-between gap-3">
             <Label htmlFor="template-message" className="text-[12px] font-medium text-muted-foreground">
-              Message
+              {t("templates.message")}
             </Label>
             <Button
               type="button"
@@ -70,7 +73,7 @@ export function TemplateEditor({
               onClick={onReset}
             >
               <RotateCcw className="size-3.5" strokeWidth={1.5} />
-              Reset
+              {t("templates.reset")}
             </Button>
           </div>
 
@@ -86,7 +89,9 @@ export function TemplateEditor({
             />
             <div className="flex shrink-0 items-center justify-end border-t border-[#E6E8EC] bg-[#F7F8FA] px-3 py-2">
               <p id="template-char-count" className="text-[11px] tabular-nums text-[#667085]">
-                {draft.length.toLocaleString("en-US")} characters
+                {t("templates.characters", {
+                  count: draft.length.toLocaleString(numberLocale),
+                })}
               </p>
             </div>
           </div>
@@ -101,7 +106,9 @@ export function TemplateEditor({
         </div>
 
         <div className="shrink-0 space-y-2.5">
-          <p className="text-[12px] font-medium text-muted-foreground">Available variables</p>
+          <p className="text-[12px] font-medium text-muted-foreground">
+            {t("templates.availableVariables")}
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {variables.map((variable) => (
               <TemplateVariableChip
@@ -113,7 +120,7 @@ export function TemplateEditor({
           </div>
           <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
             <MousePointer2 className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
-            Click on a variable to insert it at the cursor position.
+            {t("templates.insertHint")}
           </p>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { displayCarrierName } from "@/lib/carriers";
 import { formatOrderTotal, getOrderCurrency, safeTrackingHref } from "@/lib/order-domain";
 import {
   extractPlaceholders,
@@ -45,7 +46,7 @@ function valueForKey(key: string, ctx: TemplateRenderContext): string | null {
     case "tracking_url":
       return safeTrackingHref(ctx.trackingUrl) || "";
     case "shipping_company":
-      return ctx.shippingCompany?.trim() || "";
+      return displayCarrierName(ctx.shippingCompany);
     case "total":
       return formatTotal(ctx);
     case "currency":

@@ -1,28 +1,23 @@
 import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useMemo } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { ConnectionActivity } from "@/components/connections/workspace/connection-activity";
-import { ConnectionAdvancedRow } from "@/components/connections/workspace/connection-advanced-row";
 import { ConnectionHero } from "@/components/connections/workspace/connection-hero";
-import { ConnectionStatCards } from "@/components/connections/workspace/connection-stat-cards";
-import { ConnectionSyncPanel } from "@/components/connections/workspace/connection-sync-panel";
-import { buildConnectionStatCards } from "@/components/connections/workspace/build-connection-stats";
-import { DropeaApiConfig } from "@/components/connections/dropea/dropea-api-config";
-import { DropeaConnectPanel } from "@/components/connections/dropea/dropea-connect-panel";
+import { DropeaSetupPanel } from "@/components/connections/dropea/dropea-setup-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import {
   dropeaStatusClass,
-  dropeaStatusLabel,
-  formatDropeaDateTime,
-  formatDropeaMetric,
-  formatDropeaRelative,
+  dropeaStatusLabelKey,
 } from "@/lib/integrations/dropea/dropea-format";
 import { getDropeaDashboard } from "@/lib/integrations/dropea/dropea.functions";
 import { applyOperatorDropeaSummary } from "@/lib/integrations/dropea/dropea-operator-status";
+import { getWorkspaceWebhookUrl } from "@/lib/integrations/workspace-webhook.functions";
+import { useT } from "@/lib/i18n/locale-context";
+import { metaT } from "@/lib/i18n/meta";
 
 const dropeaDashboardQuery = queryOptions({
   queryKey: ["connections", "dropea", "dashboard"],
@@ -34,17 +29,15 @@ export const Route = createFileRoute("/connections/dropea")({
   loader: ({ context }) => context.queryClient.ensureQueryData(dropeaDashboardQuery),
   head: () => ({
     meta: [
-      { title: "Dropea — Connections — ELEVATE" },
-      {
-        name: "description",
-        content: "Dropea API connection settings for ELEVATE Orders.",
-      },
+      { title: metaT("meta.dropeaTitle") },
+      { name: "description", content: metaT("meta.dropeaDescription") },
     ],
   }),
   component: DropeaConnectionPage,
 });
 
 function DropeaConnectionPage() {
+  const t = useT();
   const query = useQuery(dropeaDashboardQuery);
   const {
     linked,
@@ -53,10 +46,19 @@ function DropeaConnectionPage() {
     connect,
     disconnect,
   } = useDropeaConnectionPreference();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const { workspaceId } = useWorkspaceId();
   const data = query.data;
   const loading = query.isPending && !data;
   const credentialsConfigured = apiTokenConfigured && hmacSecretConfigured;
+
+  const webhookQuery = useQuery({
+    queryKey: ["workspace-webhook", "dropea", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getWorkspaceWebhookUrl({
+        data: { workspaceId, supply: "dropea" },
+      }),
+  });
 
   const summary = useMemo(() => {
     if (!data?.summary) return null;
@@ -72,115 +74,56 @@ function DropeaConnectionPage() {
   const fullyLinked = linked && credentialsConfigured;
   const events = fullyLinked ? (data?.recentEvents ?? []) : [];
 
-  const stats = useMemo(() => {
-    if (!summary) return [];
-    const lastSync = summary.lastSyncAt;
-    return buildConnectionStatCards({
-      lastSyncRelative: formatDropeaRelative(lastSync),
-      lastSyncExact: lastSync ? formatDropeaDateTime(lastSync) : "No activity yet",
-      orderCount: formatDropeaMetric(summary.orderCount),
-      supplyLabel: "Dropea",
-      status: summary.status,
-      ...(summary.errorMessage ? { errorMessage: summary.errorMessage } : {}),
-    });
-  }, [summary]);
-
   const activity = events.map((event) => ({
     id: event.id,
-    title: `Order #${event.orderId} updated`,
-    detail: event.statusName ?? event.details ?? "Dropea event received",
+    title: t("connections.orderUpdated", { id: event.orderId }),
+    detail: event.statusName ?? event.details ?? t("connections.dropeaEventDetail"),
     at: event.eventDate,
   }));
 
   return (
-    <AppShell title="Connections" subtitle="Dropi webhook and Dropea API">
+    <AppShell title={t("connections.title")} subtitle="Dropea">
       <div className="space-y-5">
         {loading || !summary ? (
           <div className="space-y-3">
-            <Skeleton className="h-4 w-28" />
             <Skeleton className="h-16 w-full rounded-[16px]" />
-            <Skeleton className="h-24 w-full rounded-[14px]" />
+            <Skeleton className="h-40 w-full rounded-[14px]" />
           </div>
         ) : (
-          <section className="space-y-4 rounded-[16px] border border-[#E6E8EC] bg-white p-5">
-            <ConnectionHero
-              supply="dropea"
-              title="Dropea"
-              subtitle="API synchronization"
-              statusLabel={dropeaStatusLabel(summary.status)}
-              statusClass={dropeaStatusClass(summary.status)}
-              methodLabel="API"
-            />
-            <ConnectionStatCards cards={stats} />
-          </section>
-        )}
+          <>
+            <section className="rounded-[16px] border border-[#E6E8EC] bg-white p-5">
+              <ConnectionHero
+                supply="dropea"
+                title="Dropea"
+                subtitle={t("connections.dropeaSubtitle")}
+                statusLabel={t(dropeaStatusLabelKey(summary.status))}
+                statusClass={dropeaStatusClass(summary.status)}
+                methodLabel={t("connections.methodApi")}
+              />
+            </section>
 
-        {summary && !loading && !fullyLinked ? (
-          <DropeaConnectPanel
-            linked={linked}
-            apiTokenConfigured={apiTokenConfigured}
-            hmacSecretConfigured={hmacSecretConfigured}
-            status={summary.status}
-            serverReady={serverReady}
-            onConnect={connect}
-            onDisconnect={disconnect}
-          />
-        ) : null}
-
-        {summary && fullyLinked ? (
-          <ConnectionSyncPanel
-            title="Synchronization"
-            description="ELEVATE is connected to your Dropea account and importing orders as events arrive."
-            checks={[
-              { label: "Connection active", ok: fullyLinked },
-              {
-                label: summary.lastSyncAt
-                  ? `Last successful sync ${formatDropeaRelative(summary.lastSyncAt)}`
-                  : "Waiting for the first sync",
-                ok: Boolean(summary.lastSyncAt),
-              },
-              {
-                label:
-                  summary.status === "error"
-                    ? "Synchronization has problems"
-                    : "No synchronization problems",
-                ok: summary.status !== "error",
-              },
-            ]}
-            refreshing={query.isFetching}
-            onRefresh={() => {
-              void query.refetch().then(() => toast.success("Dropea status refreshed"));
-            }}
-            onTest={() => {
-              if (serverReady && fullyLinked) {
-                toast.success("Dropea connection is active");
-                return;
+            <DropeaSetupPanel
+              linked={linked}
+              apiTokenConfigured={apiTokenConfigured}
+              hmacSecretConfigured={hmacSecretConfigured}
+              serverReady={serverReady}
+              webhookUrl={webhookQuery.data?.webhookUrl ?? ""}
+              loadingUrl={webhookQuery.isPending || !workspaceId}
+              urlError={
+                webhookQuery.isError ? t("connections.webhookUrlError") : null
               }
-              toast.error("Dropea is not fully connected yet");
-            }}
-            onDisconnect={disconnect}
-            refreshLabel="Sync now"
-          />
-        ) : null}
-
-        {fullyLinked ? (
-          <ConnectionActivity
-            items={activity}
-            emptyLabel="No Dropea events received yet."
-          />
-        ) : null}
-
-        {summary && !loading ? (
-          <ConnectionAdvancedRow
-            open={advancedOpen}
-            onToggle={() => setAdvancedOpen((open) => !open)}
-          >
-            <DropeaApiConfig
-              summary={summary}
-              credentialsConfigured={credentialsConfigured}
+              onConnect={connect}
+              onDisconnect={disconnect}
             />
-          </ConnectionAdvancedRow>
-        ) : null}
+
+            {fullyLinked ? (
+              <ConnectionActivity
+                items={activity}
+                emptyLabel={t("connections.emptyDropeaActivity")}
+              />
+            ) : null}
+          </>
+        )}
       </div>
     </AppShell>
   );

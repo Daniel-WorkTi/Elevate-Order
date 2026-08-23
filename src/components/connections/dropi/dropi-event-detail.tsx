@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatDropiDateTime } from "@/lib/integrations/dropi/dropi-format";
 import type { DropiWebhookEventRow } from "@/lib/integrations/dropi/dropi-types";
+import { useI18n } from "@/lib/i18n/locale-context";
 
 export function DropiEventDetail({
   event,
@@ -20,6 +21,7 @@ export function DropiEventDetail({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { locale, t } = useI18n();
   const [showRaw, setShowRaw] = useState(false);
 
   return (
@@ -32,24 +34,29 @@ export function DropiEventDetail({
     >
       <SheetContent className="w-full border-[#E6E8EC] sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-[16px] font-semibold text-[#0A0C10]">Event detail</SheetTitle>
+          <SheetTitle className="text-[16px] font-semibold text-[#0A0C10]">
+            {t("connections.eventDetail")}
+          </SheetTitle>
         </SheetHeader>
 
         {event ? (
           <div className="mt-6 space-y-4 text-[13px]">
-            <DetailRow label="Event" value="order.updated" />
-            <DetailRow label="Order" value={`#${event.orderId}`} />
-            <DetailRow label="Received" value={formatDropiDateTime(event.eventDate)} />
-            <DetailRow label="Status" value={event.statusName ?? "—"} />
-            <DetailRow label="Details" value={event.details ?? "—"} />
-            <DetailRow label="Tracking code" value={event.trackingCode ?? "—"} />
+            <DetailRow label={t("connections.event")} value="order.updated" />
+            <DetailRow label={t("connections.order")} value={`#${event.orderId}`} />
+            <DetailRow label={t("connections.received")} value={formatDropiDateTime(event.eventDate, locale)} />
+            <DetailRow label={t("common.status")} value={event.statusName ?? "—"} />
+            <DetailRow label={t("connections.details")} value={event.details ?? "—"} />
+            <DetailRow label={t("connections.trackingCode")} value={event.trackingCode ?? "—"} />
             <DetailRow
-              label="Tracking URL"
+              label={t("connections.trackingUrl")}
               value={event.trackingUrl ?? "—"}
               mono={Boolean(event.trackingUrl)}
             />
-            <DetailRow label="Shipping company" value={event.shippingCompany ?? "—"} />
-            <DetailRow label="Result" value="Processed" />
+            <DetailRow
+              label={t("connections.shippingCompany")}
+              value={event.shippingCompany ?? "—"}
+            />
+            <DetailRow label={t("connections.result")} value={t("connections.processed")} />
 
             {event.rawJson ? (
               <div className="pt-2">
@@ -60,7 +67,7 @@ export function DropiEventDetail({
                   className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
                 >
                   <Code2 className="size-3.5" strokeWidth={1.75} />
-                  {showRaw ? "Hide raw payload" : "View raw payload"}
+                  {showRaw ? t("connections.hideRawPayload") : t("connections.viewRawPayload")}
                 </Button>
                 {showRaw ? (
                   <pre className="mt-3 max-h-64 overflow-auto rounded-[10px] border border-[#E6E8EC] bg-[#F7F8FA] p-3 font-mono text-[11px] text-[#0A0C10]">

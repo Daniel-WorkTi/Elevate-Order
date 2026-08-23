@@ -1,5 +1,6 @@
 import { Info } from "lucide-react";
 
+import { useT } from "@/lib/i18n/locale-context";
 import { formatMargin } from "@/lib/money/calculate-profit";
 import { formatSummaryMoney, type FinancialSummary } from "@/lib/profits/aggregate";
 
@@ -10,40 +11,42 @@ export function FinancialSummaryPanel({
   summary: FinancialSummary;
   missingCostCount: number;
 }) {
+  const t = useT();
+
   return (
     <section className="rounded-[16px] border border-border bg-card">
       <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-3 lg:grid-cols-5">
         <Metric
-          label="Revenue"
+          label={t("profits.revenue")}
           value={formatSummaryMoney(summary.revenue, summary.currency)}
         />
         <Metric
-          label="Known costs"
+          label={t("profits.knownCosts")}
           value={
             summary.costsAvailable
               ? formatSummaryMoney(summary.knownCosts, summary.currency)
               : "—"
           }
-          {...(!summary.costsAvailable ? { hint: "Not available" } : {})}
+          {...(!summary.costsAvailable ? { hint: t("profits.notAvailable") } : {})}
         />
         <Metric
-          label="Fees"
+          label={t("profits.fees")}
           value={
             summary.feesAvailable ? formatSummaryMoney(summary.fees, summary.currency) : "—"
           }
-          {...(!summary.feesAvailable ? { hint: "Not available" } : {})}
+          {...(!summary.feesAvailable ? { hint: t("profits.notAvailable") } : {})}
         />
         <Metric
-          label="Profit"
+          label={t("profits.profit")}
           value={
             summary.profitAvailable
               ? formatSummaryMoney(summary.profit, summary.currency)
-              : "Unavailable"
+              : t("profits.unavailable")
           }
           emphasize
         />
         <Metric
-          label="Margin"
+          label={t("profits.margin")}
           value={summary.profitAvailable ? formatMargin(summary.margin) : "—"}
         />
       </div>
@@ -51,20 +54,20 @@ export function FinancialSummaryPanel({
       <div className="flex items-start gap-2 border-t border-border px-4 py-3 text-[12px] text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
         <div className="space-y-1">
-          <p>
-            Profit is calculated only from synchronized financial data available for each supply.
-          </p>
+          <p>{t("profits.summaryHint")}</p>
           {!summary.profitAvailable ? (
             <p>
-              Cost data is missing for {missingCostCount} order
-              {missingCostCount === 1 ? "" : "s"}. Known costs and fees are not present in the
-              current sync schema.
+              {t(missingCostCount === 1 ? "profits.missingCostsOne" : "profits.missingCosts", {
+                count: missingCostCount,
+              })}
             </p>
           ) : null}
           {summary.skippedRevenue > 0 ? (
             <p>
-              {summary.skippedRevenue} order
-              {summary.skippedRevenue === 1 ? "" : "s"} skipped due to missing exchange rates.
+              {t(
+                summary.skippedRevenue === 1 ? "profits.skippedRatesOne" : "profits.skippedRates",
+                { count: summary.skippedRevenue },
+              )}
             </p>
           ) : null}
         </div>

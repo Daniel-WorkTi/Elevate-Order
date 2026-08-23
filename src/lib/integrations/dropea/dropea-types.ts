@@ -8,6 +8,7 @@ export type DropeaConnectionSummary = {
   status: DropeaConnectionStatus;
   method: "api";
   apiBaseUrl: string;
+  webhookRelativeUrl: string;
   serverConfigured: boolean;
   lastSyncAt: string | null;
   orderCount: number | null;

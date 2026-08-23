@@ -15,7 +15,7 @@ export function createPreviewContext(options?: {
     details: "Incomplete delivery address",
     trackingCode: withTracking ? "PT927391829PT" : null,
     trackingUrl: withTracking ? "https://example.invalid/tracking/preview" : null,
-    shippingCompany: "CTT",
+    shippingCompany: "InPost",
     total: 64.8,
     currency: "EUR",
   };

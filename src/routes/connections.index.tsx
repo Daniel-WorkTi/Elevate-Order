@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
@@ -7,25 +8,34 @@ import shopifyMark from "@/assets/shopify-mark.png";
 import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
+import { getShopifyOauthStatus } from "@/lib/integrations/shopify/oauth.functions";
+import { useT } from "@/lib/i18n/locale-context";
+import { metaT } from "@/lib/i18n/meta";
 import { cn } from "@/lib/utils";
 
 const connectionsRoute = getRouteApi("/connections");
 
 export const Route = createFileRoute("/connections/")({
   head: () => ({
-    meta: [{ title: "Connections — ELEVATE" }],
+    meta: [{ title: metaT("meta.connectionsTitle") }],
   }),
   component: ConnectionsPage,
 });
 
 function ConnectionsPage() {
+  const t = useT();
   const { source } = connectionsRoute.useSearch();
   const store = useStoreConnectionPreference();
   const dropi = useDropiConnectionPreference();
   const dropea = useDropeaConnectionPreference();
+  const shopifyOauth = useQuery({
+    queryKey: ["connections", "shopify", "oauth"],
+    queryFn: () => getShopifyOauthStatus(),
+  });
+  const shopifyLinked = store.linked || Boolean(shopifyOauth.data?.connected);
 
   return (
-    <AppShell title="Connections" subtitle="Store, Dropi webhook and Dropea API">
+    <AppShell title={t("connections.title")} subtitle={t("connections.subtitle")}>
       <div className="space-y-4">
         <Link
           to="/connections/shopify"
@@ -33,31 +43,48 @@ function ConnectionsPage() {
         >
           <div className="flex items-start gap-3">
             <span className="grid size-10 place-items-center overflow-hidden rounded-[10px] border border-[#E6E8EC] bg-white">
-              <img src={shopifyMark} alt="" width={28} height={28} className="size-7 object-contain" />
+              <img
+                src={shopifyMark}
+                alt=""
+                width={28}
+                height={28}
+                className="size-7 object-contain"
+              />
             </span>
             <div>
-              <p className="text-[15px] font-semibold text-[#0A0C10]">Shopify store</p>
-              <p className="mt-0.5 text-[13px] text-[#667085]">
-                Connect your shop to this workspace
+              <p className="text-[15px] font-semibold text-[#0A0C10]">
+                {t("connections.shopifyStore")}
               </p>
+              <p className="mt-0.5 text-[13px] text-[#667085]">{t("connections.shopifyHint")}</p>
               {source === "shopify" ? (
-                <p className="mt-2 text-[12px] font-medium text-[#5E8E3E]">Selected from setup</p>
+                <p className="mt-2 text-[12px] font-medium text-[#5E8E3E]">
+                  {t("connections.selectedFromSetup")}
+                </p>
               ) : null}
-              {store.linked && store.storeName ? (
-                <p className="mt-1 text-[12px] text-[#667085]">{store.storeDomain}</p>
+              {shopifyLinked && (shopifyOauth.data?.shopDomain ?? store.storeName) ? (
+                <p className="mt-1 text-[12px] text-[#667085]">
+                  {shopifyOauth.data?.shopDomain ?? store.storeDomain}
+                </p>
               ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-                store.linked
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                shopifyLinked
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : "border-[#E6E8EC] bg-[#F7F8FA] text-[#667085]",
               )}
             >
-              {store.linked ? "Linked" : "Not connected"}
+              <span
+                className={cn(
+                  "size-2 shrink-0 rounded-full",
+                  shopifyLinked ? "bg-emerald-500" : "bg-[#98A2B3]",
+                )}
+                aria-hidden
+              />
+              {shopifyLinked ? t("connections.linked") : t("connections.notConnected")}
             </span>
             <ArrowRight className="size-4 shrink-0 text-[#667085]" strokeWidth={1.75} />
           </div>
@@ -71,24 +98,31 @@ function ConnectionsPage() {
             <SupplyMark supply="dropi" size={40} className="rounded-[10px]" />
             <div>
               <p className="text-[15px] font-semibold text-[#0A0C10]">Dropi Pro</p>
-              <p className="mt-0.5 text-[13px] text-[#667085]">
-                Order update webhooks — supply account
-              </p>
+              <p className="mt-0.5 text-[13px] text-[#667085]">{t("connections.dropiHint")}</p>
               {source === "dropi" ? (
-                <p className="mt-2 text-[12px] font-medium text-[#2563EB]">Selected from setup</p>
+                <p className="mt-2 text-[12px] font-medium text-[#2563EB]">
+                  {t("connections.selectedFromSetup")}
+                </p>
               ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
                 dropi.linked
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : "border-[#E6E8EC] bg-[#F7F8FA] text-[#667085]",
               )}
             >
-              {dropi.linked ? "Linked" : "Not connected"}
+              <span
+                className={cn(
+                  "size-2 shrink-0 rounded-full",
+                  dropi.linked ? "bg-emerald-500" : "bg-[#98A2B3]",
+                )}
+                aria-hidden
+              />
+              {dropi.linked ? t("connections.connected") : t("connections.notConnected")}
             </span>
             <ArrowRight className="size-4 shrink-0 text-[#667085]" strokeWidth={1.75} />
           </div>
@@ -102,24 +136,31 @@ function ConnectionsPage() {
             <SupplyMark supply="dropea" size={40} className="rounded-[10px]" />
             <div>
               <p className="text-[15px] font-semibold text-[#0A0C10]">Dropea</p>
-              <p className="mt-0.5 text-[13px] text-[#667085]">
-                API token + HMAC — supply account
-              </p>
+              <p className="mt-0.5 text-[13px] text-[#667085]">{t("connections.dropeaHint")}</p>
               {source === "dropea" ? (
-                <p className="mt-2 text-[12px] font-medium text-sky-800">Selected from setup</p>
+                <p className="mt-2 text-[12px] font-medium text-sky-800">
+                  {t("connections.selectedFromSetup")}
+                </p>
               ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
                 dropea.linked
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : "border-[#E6E8EC] bg-[#F7F8FA] text-[#667085]",
               )}
             >
-              {dropea.linked ? "Linked" : "Not connected"}
+              <span
+                className={cn(
+                  "size-2 shrink-0 rounded-full",
+                  dropea.linked ? "bg-emerald-500" : "bg-[#98A2B3]",
+                )}
+                aria-hidden
+              />
+              {dropea.linked ? t("connections.connected") : t("connections.notConnected")}
             </span>
             <ArrowRight className="size-4 shrink-0 text-[#667085]" strokeWidth={1.75} />
           </div>

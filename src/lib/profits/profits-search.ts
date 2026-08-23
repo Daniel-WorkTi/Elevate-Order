@@ -1,6 +1,8 @@
 import { endOfDay, endOfMonth, format, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import { z } from "zod";
 
+import { formatDayMonth, formatMonthYear } from "@/lib/i18n/date-locale";
+import type { Locale } from "@/lib/i18n/types";
 import type { Supply } from "@/lib/order-domain";
 
 export const PROFIT_CURRENCIES = ["EUR", "BRL", "USD", "GBP"] as const;
@@ -28,6 +30,17 @@ export const profitsSearchSchema = z.object({
 export type ProfitsSearch = z.infer<typeof profitsSearchSchema>;
 export type ProfitsSupplyFilter = ProfitsSearch["supply"];
 
+export const PERIOD_I18N_KEY: Record<ProfitPeriod, string> = {
+  today: "profits.period.today",
+  "7d": "profits.period.7d",
+  "30d": "profits.period.30d",
+  this_month: "profits.period.thisMonth",
+  last_month: "profits.period.lastMonth",
+  all: "profits.period.all",
+  custom: "profits.period.custom",
+};
+
+/** @deprecated Prefer PERIOD_I18N_KEY + t() at the UI. */
 export const PERIOD_LABEL: Record<ProfitPeriod, string> = {
   today: "Today",
   "7d": "Last 7 days",
@@ -37,6 +50,19 @@ export const PERIOD_LABEL: Record<ProfitPeriod, string> = {
   all: "All time",
   custom: "Custom",
 };
+
+export function supplyFilterI18nKey(supply: ProfitsSupplyFilter): string {
+  if (supply === "all") return "profits.supply.all";
+  if (supply === "dropea") return "profits.supply.dropea";
+  return "profits.supply.dropi";
+}
+
+/** @deprecated Prefer supplyFilterI18nKey + t() at the UI. */
+export function supplyFilterLabel(supply: ProfitsSupplyFilter): string {
+  if (supply === "all") return "All supplies";
+  if (supply === "dropea") return "Dropea";
+  return "Dropi";
+}
 
 export function profitsDateRange(search: Pick<ProfitsSearch, "period" | "from" | "to">): {
   from: string | null;
@@ -70,12 +96,6 @@ export function profitsDateRange(search: Pick<ProfitsSearch, "period" | "from" |
   }
 }
 
-export function supplyFilterLabel(supply: ProfitsSupplyFilter): string {
-  if (supply === "all") return "All supplies";
-  if (supply === "dropea") return "Dropea";
-  return "Dropi";
-}
-
 export function matchesSupplyFilter(source: string, filter: ProfitsSupplyFilter): boolean {
   if (filter === "all") return true;
   const normalized = source.trim().toLowerCase();
@@ -95,14 +115,18 @@ export function chartBucketKey(iso: string, period: ProfitPeriod): string {
   return format(date, "yyyy-MM");
 }
 
-export function chartBucketLabel(key: string, period: ProfitPeriod): string {
+export function chartBucketLabel(
+  key: string,
+  period: ProfitPeriod,
+  locale: Locale = "pt",
+): string {
   if (key === "unknown") return "—";
   const date = new Date(key.length === 7 ? `${key}-01` : key);
   if (Number.isNaN(date.getTime())) return key;
   if (period === "today" || period === "7d" || period === "30d") {
-    return format(date, "d MMM");
+    return formatDayMonth(date, locale);
   }
-  return format(date, "MMM yyyy");
+  return formatMonthYear(date, locale);
 }
 
 export type { Supply };
