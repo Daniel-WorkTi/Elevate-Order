@@ -3,6 +3,9 @@ import type {
   DropeaConnectionSummary,
 } from "@/lib/integrations/dropea/dropea-types";
 
+/**
+ * Once credentials are saved and linked, show Connected (like Shopify / Dropi).
+ */
 export function resolveDropeaOperatorStatus(input: {
   linked: boolean;
   apiTokenConfigured: boolean;
@@ -21,9 +24,7 @@ export function resolveDropeaOperatorStatus(input: {
 
   if (summary.status === "error" && summary.errorMessage) return "error";
 
-  if (summary.lastSyncAt || (summary.orderCount ?? 0) > 0) return "connected";
-
-  return "configured";
+  return "connected";
 }
 
 export function applyOperatorDropeaSummary(

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/app-shell";
+import { ConnectionsIntro } from "@/components/connections/workspace/connection-howto";
 import { ConnectionRow } from "@/components/connections/workspace/connection-row";
 import { SupplyMark } from "@/components/supply-logo";
 import shopifyMark from "@/assets/shopify-mark.png";
@@ -50,7 +51,7 @@ function ConnectionsPage() {
   const dropiStatus = dropiDash.data?.summary
     ? applyOperatorDropiSummary(dropiDash.data.summary, dropi.linked).status
     : dropi.linked
-      ? "configured"
+      ? "connected"
       : "not_configured";
   const dropeaStatus = dropeaDash.data?.summary
     ? applyOperatorDropeaSummary(
@@ -59,40 +60,62 @@ function ConnectionsPage() {
         dropea.apiTokenConfigured,
         dropea.hmacSecretConfigured,
       ).status
-    : dropea.linked
-      ? "configured"
+    : dropea.linked && dropea.apiTokenConfigured && dropea.hmacSecretConfigured
+      ? "connected"
       : "not_configured";
 
+  const dropiLinked = dropiStatus === "connected" || dropiStatus === "configured";
+  const dropeaLinked = dropeaStatus === "connected" || dropeaStatus === "configured";
+
   return (
-    <AppShell title={t("connections.title")}>
-      <div className="space-y-2">
-        <ConnectionRow
-          to="/connections/shopify"
-          title="Shopify"
-          statusLabel={shopifyLinked ? t("connections.linked") : t("connections.notConnected")}
-          tone={shopifyLinked ? "ok" : "off"}
-          icon={
-            <span className="grid size-9 place-items-center overflow-hidden rounded-[10px] border border-[#E6E8EC] bg-white">
-              <img src={shopifyMark} alt="" width={20} height={20} className="size-5 object-contain" />
-            </span>
-          }
-        />
-        <ConnectionRow
-          to="/connections/dropi"
-          title="Dropi"
-          statusLabel={t(dropiStatusLabelKey(dropiStatus))}
-          tone={dropiStatus === "connected" ? "ok" : dropiStatus === "configured" ? "wait" : "off"}
-          icon={<SupplyMark supply="dropi" size={36} className="rounded-[10px]" />}
-        />
-        <ConnectionRow
-          to="/connections/dropea"
-          title="Dropea"
-          statusLabel={t(dropeaStatusLabelKey(dropeaStatus))}
-          tone={
-            dropeaStatus === "connected" ? "ok" : dropeaStatus === "configured" ? "wait" : "off"
-          }
-          icon={<SupplyMark supply="dropea" size={36} className="rounded-[10px]" />}
-        />
+    <AppShell title={t("connections.title")} subtitle={t("connections.subtitle")}>
+      <div className="space-y-5">
+        <ConnectionsIntro />
+        <div className="space-y-2">
+          <ConnectionRow
+            to="/connections/shopify"
+            title="Shopify"
+            statusLabel={shopifyLinked ? t("connections.linked") : t("connections.notConnected")}
+            tone={shopifyLinked ? "ok" : "off"}
+            icon={
+              <span className="grid size-9 place-items-center overflow-hidden rounded-[10px] border border-[#E6E8EC] bg-white">
+                <img
+                  src={shopifyMark}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="size-5 object-contain"
+                />
+              </span>
+            }
+          />
+          <ConnectionRow
+            to="/connections/dropi"
+            title="Dropi"
+            statusLabel={
+              dropiStatus === "error"
+                ? t(dropiStatusLabelKey(dropiStatus))
+                : dropiLinked
+                  ? t("connections.linked")
+                  : t("connections.notConnected")
+            }
+            tone={dropiStatus === "error" ? "wait" : dropiLinked ? "ok" : "off"}
+            icon={<SupplyMark supply="dropi" size={36} className="rounded-[10px]" />}
+          />
+          <ConnectionRow
+            to="/connections/dropea"
+            title="Dropea"
+            statusLabel={
+              dropeaStatus === "error"
+                ? t(dropeaStatusLabelKey(dropeaStatus))
+                : dropeaLinked
+                  ? t("connections.linked")
+                  : t("connections.notConnected")
+            }
+            tone={dropeaStatus === "error" ? "wait" : dropeaLinked ? "ok" : "off"}
+            icon={<SupplyMark supply="dropea" size={36} className="rounded-[10px]" />}
+          />
+        </div>
       </div>
     </AppShell>
   );

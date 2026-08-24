@@ -10,6 +10,18 @@ export type OrderStatusKey =
   | "cancelled"
   | "unknown";
 
+export type OrderLineItem = {
+  id: string;
+  title: string;
+  variant: string | null;
+  imageUrl: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  lineTotal: number | null;
+  productId?: number | null;
+  variantId?: number | null;
+};
+
 export type OperationalOrder = {
   id: string;
   order_id: number;
@@ -25,11 +37,19 @@ export type OperationalOrder = {
   currency: string | null;
   customer_name: string | null;
   phone: string | null;
+  email: string | null;
   country: string | null;
+  city: string | null;
+  postal_code: string | null;
+  address: string | null;
   source: string;
   last_event_at: string | null;
   created_at: string | null;
   product_summary: string | null;
+  /** Line items when available from snapshot; otherwise derived from product_summary. */
+  line_items?: OrderLineItem[];
+  /** Payment method label when present in snapshot (e.g. COD / gateway). */
+  payment_method?: string | null;
 };
 
 export const SUPPLY_LABEL: Record<Supply, string> = {
@@ -75,7 +95,7 @@ const STATUS_RULES: Array<{ key: Exclude<OrderStatusKey, "unknown">; pattern: Re
   },
   { key: "messaged", pattern: /messag|contacted|whatsapp/i },
   { key: "waiting", pattern: /wait|pendiente|pending|hold|espera|unanswered/i },
-  { key: "confirmed", pattern: /confirm|nuevo|new|approved|prepar|processing|paid/i },
+  { key: "confirmed", pattern: /confirm|nuevo|new|approved|prepar|processing|paid|\bopen\b/i },
 ];
 
 export function isSupply(value: string): value is Supply {
@@ -158,6 +178,14 @@ export function formatConvertedTotal(
 
 export function formatOrderId(order: Pick<OperationalOrder, "order_id">): string {
   return `#${order.order_id}`;
+}
+
+/** Prefer Shopify ID when linked; otherwise the supply order id. */
+export function formatPrimaryOrderId(
+  order: Pick<OperationalOrder, "order_id" | "shopify_order_id">,
+): string {
+  const id = order.shopify_order_id ?? order.order_id;
+  return `#${id}`;
 }
 
 /** Return a tracking URL only when the supply provided a real http(s) link. Never construct one. */

@@ -5,11 +5,22 @@ import {
   ORDER_SORT_FIELDS,
   PAGE_SIZES,
   type OperationalOrder,
+  type OrderLineItem,
   type OrderSortField,
   type PageSize,
   type Supply,
 } from "@/lib/order-domain";
+import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
+import {
+  lineItemImageKey,
+  resolveShopifyLineItemImages,
+} from "@/lib/integrations/shopify/shopify-product-images";
 import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+import { coalesceText, staticFieldsFromSnapshot } from "@/lib/orders/hydrate-static-fields";
+import {
+  paymentMethodFromSnapshot,
+  resolveOrderLineItems,
+} from "@/lib/orders/order-line-items";
 
 export type SyncedOrder = {
   order_id: number;
@@ -26,7 +37,7 @@ export type SyncedOrder = {
 };
 
 const ORDER_COLUMNS_FULL =
-  "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, country, city, postal_code, address, product_summary, source, last_event_at, created_at";
+  "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, created_at, workspace_id";
 
 const ORDER_COLUMNS_LEGACY =
   "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at, created_at";
@@ -79,11 +90,14 @@ type OrdersRow = {
   currency: string | null;
   customer_name: string | null;
   phone: string | null;
+  email: string | null;
   country: string | null;
   city: string | null;
   postal_code: string | null;
   address: string | null;
   product_summary: string | null;
+  snapshot?: unknown;
+  workspace_id?: string | null;
   source: string;
   last_event_at: string | null;
   created_at: string | null;
@@ -96,6 +110,9 @@ function asNumber(value: number | string | null): number | null {
 }
 
 function mapOrder(row: OrdersRow): OperationalOrder {
+  const extra = staticFieldsFromSnapshot(row.snapshot);
+  const productSummary = coalesceText(row.product_summary, extra.product_summary);
+  const total = asNumber(row.total);
   return {
     id: row.id,
     order_id: row.order_id,
@@ -105,17 +122,157 @@ function mapOrder(row: OrdersRow): OperationalOrder {
     details: row.details,
     tracking_code: row.tracking_code,
     tracking_url: row.tracking_url,
-    shipping_company: row.shipping_company,
-    total: asNumber(row.total),
+    shipping_company: coalesceText(row.shipping_company, extra.shipping_company),
+    total,
     currency: row.currency ?? null,
-    customer_name: row.customer_name ?? null,
-    phone: row.phone ?? null,
-    country: row.country ?? null,
+    customer_name: coalesceText(row.customer_name, extra.customer_name),
+    phone: coalesceText(row.phone, extra.phone),
+    email: coalesceText(row.email, extra.email),
+    country: coalesceText(row.country, extra.country),
+    city: coalesceText(row.city, extra.city),
+    postal_code: coalesceText(row.postal_code, extra.postal_code),
+    address: coalesceText(row.address, extra.address),
     source: row.source,
     last_event_at: row.last_event_at,
     created_at: row.created_at,
-    product_summary: row.product_summary ?? null,
+    product_summary: productSummary,
+    line_items: resolveOrderLineItems({
+      snapshot: row.snapshot,
+      productSummary,
+      total,
+    }),
+    payment_method: paymentMethodFromSnapshot(row.snapshot),
   };
+}
+
+function lineItemsNeedImages(items: OrderLineItem[] | undefined): boolean {
+  if (!items || items.length === 0) return true;
+  return items.some((item) => !item.imageUrl);
+}
+
+async function enrichOrderProductImages(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  order: OperationalOrder,
+  row: OrdersRow,
+  workspaceId: string,
+): Promise<OperationalOrder> {
+  let lineItems = order.line_items ?? [];
+
+  // 1) Prefer line items/images from a Shopify twin snapshot already in DB.
+  if (order.shopify_order_id && lineItemsNeedImages(lineItems)) {
+    const twin = await supabaseAdmin
+      .from("orders")
+      .select("snapshot")
+      .eq("shopify_order_id", order.shopify_order_id)
+      .ilike("source", "%shopify%")
+      .limit(1)
+      .maybeSingle();
+
+    const twinItems = resolveOrderLineItems({
+      snapshot: twin.data?.snapshot,
+      productSummary: order.product_summary,
+      total: order.total,
+    });
+    if (twinItems.some((item) => item.imageUrl) || (lineItems.length === 0 && twinItems.length > 0)) {
+      lineItems = twinItems.map((item, index) => ({
+        ...item,
+        imageUrl: item.imageUrl ?? lineItems[index]?.imageUrl ?? null,
+      }));
+    }
+  }
+
+  // 2) Live Admin API: resolve missing thumbnails via product_id (needs read_products).
+  const missingRefs = lineItems
+    .filter((item) => !item.imageUrl && item.productId)
+    .map((item) => ({
+      productId: item.productId ?? null,
+      variantId: item.variantId ?? null,
+    }));
+
+  if (missingRefs.length > 0) {
+    const storeQuery = await supabaseAdmin
+      .from("shopify_stores")
+      .select("shop_domain, access_token")
+      .is("uninstalled_at", null)
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .maybeSingle();
+
+    let store = storeQuery.data;
+    if (!store) {
+      const fallback = await supabaseAdmin
+        .from("shopify_stores")
+        .select("shop_domain, access_token")
+        .is("uninstalled_at", null)
+        .limit(1)
+        .maybeSingle();
+      store = fallback.data;
+    }
+
+    const host = normalizeShopifyDomain(store?.shop_domain ?? "");
+    const token = store?.access_token?.trim();
+    if (host && token) {
+      const imageMap = await resolveShopifyLineItemImages(host, token, missingRefs);
+      if (imageMap.size > 0) {
+        lineItems = lineItems.map((item) => {
+          if (item.imageUrl || !item.productId) return item;
+          const src = imageMap.get(lineItemImageKey(item.productId, item.variantId ?? null));
+          return src ? { ...item, imageUrl: src } : item;
+        });
+
+        // Persist images back into snapshot so next open is instant.
+        try {
+          const snapshot =
+            row.snapshot && typeof row.snapshot === "object" && !Array.isArray(row.snapshot)
+              ? { ...(row.snapshot as Record<string, unknown>) }
+              : {};
+          const rawItems = Array.isArray(snapshot["line_items"])
+            ? (snapshot["line_items"] as unknown[])
+            : [];
+          const nextItems =
+            rawItems.length > 0
+              ? rawItems.map((entry, index) => {
+                  const record =
+                    entry && typeof entry === "object" && !Array.isArray(entry)
+                      ? { ...(entry as Record<string, unknown>) }
+                      : {};
+                  const productId = Number(record["product_id"]);
+                  const variantId = Number(record["variant_id"]);
+                  const key = lineItemImageKey(
+                    Number.isFinite(productId) ? productId : 0,
+                    Number.isFinite(variantId) ? variantId : null,
+                  );
+                  const src = imageMap.get(key) ?? lineItems[index]?.imageUrl;
+                  if (!src) return entry;
+                  return { ...record, image: { src } };
+                })
+              : lineItems.map((item) => ({
+                  id: item.id,
+                  name: item.title,
+                  title: item.title,
+                  variant_title: item.variant,
+                  quantity: item.quantity,
+                  price: item.unitPrice != null ? String(item.unitPrice) : undefined,
+                  product_id: item.productId,
+                  variant_id: item.variantId,
+                  image: item.imageUrl ? { src: item.imageUrl } : undefined,
+                }));
+
+          await supabaseAdmin
+            .from("orders")
+            .update({
+              snapshot: { ...snapshot, line_items: nextItems } as import("@/integrations/supabase/types").Json,
+            })
+            .eq("id", row.id);
+        } catch (error) {
+          console.warn("persist order product images failed", error);
+        }
+      }
+    }
+  }
+
+  return { ...order, line_items: lineItems };
 }
 
 function sanitizeSearch(value: string): string {
@@ -410,33 +567,47 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: row, error } = await supabaseAdmin
-        .from("orders")
-        .select(ORDER_COLUMNS_FULL)
-        .eq("order_id", data.orderId)
-        .eq("workspace_id", workspaceId)
-        .maybeSingle();
+
+      /** Prefer scoped row; fall back to legacy null workspace. Avoid raw `.or(uuid)` — hyphens break PostgREST. */
+      const loadScoped = async (columns: string) =>
+        supabaseAdmin
+          .from("orders")
+          .select(columns)
+          .eq("order_id", data.orderId)
+          .eq("workspace_id", workspaceId)
+          .maybeSingle();
+
+      const loadLegacyNull = async (columns: string) =>
+        supabaseAdmin
+          .from("orders")
+          .select(columns)
+          .eq("order_id", data.orderId)
+          .is("workspace_id", null)
+          .limit(1);
+
+      let { data: scopedRow, error } = await loadScoped(ORDER_COLUMNS_FULL);
+      let row = (scopedRow as OrdersRow | null) ?? null;
 
       if (error && isMissingWorkspaceColumn(error.message)) {
         return { order: null, error: null };
       }
 
       if (error && isMissingColumnError(error)) {
-        const fallback = await supabaseAdmin
-          .from("orders")
-          .select(ORDER_COLUMNS_LEGACY)
-          .eq("order_id", data.orderId)
-          .eq("workspace_id", workspaceId)
-          .maybeSingle();
-        if (fallback.error) {
-          if (isMissingWorkspaceColumn(fallback.error.message)) {
-            return { order: null, error: null };
-          }
-          console.error("getSyncedOrder failed", fallback.error);
-          return { order: null, error: "Unable to load this order." };
+        const fallback = await loadScoped(ORDER_COLUMNS_LEGACY);
+        error = fallback.error;
+        row = (fallback.data as OrdersRow | null) ?? null;
+      }
+
+      if (!row && !error) {
+        const legacy = await loadLegacyNull(ORDER_COLUMNS_FULL);
+        if (legacy.error && isMissingColumnError(legacy.error)) {
+          const legacyFallback = await loadLegacyNull(ORDER_COLUMNS_LEGACY);
+          error = legacyFallback.error;
+          row = ((legacyFallback.data ?? [])[0] as OrdersRow | undefined) ?? null;
+        } else {
+          error = legacy.error;
+          row = ((legacy.data ?? [])[0] as OrdersRow | undefined) ?? null;
         }
-        if (!fallback.data) return { order: null, error: null };
-        return { order: mapOrder(fallback.data as OrdersRow), error: null };
       }
 
       if (error) {
@@ -446,7 +617,52 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
 
       if (!row) return { order: null, error: null };
 
-      return { order: mapOrder(row as OrdersRow), error: null };
+      if (!row.workspace_id) {
+        await supabaseAdmin
+          .from("orders")
+          .update({ workspace_id: workspaceId })
+          .eq("id", row.id);
+      }
+
+      let order = mapOrder(row);
+      if (!order.customer_name || !order.product_summary || (!order.phone && !order.email)) {
+        const events = await supabaseAdmin
+          .from("order_events")
+          .select("raw, shipping_company")
+          .eq("order_id", data.orderId)
+          .order("event_date", { ascending: false })
+          .limit(8);
+        for (const event of events.data ?? []) {
+          const extra = staticFieldsFromSnapshot((event as { raw?: unknown }).raw);
+          const carrier = (event as { shipping_company?: string | null }).shipping_company;
+          order = {
+            ...order,
+            customer_name: coalesceText(order.customer_name, extra.customer_name),
+            phone: coalesceText(order.phone, extra.phone),
+            email: coalesceText(order.email, extra.email),
+            city: coalesceText(order.city, extra.city),
+            postal_code: coalesceText(order.postal_code, extra.postal_code),
+            address: coalesceText(order.address, extra.address),
+            country: coalesceText(order.country, extra.country),
+            product_summary: coalesceText(order.product_summary, extra.product_summary),
+            shipping_company: coalesceText(order.shipping_company, extra.shipping_company, carrier),
+          };
+        }
+        order = {
+          ...order,
+          line_items:
+            order.line_items && order.line_items.length > 0
+              ? order.line_items
+              : resolveOrderLineItems({
+                  productSummary: order.product_summary,
+                  total: order.total,
+                }),
+        };
+      }
+
+      order = await enrichOrderProductImages(supabaseAdmin, order, row, workspaceId);
+
+      return { order, error: null };
     } catch (error) {
       console.error("getSyncedOrder failed", error);
       return { order: null, error: "Unable to load this order." };
@@ -487,17 +703,30 @@ export const listOrderEvents = createServerFn({ method: "GET" })
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: rows, error } = await supabaseAdmin
-        .from("order_events")
-        .select(
-          "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at",
-        )
-        .eq("order_id", data.orderId)
-        .eq("workspace_id", workspaceId)
-        .order("event_date", { ascending: true });
+      const selectEvents = () =>
+        supabaseAdmin
+          .from("order_events")
+          .select(
+            "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at, workspace_id",
+          )
+          .eq("order_id", data.orderId)
+          .order("event_date", { ascending: true });
+
+      let { data: rows, error } = await selectEvents();
 
       if (error && isMissingWorkspaceColumn(error.message)) {
-        return { events: [], error: null };
+        const legacy = await supabaseAdmin
+          .from("order_events")
+          .select(
+            "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at",
+          )
+          .eq("order_id", data.orderId)
+          .order("event_date", { ascending: true });
+        rows = (legacy.data ?? []).map((event) => ({
+          ...event,
+          workspace_id: null as string | null,
+        }));
+        error = legacy.error;
       }
 
       if (error) {
@@ -505,7 +734,11 @@ export const listOrderEvents = createServerFn({ method: "GET" })
         return { events: [], error: "Unable to load timeline." };
       }
 
-      return { events: (rows ?? []) as OrderEventRow[], error: null };
+      const scoped = ((rows ?? []) as Array<OrderEventRow & { workspace_id?: string | null }>).filter(
+        (event) => event.workspace_id === workspaceId || event.workspace_id == null,
+      );
+
+      return { events: scoped, error: null };
     } catch (error) {
       console.error("listOrderEvents failed", error);
       return { events: [], error: "Unable to load timeline." };

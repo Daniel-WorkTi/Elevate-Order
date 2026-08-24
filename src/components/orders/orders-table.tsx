@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import {
   flexRender,
   getCoreRowModel,
@@ -22,8 +22,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useT } from "@/lib/i18n/locale-context";
-import { SUPPLY_LABEL, type OperationalOrder, type PageSize } from "@/lib/order-domain";
+import { SUPPLY_LABEL, type PageSize } from "@/lib/order-domain";
 import { clearFiltersSearch, hasActiveFilters, type OrdersSearch } from "@/lib/orders-search";
+import type { OperationalOrder } from "@/lib/order-domain";
 
 export function OrdersTable({
   orders,
@@ -45,13 +46,13 @@ export function OrdersTable({
   onSearchChange: (next: OrdersSearch) => void;
 }) {
   const t = useT();
-  const navigate = useNavigate();
   const columns = useOrdersColumns();
+
   const sorting = useMemo<SortingState>(
     () => [{ id: search.sort, desc: search.dir === "desc" }],
     [search.sort, search.dir],
   );
-  const meta = useMemo<OrdersTableMeta>(() => (fx ? { fx } : {}), [fx]);
+  const meta = useMemo<OrdersTableMeta>(() => ({ ...(fx ? { fx } : {}) }), [fx]);
   const filtered = hasActiveFilters(search);
 
   const table = useReactTable({
@@ -155,13 +156,7 @@ export function OrdersTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="h-[60px] cursor-pointer border-border hover:bg-[color:var(--elevate-blue-soft)]/40"
-                  onClick={() => {
-                    void navigate({
-                      to: "/orders/$id",
-                      params: { id: String(row.original.order_id) },
-                    });
-                  }}
+                  className="h-[60px] border-border hover:bg-[color:var(--elevate-blue-soft)]/40"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="px-4">

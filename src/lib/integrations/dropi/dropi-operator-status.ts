@@ -5,8 +5,8 @@ import type {
 
 /**
  * Operator-facing status.
- * Linking the workspace is not the same as receiving orders. Stay on
- * "configured" until this workspace has at least one Dropi webhook/order.
+ * Once the operator clicks Connect (linked), show Connected — same as Shopify.
+ * Waiting for the first webhook is operational detail, not a separate badge.
  */
 export function resolveDropiOperatorStatus(input: {
   linked: boolean;
@@ -24,12 +24,7 @@ export function resolveDropiOperatorStatus(input: {
     return "error";
   }
 
-  const hasEvents =
-    Boolean(summary.lastWebhookAt) ||
-    Boolean(summary.lastSuccessfulEventAt) ||
-    (summary.orderCount ?? 0) > 0;
-
-  return hasEvents ? "connected" : "configured";
+  return "connected";
 }
 
 export function applyOperatorDropiSummary(

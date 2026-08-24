@@ -92,6 +92,36 @@ export const en: TranslationDict = {
 
   "connections.title": "Connections",
   "connections.subtitle": "Store, Dropi webhook and Dropea API",
+  "connections.introTitle": "How to connect",
+  "connections.introBody":
+    "Each integration needs credentials from that platform. Open a row below and follow the steps — ELEVATE does not create tokens for you.",
+  "connections.how.shopify.title": "Shopify",
+  "connections.how.shopify.summary":
+    "Authorize the app in Admin or use an Admin API token (shpat_). Domain: shop.myshopify.com.",
+  "connections.how.shopify.s1":
+    "In Shopify Admin, use Connect with Shopify (recommended) or Apps → Develop apps → create a custom app with Admin API access.",
+  "connections.how.shopify.s2":
+    "For a token: copy the access token (starts with shpat_) and use the admin domain (shop.myshopify.com), not the public website.",
+  "connections.how.shopify.s3":
+    "In ELEVATE, paste the domain (and token if needed) and use Sync now to import orders.",
+  "connections.how.dropi.title": "Dropi",
+  "connections.how.dropi.summary":
+    "Copy the ELEVATE webhook URL and paste it into Dropi order-update notifications.",
+  "connections.how.dropi.s1":
+    "Copy the webhook URL generated on this page (must be public HTTPS — localhost will not work).",
+  "connections.how.dropi.s2":
+    "In Dropi → notifications / order updates → paste this URL and save.",
+  "connections.how.dropi.s3":
+    "Back in ELEVATE, click Connect Dropi. New orders arrive via webhook; past history is not imported.",
+  "connections.how.dropea.title": "Dropea",
+  "connections.how.dropea.summary":
+    "From the Dropea panel, copy the API token and HMAC secret; paste the webhook URL into notifications.",
+  "connections.how.dropea.s1":
+    "In the Dropea panel (integrations / API), copy the API token and HMAC secret.",
+  "connections.how.dropea.s2":
+    "Paste both into ELEVATE and copy the webhook URL into Dropea notifications.",
+  "connections.how.dropea.s3":
+    "Click Connect Dropea. Future events appear in Orders and Inbox.",
   "connections.shopifyStore": "Shopify store",
   "connections.shopifyHint": "Connect your shop to this workspace",
   "connections.connectShopify": "Connect Shopify Store",
@@ -408,6 +438,40 @@ export const en: TranslationDict = {
   "orders.detail.loadError": "Unable to load this order.",
   "orders.detail.headTitle": "Order #{{id}} — ELEVATE",
   "orders.detail.back": "Orders",
+  "orders.detail.orderTitle": "Order #{{id}}",
+  "orders.detail.createdAt": "Created on {{datetime}}",
+  "orders.detail.trackOrder": "Track order",
+  "orders.detail.viewOnShopify": "View on Shopify",
+  "orders.detail.sendMessage": "Send message",
+  "orders.detail.trackingUnavailable": "Tracking is not available yet.",
+  "orders.detail.shopifyUnavailable": "Shopify link is unavailable for this order.",
+  "orders.detail.customerData": "Customer details",
+  "orders.detail.orderSummary": "Order summary",
+  "orders.detail.orderProducts": "Order products",
+  "orders.detail.history": "History",
+  "orders.detail.viewFullHistory": "View full history",
+  "orders.detail.hideFullHistory": "Hide history",
+  "orders.detail.progress.title": "Order progress",
+  "orders.detail.progress.current": "Current",
+  "orders.detail.progress.confirmed": "Confirmed",
+  "orders.detail.progress.paid": "Payment approved",
+  "orders.detail.progress.awaitingShip": "Awaiting shipment",
+  "orders.detail.progress.shipped": "Shipped",
+  "orders.detail.progress.delivered": "Delivered",
+  "orders.detail.name": "Name",
+  "orders.detail.paymentMethod": "Payment",
+  "orders.detail.shopifyId": "Order ID (Shopify)",
+  "orders.detail.supplyId": "{{supply}} ID",
+  "orders.detail.store": "Store",
+  "orders.detail.products": "Products",
+  "orders.detail.productsCount": "{{count}} items",
+  "orders.detail.product": "Product",
+  "orders.detail.qty": "Qty",
+  "orders.detail.unitPrice": "Unit price",
+  "orders.detail.lineTotal": "Total",
+  "orders.detail.whatsappOnlyOnClick": "WhatsApp opens only when you click the button.",
+  "orders.detail.previewBanner": "This is a local preview of the screen — not from Dropi.",
+  "orders.detail.viewPreview": "View preview",
   "orders.detail.supplyInfo": "Supply information",
   "orders.detail.reason": "Reason",
   "orders.detail.orderId": "Order ID",
@@ -435,6 +499,10 @@ export const en: TranslationDict = {
   "orders.detail.customerUnavailable":
     "Customer details are not available for this synchronized order yet.",
   "orders.detail.phone": "Phone",
+  "orders.detail.email": "Email",
+  "orders.detail.address": "Address",
+  "orders.detail.city": "City",
+  "orders.detail.postalCode": "Postal code",
   "orders.detail.order": "Order",
   "orders.detail.lineItemsHint":
     "Line items are not included in the current sync payload. Showing the supply total when available.",

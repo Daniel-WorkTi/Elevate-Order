@@ -9,6 +9,7 @@ import {
   shopifySyncInputSchema,
   type ShopifyNormalizedOrder,
 } from "@/lib/integrations/shopify/shopify-normalize";
+import { attachShopifyLineItemImages } from "@/lib/integrations/shopify/shopify-product-images";
 import { persistShopifyNormalizedOrders } from "@/lib/integrations/shopify/persist";
 
 export type ShopifySyncResult = {
@@ -136,8 +137,11 @@ export const syncShopifyOrders = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<ShopifySyncResult> => {
     try {
       const limit = data.limit ?? 50;
+      const host = requireAdminDomain(data.storeDomain);
+      const token = requireAdminToken(data.accessToken);
       const rawOrders = await fetchShopifyOrders(data.storeDomain, data.accessToken, limit);
-      const normalized = rawOrders
+      const withImages = await attachShopifyLineItemImages(host, token, rawOrders);
+      const normalized = withImages
         .map((row) => normalizeShopifyRestOrder(row as never))
         .filter((row): row is ShopifyNormalizedOrder => Boolean(row));
 

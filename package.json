@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "npx --yes tsx --test src/lib/carriers/get-carrier-meta.test.ts src/lib/inbox/aggregate-recovery.test.ts src/lib/inbox/order-to-inbox.test.ts src/lib/integrations/shopify/oauth.test.ts src/lib/i18n/date-locale.test.ts"
+    "test": "npx --yes tsx --test src/lib/carriers/get-carrier-meta.test.ts src/lib/inbox/aggregate-recovery.test.ts src/lib/inbox/order-to-inbox.test.ts src/lib/integrations/shopify/oauth.test.ts src/lib/integrations/shopify/shopify-normalize.test.ts src/lib/orders/hydrate-static-fields.test.ts src/lib/i18n/date-locale.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

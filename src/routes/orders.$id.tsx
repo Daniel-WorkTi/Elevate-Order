@@ -1,21 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 
 import { AppShell } from "@/components/app-shell";
-import { CustomerSection } from "@/components/orders/detail/customer-section";
-import { MessageComposer } from "@/components/orders/detail/message-composer";
+import { CustomerDetailsCard } from "@/components/orders/detail/customer-details-card";
 import { OrderDetailHeader } from "@/components/orders/detail/order-detail-header";
 import { OrderDetailSkeleton } from "@/components/orders/detail/order-detail-skeleton";
-import { OrderItemsSection } from "@/components/orders/detail/order-items-section";
-import { OrderTimeline } from "@/components/orders/detail/order-timeline";
-import { SupplyInformation } from "@/components/orders/detail/supply-information";
-import { TrackingSection } from "@/components/orders/detail/tracking-section";
+import { OrderMessageCard } from "@/components/orders/detail/order-message-card";
+import { OrderProductsCard } from "@/components/orders/detail/order-products-card";
+import { OrderProgress } from "@/components/orders/detail/order-progress";
+import { OrderSummaryCard } from "@/components/orders/detail/order-summary-card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
-import { formatOrderId } from "@/lib/order-domain";
+import {
+  getOrderDetailPreview,
+  getOrderDetailPreviewEvents,
+  ORDER_DETAIL_PREVIEW_ID,
+} from "@/lib/orders/order-detail-preview";
+import { shopifyAdminOrderUrl } from "@/lib/orders/shopify-admin-order-url";
 import { getSyncedOrder, listOrderEvents } from "@/lib/synced-orders.functions";
 
 export const Route = createFileRoute("/orders/$id")({
@@ -29,40 +34,81 @@ function OrderDetailPage() {
   const t = useT();
   const { id } = Route.useParams();
   const { workspaceId } = useWorkspaceId();
+  const store = useStoreConnectionPreference();
+  const messageRef = useRef<HTMLTextAreaElement | null>(null);
+  const isPreview = id === ORDER_DETAIL_PREVIEW_ID;
   const orderId = Number(id);
-  const validId = Number.isInteger(orderId) && orderId > 0;
+  const validId = isPreview || (Number.isInteger(orderId) && orderId > 0);
 
   const orderQuery = useQuery({
     queryKey: ["order", orderId, workspaceId],
-    enabled: validId && Boolean(workspaceId),
+    enabled: !isPreview && Number.isInteger(orderId) && orderId > 0 && Boolean(workspaceId),
     queryFn: () => getSyncedOrder({ data: { orderId, workspaceId } }),
   });
 
+  const previewOrder = isPreview ? getOrderDetailPreview() : null;
   const syncedOrder = orderQuery.data?.order ?? null;
-  const order = syncedOrder;
+  const order = previewOrder ?? syncedOrder;
 
   const eventsQuery = useQuery({
     queryKey: ["order-events", orderId, workspaceId],
-    enabled: validId && Boolean(syncedOrder) && Boolean(workspaceId),
+    enabled:
+      !isPreview &&
+      Number.isInteger(orderId) &&
+      orderId > 0 &&
+      Boolean(syncedOrder) &&
+      Boolean(workspaceId),
     queryFn: () => listOrderEvents({ data: { orderId, workspaceId } }),
   });
 
+  const events = isPreview
+    ? getOrderDetailPreviewEvents()
+    : (eventsQuery.data?.events ?? []);
+
+  const waitingWorkspace = !isPreview && Number.isInteger(orderId) && orderId > 0 && !workspaceId;
+  const loadingOrder =
+    !isPreview &&
+    (waitingWorkspace || (Boolean(workspaceId) && orderQuery.isPending));
+
   const loadError =
-    !validId
+    isPreview || !validId || waitingWorkspace
       ? null
       : (orderQuery.data?.error ??
         (orderQuery.isError ? t("orders.detail.loadError") : null));
-  const notFound = validId && !orderQuery.isPending && !loadError && !order;
+  const notFound =
+    !isPreview &&
+    Number.isInteger(orderId) &&
+    orderId > 0 &&
+    Boolean(workspaceId) &&
+    !orderQuery.isPending &&
+    !loadError &&
+    !order;
+
+  const shopifyUrl = order
+    ? shopifyAdminOrderUrl(store.storeDomain, order.shopify_order_id)
+    : null;
+  const storeUrl = store.storeDomain
+    ? `https://${store.storeDomain.replace(/^https?:\/\//, "")}`
+    : null;
+  const eventsError = isPreview ? null : (eventsQuery.data?.error ?? null);
+
+  function focusMessage() {
+    const el = document.getElementById("order-message-card");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      messageRef.current?.focus();
+    }, 280);
+  }
 
   return (
     <AppShell
-      title={order ? formatOrderId(order) : `${t("orders.detail.order")} #${id}`}
-      subtitle={t("orders.detailSubtitle")}
+      title={t("orders.title")}
+      subtitle={isPreview ? t("orders.detail.previewBanner") : undefined}
     >
       {!validId ? (
         <NotFoundState />
-      ) : orderQuery.isPending ? (
-        <div className="space-y-4">
+      ) : loadingOrder ? (
+        <div className="mx-auto w-full max-w-[1440px] space-y-3">
           <div className="space-y-2">
             <div className="h-4 w-20 rounded bg-muted" />
             <div className="h-7 w-48 rounded bg-muted" />
@@ -74,46 +120,44 @@ function OrderDetailPage() {
       ) : notFound || !order ? (
         <NotFoundState />
       ) : (
-        <div className="space-y-6">
-          <OrderDetailHeader order={order} />
+        <div className="mx-auto w-full max-w-[1440px] space-y-4">
+          {isPreview ? (
+            <p className="rounded-[10px] border border-[#E6E8EC] bg-[#EFF6FF] px-3 py-2 text-[12px] leading-snug text-[#1D4ED8] md:text-[13px]">
+              {t("orders.detail.previewBanner")}
+            </p>
+          ) : null}
 
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.95fr)_minmax(300px,1fr)]">
-            <div className="order-1 space-y-0 rounded-[16px] border border-border bg-card">
-              <div className="p-5 md:p-6">
-                <CustomerSection order={order} />
-              </div>
-              <Separator />
-              <div className="p-5 md:p-6">
-                <OrderItemsSection order={order} />
-              </div>
-              <Separator />
-              <div className="p-5 md:p-6">
-                <SupplyInformation order={order} />
-              </div>
-              <Separator />
-              <div className="p-5 md:p-6">
-                <TrackingSection order={order} />
-              </div>
-              <div className="hidden lg:block">
-                <Separator />
-                <div className="p-5 md:p-6">
-                  <OrderTimeline
-                    events={eventsQuery.data?.events ?? []}
-                    error={eventsQuery.data?.error ?? null}
-                  />
-                </div>
-              </div>
+          <OrderDetailHeader
+            order={order}
+            shopifyUrl={shopifyUrl}
+            onSendMessage={focusMessage}
+          />
+
+          {/* Desktop: Progress full → left (Cliente+Produtos) | right (Resumo+Mensagem)
+              Mobile: Progress → Cliente → Resumo → Produtos → Mensagem */}
+          <div className="hidden lg:block">
+            <OrderProgress order={order} events={events} error={eventsError} />
+          </div>
+
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+            <div className="min-w-0 lg:row-start-1">
+              <CustomerDetailsCard order={order} />
             </div>
-
-            <aside className="order-2 lg:sticky lg:top-24">
-              <MessageComposer order={order} events={eventsQuery.data?.events ?? []} />
-            </aside>
-
-            <div className="order-3 rounded-[16px] border border-border bg-card p-5 md:p-6 lg:hidden">
-              <OrderTimeline
-                events={eventsQuery.data?.events ?? []}
-                error={eventsQuery.data?.error ?? null}
+            <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+              <OrderSummaryCard
+                order={order}
+                storeName={store.storeName}
+                storeUrl={storeUrl}
               />
+            </div>
+            <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+              <OrderProductsCard order={order} />
+            </div>
+            <div className="lg:hidden">
+              <OrderProgress order={order} events={events} error={eventsError} />
+            </div>
+            <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:sticky lg:top-24">
+              <OrderMessageCard order={order} messageRef={messageRef} />
             </div>
           </div>
         </div>
@@ -130,9 +174,16 @@ function NotFoundState() {
         {t("orders.notFound")}
       </h2>
       <p className="mt-2 text-[13px] text-muted-foreground">{t("orders.detail.notFoundHint")}</p>
-      <Button asChild className="mt-5 h-9 rounded-[10px] text-[13px] shadow-none">
-        <Link to="/orders">{t("orders.backToOrders")}</Link>
-      </Button>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        <Button asChild className="h-9 rounded-[10px] text-[13px] shadow-none">
+          <Link to="/orders/$id" params={{ id: ORDER_DETAIL_PREVIEW_ID }}>
+            {t("orders.detail.viewPreview")}
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="h-9 rounded-[10px] text-[13px] shadow-none">
+          <Link to="/orders">{t("orders.backToOrders")}</Link>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -152,6 +203,11 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
           className="h-9 rounded-[10px] text-[13px] shadow-none"
         >
           {t("common.retry")}
+        </Button>
+        <Button asChild className="h-9 rounded-[10px] text-[13px] shadow-none">
+          <Link to="/orders/$id" params={{ id: ORDER_DETAIL_PREVIEW_ID }}>
+            {t("orders.detail.viewPreview")}
+          </Link>
         </Button>
         <Button asChild variant="outline" className="h-9 rounded-[10px] text-[13px] shadow-none">
           <Link to="/orders">{t("orders.backToOrders")}</Link>

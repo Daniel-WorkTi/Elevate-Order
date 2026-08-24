@@ -3,6 +3,7 @@ import { Check, Copy, Eye, EyeOff, Link2, Unplug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConnectionHowTo } from "@/components/connections/workspace/connection-howto";
 import type { DropeaConnectCredentials } from "@/hooks/use-dropea-connection-preference";
 import { useT } from "@/lib/i18n/locale-context";
 
@@ -93,56 +94,59 @@ export function DropeaSetupPanel({
   }
 
   return (
-    <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
-      <SecretField
-        id="dropea-api-token"
-        label={t("connections.apiToken")}
-        placeholder={t("connections.pasteApiTokenShort")}
-        value={apiToken}
-        show={showToken}
-        onShowChange={setShowToken}
-        onChange={(value) => {
-          setApiToken(value);
-          setError(null);
-        }}
-      />
+    <div className="space-y-3">
+      <ConnectionHowTo kind="dropea" />
+      <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
+        <SecretField
+          id="dropea-api-token"
+          label={t("connections.apiToken")}
+          placeholder={t("connections.pasteApiTokenShort")}
+          value={apiToken}
+          show={showToken}
+          onShowChange={setShowToken}
+          onChange={(value) => {
+            setApiToken(value);
+            setError(null);
+          }}
+        />
 
-      <SecretField
-        id="dropea-hmac-secret"
-        label={t("connections.hmacSecret")}
-        placeholder={t("connections.pasteHmacShort")}
-        value={hmacSecret}
-        show={showHmac}
-        onShowChange={setShowHmac}
-        onChange={(value) => {
-          setHmacSecret(value);
-          setError(null);
-        }}
-      />
+        <SecretField
+          id="dropea-hmac-secret"
+          label={t("connections.hmacSecret")}
+          placeholder={t("connections.pasteHmacShort")}
+          value={hmacSecret}
+          show={showHmac}
+          onShowChange={setShowHmac}
+          onChange={(value) => {
+            setHmacSecret(value);
+            setError(null);
+          }}
+        />
 
-      {webhookBlock}
-      {urlError ? <p className="text-[12px] font-medium text-red-600">{urlError}</p> : null}
+        {webhookBlock}
+        {urlError ? <p className="text-[12px] font-medium text-red-600">{urlError}</p> : null}
 
-      <Button
-        type="button"
-        disabled={!serverReady}
-        onClick={() => {
-          const ok = onConnect({ apiToken, hmacSecret });
-          if (!ok) {
-            setError(t("connections.enterBothToConnect"));
-            return;
-          }
-          setApiToken("");
-          setHmacSecret("");
-        }}
-        className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
-      >
-        <Link2 className="size-3.5" strokeWidth={1.75} />
-        {t("connections.connectDropea")}
-      </Button>
+        <Button
+          type="button"
+          disabled={!serverReady}
+          onClick={() => {
+            const ok = onConnect({ apiToken, hmacSecret });
+            if (!ok) {
+              setError(t("connections.enterBothToConnect"));
+              return;
+            }
+            setApiToken("");
+            setHmacSecret("");
+          }}
+          className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
+        >
+          <Link2 className="size-3.5" strokeWidth={1.75} />
+          {t("connections.connectDropea")}
+        </Button>
 
-      {error ? <p className="text-[12px] font-medium text-red-600">{error}</p> : null}
-    </section>
+        {error ? <p className="text-[12px] font-medium text-red-600">{error}</p> : null}
+      </section>
+    </div>
   );
 }
 

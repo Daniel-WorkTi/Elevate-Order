@@ -1,4 +1,4 @@
-import { Copy, MapPin, Phone, User } from "lucide-react";
+import { Copy, Mail, MapPin, Phone, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { LanguageBadge } from "@/components/i18n/language-badge";
@@ -11,9 +11,17 @@ export function CustomerSection({ order }: { order: OperationalOrder }) {
   const t = useT();
   const name = order.customer_name?.trim();
   const phone = order.phone?.trim();
+  const email = order.email?.trim();
   const country = order.country?.trim();
-  const hasAny = Boolean(name || phone || country);
+  const city = order.city?.trim();
+  const postalCode = order.postal_code?.trim();
+  const address = order.address?.trim();
+  const location = [address, [postalCode, city].filter(Boolean).join(" "), country]
+    .filter(Boolean)
+    .join(", ");
+  const hasAny = Boolean(name || phone || email || location);
   const phoneLabel = t("orders.detail.phone");
+  const emailLabel = t("orders.detail.email");
 
   async function copyText(label: string, value: string) {
     try {
@@ -64,10 +72,31 @@ export function CustomerSection({ order }: { order: OperationalOrder }) {
             </div>
           ) : null}
 
-          {country ? (
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <MapPin className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
-              <span>{country}</span>
+          {email ? (
+            <div className="flex items-center gap-1.5">
+              <Mail
+                className="size-3.5 shrink-0 text-muted-foreground"
+                strokeWidth={1.5}
+                aria-hidden
+              />
+              <span className="min-w-0 truncate">{email}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 rounded-[8px] text-muted-foreground"
+                onClick={() => void copyText(emailLabel, email)}
+                aria-label={t("common.copyLabel", { label: emailLabel })}
+              >
+                <Copy className="size-3.5" strokeWidth={1.5} />
+              </Button>
+            </div>
+          ) : null}
+
+          {location ? (
+            <div className="flex items-start gap-1.5 text-muted-foreground">
+              <MapPin className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
+              <span className="text-foreground">{location}</span>
               <LanguageBadge language={languageFromCountry(country)} />
             </div>
           ) : (

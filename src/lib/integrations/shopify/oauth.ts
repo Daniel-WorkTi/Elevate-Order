@@ -6,11 +6,12 @@ export const SHOPIFY_OAUTH_STATE_COOKIE = "elevate_shopify_oauth";
 /**
  * Order-management / call-center reads.
  * `read_orders` already includes Fulfillment + tracking.
+ * `read_products` is required for product thumbnails on order detail.
  * `read_fulfillments` is FulfillmentService (warehouse apps) — do not request it.
  * `read_all_orders` needs Partner Dashboard approval before it can be declared.
  */
 export const SHOPIFY_DEFAULT_SCOPES =
-  "read_orders,read_customers,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders";
+  "read_orders,read_products,read_customers,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders";
 
 export type ShopifyAppConfig = {
   apiKey: string;

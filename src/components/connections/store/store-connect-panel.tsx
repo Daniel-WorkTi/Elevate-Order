@@ -3,6 +3,7 @@ import { Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConnectionHowTo } from "@/components/connections/workspace/connection-howto";
 import type { StoreConnectInput } from "@/hooks/use-store-connection-preference";
 import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
 import { useT } from "@/lib/i18n/locale-context";
@@ -89,7 +90,9 @@ export function StoreConnectPanel({
   }
 
   return (
-    <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
+    <div className="space-y-3">
+      <ConnectionHowTo kind="shopify" />
+      <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
       {oauthError ? (
         <p className="text-[13px] font-medium text-red-600">{t("connections.shopifyOauthError")}</p>
       ) : null}
@@ -178,6 +181,7 @@ export function StoreConnectPanel({
       </Button>
 
       {error ? <p className="text-[12px] font-medium text-red-600">{error}</p> : null}
-    </section>
+      </section>
+    </div>
   );
 }

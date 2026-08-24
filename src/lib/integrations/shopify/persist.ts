@@ -80,33 +80,10 @@ export async function persistShopifyNormalizedOrders(
         );
       }
       if (/product_summary|customer_name|snapshot|column/i.test(upsertError.message ?? "")) {
-        const logistics = orderRows.map(
-          ({
-            customer_name: _c,
-            phone: _p,
-            email: _e,
-            city: _city,
-            postal_code: _pc,
-            address: _a,
-            country: _co,
-            product_summary: _pr,
-            currency: _cu,
-            snapshot: _s,
-            ...rest
-          }) => rest,
+        console.error("Shopify upsert failed", upsertError);
+        throw new Error(
+          "Colunas de cliente/produto em falta na tabela orders. Rode a migration 20260813220000_orders_static_fields.sql no SQL Editor do Supabase e clique em Atualizar.",
         );
-        const { error: fallbackError } = await supabaseAdmin
-          .from("orders")
-          .upsert(logistics, { onConflict: "order_id" });
-        if (fallbackError) {
-          console.error("Shopify upsert failed", fallbackError);
-          throw new Error("Failed to store Shopify orders.");
-        }
-        return {
-          imported: logistics.length,
-          enriched: 0,
-          warning: "Static columns missing — run migration 20260813220000_orders_static_fields",
-        };
       }
       console.error("Shopify upsert failed", upsertError);
       throw new Error("Failed to store Shopify orders.");
@@ -116,7 +93,7 @@ export async function persistShopifyNormalizedOrders(
   const { data: linkedRows } = await supabaseAdmin
     .from("orders")
     .select(
-      "order_id, shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, source",
+      "order_id, shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, source, snapshot",
     )
     .in("shopify_order_id", shopifyIds)
     .not("source", "ilike", "%shopify%");
@@ -125,6 +102,17 @@ export async function persistShopifyNormalizedOrders(
   for (const row of linkedRows ?? []) {
     const match = normalized.find((order) => order.shopify_order_id === row.shopify_order_id);
     if (!match) continue;
+    const supplySnapshot = row.snapshot;
+    const supplyHasLineItems =
+      supplySnapshot &&
+      typeof supplySnapshot === "object" &&
+      !Array.isArray(supplySnapshot) &&
+      Array.isArray((supplySnapshot as { line_items?: unknown }).line_items) &&
+      ((supplySnapshot as { line_items: unknown[] }).line_items?.length ?? 0) > 0;
+    const shopifyHasLineItems =
+      Array.isArray((match.snapshot as { line_items?: unknown }).line_items) &&
+      ((match.snapshot as { line_items: unknown[] }).line_items?.length ?? 0) > 0;
+
     const { error } = await supabaseAdmin
       .from("orders")
       .update({
@@ -137,6 +125,9 @@ export async function persistShopifyNormalizedOrders(
         country: coalesceStatic(match.country, row.country),
         product_summary: coalesceStatic(match.product_summary, row.product_summary),
         currency: coalesceStatic(match.currency, row.currency),
+        ...(!supplyHasLineItems && shopifyHasLineItems
+          ? { snapshot: match.snapshot as import("@/integrations/supabase/types").Json }
+          : {}),
         ...(scopedWorkspaceId ? { workspace_id: scopedWorkspaceId } : {}),
         updated_at: nowIso,
       })
@@ -168,9 +159,10 @@ export async function persistShopifyNormalizedOrders(
     raw: order.snapshot as import("@/integrations/supabase/types").Json,
   }));
 
-  await supabaseAdmin
+  const { error: eventsError } = await supabaseAdmin
     .from("order_events")
     .upsert(eventRows, { onConflict: "order_id,event_date,status_id", ignoreDuplicates: true });
+  if (eventsError) console.error("Shopify order_events upsert failed", eventsError);
 
   return { imported: orderRows.length, enriched, warning: null };
 }

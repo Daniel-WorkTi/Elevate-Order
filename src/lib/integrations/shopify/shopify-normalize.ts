@@ -55,6 +55,19 @@ export type ShopifyNormalizedOrder = {
   snapshot: Record<string, unknown>;
 };
 
+type ShopifyAddress = {
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  zip?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  country?: string | null;
+  country_code?: string | null;
+};
+
 type ShopifyRestOrder = {
   id: number;
   name?: string;
@@ -73,19 +86,19 @@ type ShopifyRestOrder = {
     email?: string | null;
     phone?: string | null;
   } | null;
-  shipping_address?: {
+  shipping_address?: ShopifyAddress | null;
+  billing_address?: ShopifyAddress | null;
+  shipping_lines?: Array<{ title?: string | null; code?: string | null }>;
+  line_items?: Array<{
+    title?: string | null;
+    quantity?: number | null;
     name?: string | null;
-    first_name?: string | null;
-    last_name?: string | null;
-    phone?: string | null;
-    city?: string | null;
-    zip?: string | null;
-    address1?: string | null;
-    address2?: string | null;
-    country?: string | null;
-    country_code?: string | null;
-  } | null;
-  line_items?: Array<{ title?: string | null; quantity?: number | null; name?: string | null }>;
+    product_id?: number | null;
+    variant_id?: number | null;
+    price?: string | null;
+    variant_title?: string | null;
+    image?: { src?: string | null } | string | null;
+  }>;
   fulfillments?: Array<{
     tracking_number?: string | null;
     tracking_url?: string | null;
@@ -127,20 +140,24 @@ function statusLabel(order: ShopifyRestOrder): string {
     return fulfillment ? "Shipped" : "Confirmed";
   }
   if (financial === "refunded" || financial === "voided") return "Cancelled";
-  return first(fulfillment, financial, "Open") ?? "Open";
+  return first(fulfillment, financial, "Confirmed") ?? "Confirmed";
 }
 
 export function normalizeShopifyRestOrder(order: ShopifyRestOrder): ShopifyNormalizedOrder | null {
   if (!order?.id || !Number.isFinite(order.id)) return null;
 
   const ship = order.shipping_address;
+  const bill = order.billing_address;
   const customer = order.customer;
   const fulfillment = order.fulfillments?.[0];
+  const shipLine = order.shipping_lines?.[0];
 
   const customerName = first(
     ship?.name,
+    bill?.name,
     [customer?.first_name, customer?.last_name].filter(Boolean).join(" "),
     [ship?.first_name, ship?.last_name].filter(Boolean).join(" "),
+    [bill?.first_name, bill?.last_name].filter(Boolean).join(" "),
   );
 
   const products = (order.line_items ?? [])
@@ -165,19 +182,21 @@ export function normalizeShopifyRestOrder(order: ShopifyRestOrder): ShopifyNorma
       fulfillment?.tracking_numbers?.[0],
     ),
     tracking_url: first(fulfillment?.tracking_url, fulfillment?.tracking_urls?.[0]),
-    shipping_company: first(fulfillment?.tracking_company),
+    shipping_company: first(fulfillment?.tracking_company, shipLine?.title, shipLine?.code),
     total: money(order.total_price),
     currency: first(order.currency),
     customer_name: customerName,
-    phone: first(ship?.phone, customer?.phone),
+    phone: first(ship?.phone, bill?.phone, customer?.phone),
     email: first(order.email, customer?.email),
-    city: first(ship?.city),
-    postal_code: first(ship?.zip),
+    city: first(ship?.city, bill?.city),
+    postal_code: first(ship?.zip, bill?.zip),
     address: first(
       [ship?.address1, ship?.address2].filter(Boolean).join(", "),
       ship?.address1,
+      [bill?.address1, bill?.address2].filter(Boolean).join(", "),
+      bill?.address1,
     ),
-    country: first(ship?.country, ship?.country_code),
+    country: first(ship?.country, ship?.country_code, bill?.country, bill?.country_code),
     product_summary: products.length > 0 ? products.join(", ") : null,
     source: SHOPIFY_SOURCE,
     last_event_at: new Date(lastEvent).toISOString(),

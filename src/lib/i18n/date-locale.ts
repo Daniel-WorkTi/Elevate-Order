@@ -58,6 +58,14 @@ export function formatIsoDateTime(iso: string | null | undefined, locale: Locale
   return date ? formatDateTime(date, locale) : "—";
 }
 
+/** Compact operator stamp: pt `23/08/2025 às 14:23`. */
+export function formatOrderStamp(iso: string | null | undefined, locale: Locale = "pt"): string {
+  const date = parseDisplayDate(iso);
+  if (!date) return "—";
+  const pattern = locale === "pt" ? "dd/MM/yyyy 'às' HH:mm" : "MM/dd/yyyy 'at' HH:mm";
+  return format(date, pattern, { locale: dateFnsLocale(locale) });
+}
+
 export function formatIsoRelative(iso: string | null | undefined, locale: Locale = "pt"): string {
   const date = parseDisplayDate(iso);
   return date ? formatRelativeDistance(date, locale) : "—";

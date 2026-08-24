@@ -8,6 +8,7 @@ import {
   normalizeShopifyDomain,
   normalizeShopifyRestOrder,
 } from "@/lib/integrations/shopify/shopify-normalize";
+import { attachShopifyLineItemImages } from "@/lib/integrations/shopify/shopify-product-images";
 import { persistShopifyNormalizedOrders } from "@/lib/integrations/shopify/persist";
 
 const shopInput = z.object({
@@ -312,7 +313,8 @@ export async function pullAndPersistShopifyOrders(
   }
   const json = (await response.json()) as { orders?: unknown[] };
   const rawOrders = Array.isArray(json.orders) ? json.orders : [];
-  const normalized = rawOrders
+  const withImages = await attachShopifyLineItemImages(host, token, rawOrders);
+  const normalized = withImages
     .map((row) => normalizeShopifyRestOrder(row as never))
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
   return persistShopifyNormalizedOrders(normalized, workspaceId);

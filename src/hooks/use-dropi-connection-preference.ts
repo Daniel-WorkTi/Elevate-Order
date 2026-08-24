@@ -66,8 +66,7 @@ function writePreference(next: DropiConnectionPreference) {
 }
 
 /**
- * Per-operator Dropi link state. Dropi must not appear Connected until the user
- * explicitly connects it for their workspace.
+ * Per-operator Dropi link state. After Connect, UI shows Connected (like Shopify).
  */
 export function useDropiConnectionPreference() {
   const preference = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

@@ -29,6 +29,7 @@ import { Route as ConnectionsIndexRouteImport } from './routes/connections.index
 import { Route as ConnectionsDropeaRouteImport } from './routes/connections.dropea'
 import { Route as ConnectionsDropiRouteImport } from './routes/connections.dropi'
 import { Route as ConnectionsShopifyRouteImport } from './routes/connections.shopify'
+import { Route as OrdersIndexRouteImport } from './routes/orders.index'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as AuthShopifyCallbackRouteImport } from './routes/auth.shopify.callback'
 import { Route as ApiPublicWebhooksOrdersRouteImport } from './routes/api/public/webhooks/orders'
@@ -135,6 +136,11 @@ const ConnectionsShopifyRoute = ConnectionsShopifyRouteImport.update({
   path: '/shopify',
   getParentRoute: () => ConnectionsRoute,
 } as any)
+const OrdersIndexRoute = OrdersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => OrdersRoute,
+} as any)
 const OrdersIdRoute = OrdersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
+  '/orders/': typeof OrdersIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
@@ -198,7 +205,6 @@ export interface FileRoutesByTo {
   '/integracao-api': typeof IntegracaoApiRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pricing': typeof PricingRoute
   '/profits': typeof ProfitsRoute
   '/settings': typeof SettingsRoute
@@ -211,6 +217,7 @@ export interface FileRoutesByTo {
   '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections': typeof ConnectionsIndexRoute
+  '/orders': typeof OrdersIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
@@ -239,6 +246,7 @@ export interface FileRoutesById {
   '/connections/shopify': typeof ConnectionsShopifyRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
+  '/orders/': typeof OrdersIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
@@ -268,6 +276,7 @@ export interface FileRouteTypes {
     | '/connections/shopify'
     | '/orders/$id'
     | '/connections/'
+    | '/orders/'
     | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
@@ -281,7 +290,6 @@ export interface FileRouteTypes {
     | '/integracao-api'
     | '/login'
     | '/onboarding'
-    | '/orders'
     | '/pricing'
     | '/profits'
     | '/settings'
@@ -294,6 +302,7 @@ export interface FileRouteTypes {
     | '/connections/shopify'
     | '/orders/$id'
     | '/connections'
+    | '/orders'
     | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/connections/shopify'
     | '/orders/$id'
     | '/connections/'
+    | '/orders/'
     | '/auth/shopify/callback'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
@@ -490,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectionsShopifyRouteImport
       parentRoute: typeof ConnectionsRoute
     }
+    '/orders/': {
+      id: '/orders/'
+      path: '/'
+      fullPath: '/orders/'
+      preLoaderRoute: typeof OrdersIndexRouteImport
+      parentRoute: typeof OrdersRoute
+    }
     '/orders/$id': {
       id: '/orders/$id'
       path: '/$id'
@@ -548,10 +565,12 @@ const ConnectionsRouteWithChildren = ConnectionsRoute._addFileChildren(
 
 interface OrdersRouteChildren {
   OrdersIdRoute: typeof OrdersIdRoute
+  OrdersIndexRoute: typeof OrdersIndexRoute
 }
 
 const OrdersRouteChildren: OrdersRouteChildren = {
   OrdersIdRoute: OrdersIdRoute,
+  OrdersIndexRoute: OrdersIndexRoute,
 }
 
 const OrdersRouteWithChildren =

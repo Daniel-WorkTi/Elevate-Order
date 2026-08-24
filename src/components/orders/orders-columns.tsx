@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import type { ColumnDef } from "@tanstack/react-table";
 import { Link } from "@tanstack/react-router";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
   ArrowDown,
   ArrowRight,
@@ -225,7 +225,6 @@ export function useOrdersColumns(): ColumnDef<OperationalOrder>[] {
               <Link
                 to="/orders/$id"
                 params={{ id: String(order.order_id) }}
-                onClick={(event) => event.stopPropagation()}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-[8px] px-2 py-1 text-[13px] font-medium",
                   "text-[color:var(--elevate-blue)] hover:text-[color:var(--elevate-blue-hover)]",

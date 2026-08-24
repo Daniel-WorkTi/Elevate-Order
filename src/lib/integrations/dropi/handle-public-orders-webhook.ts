@@ -129,9 +129,26 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
     ((existingRows ?? []) as ExistingOrderRow[]).map((row) => [row.order_id, row]),
   );
 
+  const shopifyLookupIds = [...latest.values()]
+    .map((row) => row.shopify_order_id)
+    .filter((id): id is number => typeof id === "number");
+  const { data: shopifyTwins } = shopifyLookupIds.length
+    ? await supabaseAdmin
+        .from("orders")
+        .select(
+          "shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot, shipping_company, tracking_code, tracking_url",
+        )
+        .in("shopify_order_id", shopifyLookupIds)
+        .ilike("source", "%shopify%")
+    : { data: [] as never[] };
+  const twinByShopifyId = new Map(
+    (shopifyTwins ?? []).map((row) => [Number(row.shopify_order_id), row]),
+  );
+
   const nowIso = new Date().toISOString();
   const orderRows = [...latest.values()].map((row) => {
     const existing = existingById.get(row.order_id);
+    const twin = row.shopify_order_id ? twinByShopifyId.get(row.shopify_order_id) : undefined;
     const logistics = logisticsFromEvent(row);
     return {
       order_id: row.order_id,
@@ -139,24 +156,34 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
       status_id: row.status_id,
       status_name: row.status_name,
       details: row.details,
-      tracking_code: logistics.trackingCode ?? row.tracking_code,
-      tracking_url: logistics.trackingUrl ?? row.tracking_url,
-      shipping_company: logistics.shippingCompany ?? row.shipping_company,
+      tracking_code: logistics.trackingCode ?? row.tracking_code ?? twin?.tracking_code ?? null,
+      tracking_url: logistics.trackingUrl ?? row.tracking_url ?? twin?.tracking_url ?? null,
+      shipping_company:
+        logistics.shippingCompany ?? row.shipping_company ?? twin?.shipping_company ?? null,
       total: row.total,
       source: sourceFromWebhookAuth(row.source, auth.supply),
       workspace_id: workspaceId,
       last_event_at: row.event_date,
       updated_at: nowIso,
-      customer_name: coalesceStatic(row.customer_name, existing?.customer_name),
-      phone: coalesceStatic(row.phone, existing?.phone),
-      email: coalesceStatic(row.email, existing?.email),
-      city: coalesceStatic(row.city, existing?.city),
-      postal_code: coalesceStatic(row.postal_code, existing?.postal_code),
-      address: coalesceStatic(row.address, existing?.address),
-      country: coalesceStatic(row.country, existing?.country),
-      product_summary: coalesceStatic(row.product_summary, existing?.product_summary),
-      currency: coalesceStatic(row.currency, existing?.currency),
-      snapshot: (row.raw ?? existing?.snapshot ?? null) as
+      customer_name: coalesceStatic(
+        row.customer_name,
+        coalesceStatic(existing?.customer_name, twin?.customer_name),
+      ),
+      phone: coalesceStatic(row.phone, coalesceStatic(existing?.phone, twin?.phone)),
+      email: coalesceStatic(row.email, coalesceStatic(existing?.email, twin?.email)),
+      city: coalesceStatic(row.city, coalesceStatic(existing?.city, twin?.city)),
+      postal_code: coalesceStatic(
+        row.postal_code,
+        coalesceStatic(existing?.postal_code, twin?.postal_code),
+      ),
+      address: coalesceStatic(row.address, coalesceStatic(existing?.address, twin?.address)),
+      country: coalesceStatic(row.country, coalesceStatic(existing?.country, twin?.country)),
+      product_summary: coalesceStatic(
+        row.product_summary,
+        coalesceStatic(existing?.product_summary, twin?.product_summary),
+      ),
+      currency: coalesceStatic(row.currency, coalesceStatic(existing?.currency, twin?.currency)),
+      snapshot: (twin?.snapshot ?? row.raw ?? existing?.snapshot ?? null) as
         | import("@/integrations/supabase/types").Json
         | null,
     };
