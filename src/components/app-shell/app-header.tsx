@@ -6,6 +6,7 @@ import {
   type Workspace,
 } from "@/components/app-shell/workspace-switcher";
 import { Button } from "@/components/ui/button";
+import { useIsBelowLg } from "@/hooks/use-mobile";
 import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
@@ -25,21 +26,23 @@ export function AppHeader({
   className,
 }: AppHeaderProps) {
   const t = useT();
+  const compactChrome = useIsBelowLg();
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-20 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-4 md:px-8",
+        "sticky top-0 z-30 flex shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4",
+        "h-16 md:gap-3 md:px-5 lg:h-20 lg:gap-4 lg:px-8",
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
         {onOpenMobileNav ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="rounded-[10px] md:hidden"
+            className="shrink-0 rounded-[10px] md:hidden"
             onClick={onOpenMobileNav}
             aria-label={t("shell.openNav")}
           >
@@ -47,19 +50,25 @@ export function AppHeader({
           </Button>
         ) : null}
 
-        <div className="min-w-0">
-          <h1 className="truncate text-[18px] font-semibold tracking-tight text-foreground md:text-[20px]">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[17px] font-semibold tracking-tight text-foreground md:text-[18px] lg:text-[20px]">
             {title}
           </h1>
           {subtitle ? (
-            <p className="mt-0.5 truncate text-[13px] text-muted-foreground">{subtitle}</p>
+            <p className="mt-0.5 hidden truncate text-[13px] text-muted-foreground sm:block">
+              {subtitle}
+            </p>
           ) : null}
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
-        <CurrencySwitcher />
-        <WorkspaceSwitcher workspace={workspace} tone="header" />
+      <div className="flex min-w-0 shrink-0 items-center gap-1.5 md:gap-2 lg:gap-3">
+        <CurrencySwitcher {...(compactChrome ? { className: "max-w-[132px]" } : {})} />
+        <WorkspaceSwitcher
+          workspace={workspace}
+          tone="header"
+          {...(compactChrome ? { className: "max-w-[148px]" } : {})}
+        />
       </div>
     </header>
   );

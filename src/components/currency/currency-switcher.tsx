@@ -4,7 +4,7 @@ import { ChevronDown, CircleDollarSign } from "lucide-react";
 import { CurrencyConverterPanel } from "@/components/currency/currency-converter-popover";
 import { useExchangeRate } from "@/components/app-shell/use-exchange-rate";
 import { useCurrencyPreference } from "@/hooks/use-currency-preference";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsBelowLg, useIsMobile } from "@/hooks/use-mobile";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { getCurrencyInfo } from "@/lib/currency/currency-metadata";
@@ -12,9 +12,14 @@ import { formatCompactRate } from "@/lib/currency/format-rate";
 import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
+function currencyBadge(code: string) {
+  const info = getCurrencyInfo(code);
+  const symbol = info.symbol?.trim();
+  return symbol ? `${info.code} ${symbol}` : info.code;
+}
+
 type TriggerProps = {
-  from: string;
-  to: string;
+  displayCurrency: string;
   rateLabel: string;
   compact?: boolean | undefined;
   className?: string | undefined;
@@ -23,9 +28,11 @@ type TriggerProps = {
 
 const HeaderTriggerButton = forwardRef<HTMLButtonElement, TriggerProps>(
   function HeaderTriggerButton(
-    { from, to, rateLabel, compact, className, ariaLabel, ...rest },
+    { displayCurrency, rateLabel, compact, className, ariaLabel, ...rest },
     ref,
   ) {
+    const badge = currencyBadge(displayCurrency);
+
     if (compact) {
       return (
         <button
@@ -41,9 +48,7 @@ const HeaderTriggerButton = forwardRef<HTMLButtonElement, TriggerProps>(
           {...rest}
         >
           <CircleDollarSign className="size-3.5 text-[#2563EB]" strokeWidth={1.5} />
-          <span>
-            {to} {getCurrencyInfo(to).symbol ?? ""}
-          </span>
+          <span>{badge}</span>
         </button>
       );
     }
@@ -63,9 +68,7 @@ const HeaderTriggerButton = forwardRef<HTMLButtonElement, TriggerProps>(
         {...rest}
       >
         <span className="flex items-center gap-1.5 text-[12px] font-medium tracking-tight text-[#667085]">
-          <span className="font-semibold text-[#0A0C10]">
-            {to} {getCurrencyInfo(to).symbol ?? ""}
-          </span>
+          <span className="font-semibold text-[#0A0C10]">{badge}</span>
         </span>
 
         <span
@@ -87,17 +90,19 @@ export type CurrencySwitcherProps = {
   className?: string;
 };
 
-/** Global AppShell currency converter control (preference + live/cached rate). */
+/** Global AppShell currency converter — header badge follows primary (`to`) currency. */
 export function CurrencySwitcher({ className }: CurrencySwitcherProps) {
   const t = useT();
   const isMobile = useIsMobile();
-  const { from, to, setFrom, setTo, swap } = useCurrencyPreference();
+  const isBelowLg = useIsBelowLg();
+  const compactTrigger = isMobile || isBelowLg;
+  const { from, to, displayCurrency, setFrom, setTo, swap } = useCurrencyPreference();
   const fx = useExchangeRate(from, to);
   const [open, setOpen] = useState(false);
 
   const unavailable = !fx.loading && (fx.rate == null || Boolean(fx.error));
   const rateLabel = unavailable ? "—" : formatCompactRate(fx.rate);
-  const triggerAria = t("currency.displayAria", { to, rate: rateLabel });
+  const triggerAria = t("currency.displayAria", { to: displayCurrency, rate: rateLabel });
 
   const panel = (
     <CurrencyConverterPanel
@@ -125,8 +130,7 @@ export function CurrencySwitcher({ className }: CurrencySwitcherProps) {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <HeaderTriggerButton
-            from={from}
-            to={to}
+            displayCurrency={displayCurrency}
             rateLabel={rateLabel}
             compact
             className={className}
@@ -147,9 +151,9 @@ export function CurrencySwitcher({ className }: CurrencySwitcherProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <HeaderTriggerButton
-          from={from}
-          to={to}
+          displayCurrency={displayCurrency}
           rateLabel={rateLabel}
+          compact={compactTrigger}
           className={className}
           ariaLabel={triggerAria}
         />
@@ -157,7 +161,7 @@ export function CurrencySwitcher({ className }: CurrencySwitcherProps) {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-[400px] rounded-[16px] border border-[#E6E8EC] bg-white p-5 shadow-[0_8px_30px_rgba(10,12,16,0.08)]"
+        className="w-[min(400px,calc(100vw-2rem))] rounded-[16px] border border-[#E6E8EC] bg-white p-5 shadow-[0_8px_30px_rgba(10,12,16,0.08)]"
       >
         {panel}
       </PopoverContent>

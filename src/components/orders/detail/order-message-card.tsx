@@ -1,10 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Info, MessageCircle, Pencil } from "lucide-react";
-import { useEffect, useMemo, useState, type RefObject } from "react";
-import { toast } from "sonner";
+import { ChevronDown, Info, MessageCircle, Pencil } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useT } from "@/lib/i18n/locale-context";
 import type { OperationalOrder } from "@/lib/order-domain";
 import {
@@ -16,6 +23,7 @@ import {
   type MessageTemplateId,
 } from "@/lib/order-message";
 import { listMessageTemplates } from "@/lib/templates.functions";
+import { cn } from "@/lib/utils";
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -25,21 +33,35 @@ function WhatsAppGlyph({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Order detail “Mensagem” card — layout locked to the ops reference:
+ * header + select/edit + preview + Abrir WhatsApp + footer note.
+ */
 export function OrderMessageCard({
   order,
   messageRef,
+  className,
 }: {
   order: OperationalOrder;
   messageRef?: RefObject<HTMLTextAreaElement | null>;
+  className?: string;
 }) {
   const t = useT();
+  const { workspaceId } = useWorkspaceId();
+  const templateTriggerId = useId();
+  const localMessageRef = useRef<HTMLTextAreaElement | null>(null);
   const defaultId = pickDefaultTemplate(order);
   const [templateId, setTemplateId] = useState<MessageTemplateId>(defaultId);
   const [message, setMessage] = useState("");
+  const [selectOpen, setSelectOpen] = useState(false);
 
   const templatesQuery = useQuery({
-    queryKey: ["message-templates"],
-    queryFn: () => listMessageTemplates(),
+    queryKey: ["message-templates", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      listMessageTemplates({
+        data: { ...(workspaceId ? { workspaceId } : {}) },
+      }),
   });
 
   const templates = useMemo(() => {
@@ -66,12 +88,10 @@ export function OrderMessageCard({
   const phone = normalizeWhatsAppPhone(order.phone);
   const waHref = phone ? buildWhatsAppLink(phone, message) : null;
 
-  async function copyMessage() {
-    try {
-      await navigator.clipboard.writeText(message);
-      toast.success(t("orders.detail.messageCopied"));
-    } catch {
-      toast.error(t("orders.detail.copyMessageFailed"));
+  function setTextareaRef(node: HTMLTextAreaElement | null) {
+    localMessageRef.current = node;
+    if (messageRef) {
+      (messageRef as { current: HTMLTextAreaElement | null }).current = node;
     }
   }
 
@@ -79,49 +99,85 @@ export function OrderMessageCard({
     <section
       id="order-message-card"
       aria-labelledby="message-heading"
-      className="rounded-[12px] border border-[#E6E8EC] bg-white p-5 shadow-none"
+      className={cn(
+        "flex min-h-0 flex-1 flex-col rounded-[14px] border border-[#E6E8EC] bg-white p-5 shadow-none",
+        className,
+      )}
     >
-      <div className="mb-3 flex items-center gap-2">
-        <MessageCircle className="size-4 text-[#667085]" strokeWidth={1.5} aria-hidden />
-        <h2 id="message-heading" className="text-[15px] font-semibold text-[#0A0C10]">
-          {t("orders.detail.message")}
-        </h2>
+      {/* Header */}
+      <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="size-4 text-[#2563EB]" strokeWidth={1.75} aria-hidden />
+          <h2 id="message-heading" className="text-[15px] font-semibold tracking-tight text-[#0A0C10]">
+            {t("orders.detail.message")}
+          </h2>
+        </div>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-[13px] font-medium text-[#2563EB] transition-colors hover:text-[#1D4ED8]"
+          onClick={() => setSelectOpen(true)}
+        >
+          {t("orders.detail.selectTemplate")}
+          <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+        </button>
       </div>
 
-      <div className="relative">
+      {/* Template select — full width, pencil instead of chevron */}
+      <div className="mb-3 shrink-0">
+        <Select
+          value={templateId}
+          open={selectOpen}
+          onOpenChange={setSelectOpen}
+          onValueChange={(value) => setTemplateId(value as MessageTemplateId)}
+        >
+          <SelectTrigger
+            id={templateTriggerId}
+            className={cn(
+              "h-10 w-full rounded-[10px] border-[#E6E8EC] bg-white px-3 text-[13px] font-medium text-[#0A0C10] shadow-none",
+              "focus:ring-2 focus:ring-[#2563EB]/25 data-[placeholder]:text-[#667085]",
+              "[&_svg.lucide-chevron-down]:hidden",
+            )}
+            aria-label={t("orders.detail.selectTemplate")}
+          >
+            <SelectValue placeholder={t("orders.detail.selectTemplate")} />
+            <Pencil className="size-3.5 shrink-0 text-[#98A2B3]" strokeWidth={1.75} aria-hidden />
+          </SelectTrigger>
+          <SelectContent className="rounded-[10px] border-[#E6E8EC]">
+            {templates.map((item) => (
+              <SelectItem key={item.id} value={item.id} className="text-[13px]">
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Preview */}
+      <div className="relative min-h-0 flex-1">
         <Textarea
-          ref={messageRef}
+          ref={setTextareaRef}
           id="order-message"
           value={message}
           onChange={(event) => setMessage(event.target.value)}
-          rows={4}
-          className="min-h-[96px] resize-none rounded-[10px] border-[#E6E8EC] bg-white pb-8 pr-3 text-[13px] leading-relaxed text-[#0A0C10] shadow-none"
-        />
-        <Pencil
-          className="pointer-events-none absolute bottom-3 right-3 size-3.5 text-[#98A2B3]"
-          strokeWidth={1.5}
-          aria-hidden
+          rows={7}
+          className={cn(
+            "h-full min-h-[160px] w-full resize-none overflow-y-auto rounded-[10px]",
+            "border border-[#E6E8EC] bg-white px-3.5 py-3",
+            "text-[13px] leading-[1.55] text-[#0A0C10] shadow-none",
+            "focus-visible:ring-2 focus-visible:ring-[#2563EB]/25",
+          )}
         />
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9 shrink-0 rounded-[10px] border-[#E6E8EC] bg-white text-[13px] shadow-none sm:flex-1"
-          onClick={() => void copyMessage()}
-        >
-          <Copy className="size-3.5" strokeWidth={1.5} />
-          {t("orders.detail.copyMessage")}
-        </Button>
-
+      {/* CTA */}
+      <div className="mt-3 shrink-0">
         {waHref ? (
           <Button
             asChild
-            className="h-9 rounded-[10px] bg-[color:var(--elevate-blue)] text-[13px] text-white shadow-none hover:bg-[color:var(--elevate-blue-hover)] sm:flex-[1.35]"
+            className="h-11 w-full gap-2 rounded-[10px] bg-[#2563EB] text-[14px] font-medium text-white shadow-none hover:bg-[#1D4ED8]"
           >
             <a href={waHref} target="_blank" rel="noopener noreferrer">
-              <WhatsAppGlyph className="size-3.5" />
+              <WhatsAppGlyph className="size-4 shrink-0" />
               {t("orders.detail.openWhatsApp")}
             </a>
           </Button>
@@ -129,16 +185,17 @@ export function OrderMessageCard({
           <Button
             type="button"
             disabled
-            className="h-9 rounded-[10px] bg-[color:var(--elevate-blue)] text-[13px] text-white opacity-50 shadow-none sm:flex-[1.35]"
+            className="h-11 w-full gap-2 rounded-[10px] bg-[#2563EB] text-[14px] font-medium text-white opacity-50 shadow-none"
           >
-            <WhatsAppGlyph className="size-3.5" />
+            <WhatsAppGlyph className="size-4 shrink-0" />
             {t("orders.detail.openWhatsApp")}
           </Button>
         )}
       </div>
 
-      <p className="mt-2.5 flex items-start gap-1.5 text-[12px] text-[#667085]">
-        <Info className="mt-0.5 size-3.5 shrink-0 text-[#98A2B3]" strokeWidth={1.5} aria-hidden />
+      {/* Footer note */}
+      <p className="mt-2.5 flex shrink-0 items-center gap-1.5 text-[12px] leading-snug text-[#667085]">
+        <Info className="size-3.5 shrink-0 text-[#98A2B3]" strokeWidth={1.75} aria-hidden />
         <span>
           {phone ? t("orders.detail.whatsappOnlyOnClick") : t("orders.detail.phoneUnavailable")}
         </span>

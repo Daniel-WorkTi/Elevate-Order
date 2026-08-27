@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
   redirect,
+  isRedirect,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -18,6 +19,8 @@ import {
   isPublicAuthPath,
   type AuthUser,
 } from "@/lib/auth/session.functions";
+import { getOnboardingGate } from "@/lib/onboarding/onboarding.functions";
+import { isOnboardingExemptPath } from "@/lib/onboarding/onboarding-state";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
@@ -92,6 +95,18 @@ export const Route = createRootRouteWithContext<{
     const user = await getAuthUser();
     if (!user) {
       throw redirect({ to: "/login", search: {} });
+    }
+
+    if (!isOnboardingExemptPath(location.pathname)) {
+      try {
+        const gate = await getOnboardingGate();
+        if (gate.needsOnboarding) {
+          throw redirect({ to: "/onboarding", replace: true });
+        }
+      } catch (error) {
+        if (isRedirect(error)) throw error;
+        // Gate unavailable — skip rather than blocking the app.
+      }
     }
 
     return { user };

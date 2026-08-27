@@ -8,11 +8,13 @@ import type {
   DropiDashboardResult,
   DropiWebhookEventRow,
 } from "@/lib/integrations/dropi/dropi-types";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
+import { isMissingWorkspaceColumn } from "@/lib/workspace/parse-workspace-id";
+import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 import {
   buildWebhookRelativeUrl,
   webhookAuthConfigured,
 } from "@/lib/integrations/webhook-auth";
-import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 function envPresent(name: string) {
   const value = process.env[name]?.trim();
@@ -87,11 +89,10 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
     return { workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "" };
   })
   .handler(
-  async ({ data }): Promise<DropiDashboardResult> => {
+  async ({ data, context }): Promise<DropiDashboardResult> => {
     const authConfigured = webhookAuthConfigured();
     const serverConfigured = envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
     const webhookRelativeUrl = buildWebhookRelativeUrl();
-    const workspaceId = parseWorkspaceId(data.workspaceId);
 
     const emptySummary = {
       status: deriveStatus({
@@ -126,13 +127,12 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
       };
     }
 
-    if (!workspaceId) {
-      return {
-        summary: emptySummary,
-        fields: [...DROPI_WEBHOOK_FIELDS],
-        recentEvents: [],
-        error: null,
-      };
+    let workspaceId: string;
+    try {
+      workspaceId = (await authorizeWorkspaceInput(context.userId, data.workspaceId)).id;
+    } catch (error) {
+      if (isWorkspaceAccessError(error)) throw error;
+      throw error;
     }
 
     try {

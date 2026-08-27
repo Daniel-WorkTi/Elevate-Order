@@ -62,7 +62,10 @@ export function CurrencySelector({
           )}
         >
           <CurrencyFlag code={info.code} />
-          <span>{info.code}</span>
+          <span>
+            {info.code}
+            {info.symbol ? ` ${info.symbol}` : ""}
+          </span>
           <ChevronDown className="size-3.5 text-[#667085]" strokeWidth={1.75} />
         </Button>
       </PopoverTrigger>

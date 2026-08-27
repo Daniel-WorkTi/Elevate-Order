@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 import {
   CURRENCY_PREFERENCE_KEY,
@@ -6,7 +6,10 @@ import {
 } from "@/lib/currency/currency-types";
 import { normalizeCurrency } from "@/lib/money/format-money";
 
-const DEFAULT_PREFERENCE: CurrencyPreference = { from: "EUR", to: "BRL" };
+const DEFAULT_PREFERENCE: CurrencyPreference = {
+  from: "EUR",
+  to: "BRL",
+};
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -64,15 +67,12 @@ function writePreference(next: CurrencyPreference) {
 }
 
 /**
- * Shared currency preference for AppShell converter and future Inbox/Orders/Profits display.
+ * Global currency preference.
+ * `to` is the primary/foreground currency — every screen converts display amounts to it.
  * Presentation only — never mutates canonical order amounts.
  */
 export function useCurrencyPreference() {
   const preference = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  const setPreference = useCallback((next: CurrencyPreference) => {
-    writePreference(next);
-  }, []);
 
   const setFrom = useCallback((from: string) => {
     writePreference({ ...getSnapshot(), from });
@@ -87,7 +87,6 @@ export function useCurrencyPreference() {
     writePreference({ from: current.to, to: current.from });
   }, []);
 
-  // Sync across tabs
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== CURRENCY_PREFERENCE_KEY) return;
@@ -102,9 +101,8 @@ export function useCurrencyPreference() {
     preference,
     from: preference.from,
     to: preference.to,
-    /** Preferred display currency for operational screens (presentation only). */
+    /** Primary website currency — all page figures follow this selection. */
     displayCurrency: preference.to,
-    setPreference,
     setFrom,
     setTo,
     swap,

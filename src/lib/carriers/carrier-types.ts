@@ -3,6 +3,10 @@ export type CarrierMeta = {
   name: string;
   aliases: string[];
   logo?: string;
+  /** Official carrier website (not the parcel tracking deep-link). */
+  website?: string;
+  /** Hostnames that identify this carrier from a tracking URL. */
+  trackingHosts?: string[];
 };
 
 export type ResolvedCarrier = {
@@ -11,4 +15,5 @@ export type ResolvedCarrier = {
   missing: boolean;
   id?: string;
   logo?: string;
+  website?: string;
 };

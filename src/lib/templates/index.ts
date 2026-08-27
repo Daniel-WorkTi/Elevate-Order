@@ -1,4 +1,11 @@
-export { allDefaultTemplates, buildDefaultTemplates, defaultContentFor } from "./default-templates";
+export {
+  allDefaultTemplates,
+  buildDefaultTemplates,
+  defaultContentFor,
+  DEFAULT_TEMPLATE_LANGUAGE,
+  resolveTemplateLanguage,
+  TEMPLATE_LANGUAGES,
+} from "./default-templates";
 export { createPreviewContext } from "./preview-fixture";
 export { listUnsupportedVariables, renderOrderTemplate } from "./render-template";
 export { getTemplate, loadTemplates } from "./template-store";

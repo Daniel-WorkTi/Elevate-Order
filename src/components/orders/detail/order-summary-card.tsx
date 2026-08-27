@@ -1,20 +1,28 @@
-import { Copy, ExternalLink, FileText } from "lucide-react";
+import { Copy, FileText } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
+import { OrderSoftCardChrome } from "@/components/orders/detail/order-soft-card-chrome";
 import { Button } from "@/components/ui/button";
-import { useCurrencyPreference } from "@/hooks/use-currency-preference";
-import { useEurRateTable } from "@/hooks/use-eur-rate-table";
-import { formatOrderDisplayTotal } from "@/lib/currency/display-amount";
 import { useT } from "@/lib/i18n/locale-context";
 import {
-  formatOrderId,
-  formatOrderTotal,
+  getOrderCurrency,
   getOrderSupply,
   SUPPLY_LABEL,
   type OperationalOrder,
 } from "@/lib/order-domain";
 import { cn } from "@/lib/utils";
+
+function formatDetailTotal(order: Pick<OperationalOrder, "total" | "currency">): string | null {
+  if (order.total == null || !Number.isFinite(order.total)) return null;
+  const currency = getOrderCurrency(order);
+  const n = new Intl.NumberFormat("pt-PT", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(order.total);
+  if (currency === "BRL") return `${n} R$`;
+  return `${n} ${currency}`;
+}
 
 function SummaryRow({
   label,
@@ -68,39 +76,54 @@ export function OrderSummaryCard({
   order,
   storeName,
   storeUrl,
+  softBottom = false,
+  className,
 }: {
   order: OperationalOrder;
   storeName: string | null;
   storeUrl: string | null;
+  /** Same canvas fade as Products — bottom dissolves into #F7F8FA, no bottom border. */
+  softBottom?: boolean;
+  className?: string;
 }) {
   const t = useT();
   const supply = getOrderSupply(order);
   const supplyLabel = supply ? SUPPLY_LABEL[supply] : order.source;
-  const { displayCurrency } = useCurrencyPreference();
-  const fx = useEurRateTable();
-  const totalLabel = formatOrderTotal(order);
-  const converted = formatOrderDisplayTotal(order, displayCurrency, fx.rateMap);
+  const totalLabel = formatDetailTotal(order);
   const itemCount =
     order.line_items?.reduce((sum, item) => sum + item.quantity, 0) ??
     (order.product_summary?.trim() ? 1 : 0);
 
   const shopifyId =
     order.shopify_order_id != null ? `#${order.shopify_order_id}` : null;
-  const supplyId = formatOrderId(order);
+  const supplyId =
+    supply === "dropi"
+      ? `DP${order.order_id}`
+      : supply === "dropea"
+        ? `DR${order.order_id}`
+        : `#${order.order_id}`;
 
   return (
     <section
       aria-labelledby="summary-heading"
-      className="rounded-[12px] border border-[#E6E8EC] bg-white p-5 shadow-none"
+      className={cn(
+        "relative flex min-h-0 flex-col overflow-hidden rounded-[14px] bg-white p-5 shadow-none",
+        softBottom
+          ? "border-0 bg-gradient-to-b from-white from-[38%] via-white/75 via-[68%] to-[#F7F8FA] to-100%"
+          : "border border-[#E6E8EC]",
+        className,
+      )}
     >
-      <div className="mb-3 flex items-center gap-2">
+      {softBottom ? <OrderSoftCardChrome /> : null}
+
+      <div className="relative z-[2] mb-3 flex shrink-0 items-center gap-2">
         <FileText className="size-4 text-[#667085]" strokeWidth={1.5} aria-hidden />
         <h2 id="summary-heading" className="text-[15px] font-semibold text-[#0A0C10]">
           {t("orders.detail.orderSummary")}
         </h2>
       </div>
 
-      <dl>
+      <dl className="relative z-[2] shrink-0">
         {shopifyId ? (
           <SummaryRow label={t("orders.detail.shopifyId")}>
             <CopyValue label={t("orders.detail.shopifyId")} value={shopifyId} />
@@ -118,10 +141,9 @@ export function OrderSummaryCard({
                 href={storeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[color:var(--elevate-blue)] hover:underline"
+                className="text-[#0A0C10] hover:text-[color:var(--elevate-blue)] hover:underline"
               >
-                <span className="truncate">{storeName}</span>
-                <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.5} />
+                {storeName}
               </a>
             ) : (
               <span>{storeName}</span>
@@ -130,20 +152,17 @@ export function OrderSummaryCard({
         ) : null}
 
         <SummaryRow label={t("orders.detail.total")} className="items-center">
-          <div>
-            <p className="text-[16px] font-semibold tracking-tight text-[#0A0C10]">
-              {totalLabel ?? "—"}
-            </p>
-            {converted ? (
-              <p className="mt-0.5 text-[12px] font-normal text-[#667085]">≈ {converted}</p>
-            ) : null}
-          </div>
+          <p className="text-[15px] font-semibold tracking-tight text-[#0A0C10]">
+            {totalLabel ?? "—"}
+          </p>
         </SummaryRow>
 
         <SummaryRow label={t("orders.detail.products")}>
           {t("orders.detail.productsCount", { count: itemCount })}
         </SummaryRow>
       </dl>
+
+      {softBottom ? <div className="relative z-0 min-h-0 flex-1" aria-hidden /> : null}
     </section>
   );
 }

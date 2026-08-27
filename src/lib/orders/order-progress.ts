@@ -20,32 +20,51 @@ type PipelineStage = {
   pattern: RegExp;
 };
 
-/** Canonical call-center journey — Confirmado → Pago → Envio → Entregue */
+/**
+ * Shopify / storefront journey (ops rail):
+ * 1. Pedido no site
+ * 2. Pendente em confirmação
+ * 3. Confirmado
+ * 4. Enviado
+ * 5. Entregue
+ * 6. Pago
+ *
+ * Progress is delivery-based: paid is last. UI uses blue only (no green).
+ */
 export const ORDER_PROGRESS_PIPELINE: readonly PipelineStage[] = [
+  {
+    id: "ordered",
+    labelKey: "orders.detail.progress.ordered",
+    pattern:
+      /pedido\s+(no\s+)?site|order\s+placed|criad[oa]|created|nuevo|new\s+order|shopify|\bopen\b/i,
+  },
+  {
+    id: "pending_confirmation",
+    labelKey: "orders.detail.progress.pendingConfirmation",
+    pattern:
+      /pendente(\s+em)?\s+confirma|pending\s+confirm|por\s+confirmar|awaiting\s+confirm|unfulfilled|unauthorized|aguardando\s+confirma/i,
+  },
   {
     id: "confirmed",
     labelKey: "orders.detail.progress.confirmed",
-    pattern: /confirm|nuevo|new|approved|open|criad|created/i,
-  },
-  {
-    id: "paid",
-    labelKey: "orders.detail.progress.paid",
-    pattern: /paid|payment|pagament|aprov|cod|contra.?entrega|cash.?on.?delivery/i,
-  },
-  {
-    id: "awaiting_ship",
-    labelKey: "orders.detail.progress.awaitingShip",
-    pattern: /wait|aguard|prepar|pend|hold|processing|ready|fulfill/i,
+    pattern: /confirmad[oa]|confirmed|aprovad[oa]|accepted|aceptad|authorized|autorizad/i,
   },
   {
     id: "shipped",
     labelKey: "orders.detail.progress.shipped",
-    pattern: /ship|enviad|transit|dispatch|out for delivery|tracking/i,
+    pattern:
+      /ship|enviad|transit|tr[aá]nsito|dispatch|out for delivery|tracking|em\s+rota|caminho|fulfill/i,
   },
   {
     id: "delivered",
     labelKey: "orders.detail.progress.delivered",
-    pattern: /deliver|entregad|resolv|success/i,
+    pattern: /entregue|entregad|deliver(ed)?(?!\s*and\s*paid)/i,
+  },
+  {
+    id: "paid",
+    labelKey: "orders.detail.progress.paid",
+    pattern:
+      /\bpago\b|paid|payment\s+(approved|captured|received)|cobrado|pagamento\s+aprovado|entregue\s+e\s+pago|delivered\s*(and|&)\s*paid/i,
   },
 ];
 
@@ -54,22 +73,28 @@ function eventLabel(event: OrderEventRow): string {
 }
 
 function matchStageIndex(label: string): number {
-  return ORDER_PROGRESS_PIPELINE.findIndex((stage) => stage.pattern.test(label));
+  // Prefer later stages when a label could match more than one (e.g. "Entregue e pago").
+  let best = -1;
+  for (let i = 0; i < ORDER_PROGRESS_PIPELINE.length; i += 1) {
+    if (ORDER_PROGRESS_PIPELINE[i]!.pattern.test(label)) best = i;
+  }
+  return best;
 }
 
 function statusToStageIndex(key: OrderStatusKey): number {
   switch (key) {
-    case "confirmed":
-      return 0;
     case "waiting":
     case "messaged":
+      return 1; // pending confirmation
+    case "confirmed":
       return 2;
     case "shipped":
       return 3;
     case "delivered":
       return 4;
-    case "cancelled":
     case "incident":
+      return 3; // typically after ship
+    case "cancelled":
       return -1;
     default:
       return 0;
@@ -79,6 +104,7 @@ function statusToStageIndex(key: OrderStatusKey): number {
 /**
  * Build a compact progress rail from real events + order status.
  * Past stages = done, active = current, rest = upcoming.
+ * Incident/cancelled mark the active stage as problem (call-center recovery).
  */
 export function buildOrderProgress(
   events: OrderEventRow[],
@@ -128,7 +154,22 @@ export function buildOrderProgress(
       at: order.created_at ?? order.last_event_at ?? "",
       eventId: "synthetic-start",
     });
-    currentIndex = Math.max(currentIndex, 0);
+    if (statusToStageIndex(status.key) > 0) {
+      currentIndex = statusToStageIndex(status.key);
+    } else {
+      currentIndex = Math.max(currentIndex, 0);
+    }
+  }
+
+  // Site order is implied once we have any later stage.
+  if (matched.length > 0 && !matched.some((item) => item.stageIndex === 0)) {
+    const earliest = chronological[0];
+    matched.push({
+      stageIndex: 0,
+      label: t(ORDER_PROGRESS_PIPELINE[0]!.labelKey),
+      at: earliest?.event_date ?? order.created_at ?? "",
+      eventId: "synthetic-ordered",
+    });
   }
 
   return ORDER_PROGRESS_PIPELINE.map((stage, index) => {
@@ -139,8 +180,15 @@ export function buildOrderProgress(
         id: hit.eventId,
         label: hit.label || t(stage.labelKey),
         at: hit.at || null,
-        state: isProblem && isCurrent ? "problem" : isCurrent ? "current" : "done",
-        fromEvent: hit.eventId !== "synthetic-start",
+        state:
+          index < currentIndex
+            ? "done"
+            : isCurrent
+              ? isProblem
+                ? "problem"
+                : "current"
+              : "upcoming",
+        fromEvent: !hit.eventId.startsWith("synthetic-"),
       };
     }
 
@@ -154,7 +202,7 @@ export function buildOrderProgress(
       };
     }
 
-    if (index === currentIndex && matched.length === 0) {
+    if (index === currentIndex) {
       return {
         id: `current-${stage.id}`,
         label: order.status_name?.trim() || t(stage.labelKey),

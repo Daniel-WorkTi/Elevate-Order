@@ -6,11 +6,13 @@ export type AuthUser = {
   email: string | null;
   fullName: string | null;
   avatarUrl: string | null;
+  createdAt: string | null;
 };
 
 function mapUser(user: {
   id: string;
   email?: string | null;
+  created_at?: string | null;
   user_metadata?: Record<string, unknown>;
 }): AuthUser {
   const meta = user.user_metadata ?? {};
@@ -28,6 +30,7 @@ function mapUser(user: {
     email: user.email ?? null,
     fullName,
     avatarUrl,
+    createdAt: user.created_at ?? null,
   };
 }
 
@@ -67,12 +70,20 @@ export const signOutAuth = createServerFn({ method: "POST" }).handler(async () =
   return { ok: true as const };
 });
 
-async function startProviderOAuth(provider: "google"): Promise<{ url: string }> {
+const startOAuthSchema = z.object({
+  /** Browser origin (e.g. http://localhost:8080) — keeps local login off production. */
+  origin: z.string().url().optional(),
+});
+
+async function startProviderOAuth(
+  provider: "google",
+  explicitOrigin?: string,
+): Promise<{ url: string }> {
   const { getRequest } = await import("@tanstack/react-start/server");
   const { createServerSupabase } = await import("@/integrations/supabase/ssr.server");
 
   const request = getRequest();
-  const redirectTo = `${resolveRequestOrigin(request)}/auth/callback`;
+  const redirectTo = `${resolveOAuthOrigin(request, explicitOrigin)}/auth/callback`;
 
   const supabase = createServerSupabase();
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -91,18 +102,16 @@ async function startProviderOAuth(provider: "google"): Promise<{ url: string }> 
   return { url: data.url };
 }
 
-/** Prefer the browser Origin so login on localhost does not bounce to production. */
-function resolveRequestOrigin(request: Request): string {
-  const fromOrigin = originOf(request.headers.get("origin"));
-  if (fromOrigin) return fromOrigin;
-  const fromReferer = originOf(request.headers.get("referer"));
-  if (fromReferer) return fromReferer;
-  const fromRequest = originOf(request.url);
-  if (fromRequest) return fromRequest;
-  throw new Error("oauth_start_failed");
+function isLoopbackHost(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1"
+  );
 }
 
-function originOf(value: string | null): string | null {
+function originOf(value: string | null | undefined): string | null {
   if (!value) return null;
   try {
     const url = new URL(value);
@@ -113,10 +122,62 @@ function originOf(value: string | null): string | null {
   }
 }
 
+/** Rebuild origin from Host when the page request has no Origin (full navigation). */
+function originFromHostHeader(request: Request): string | null {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (!host) return null;
+  const hostname = host.split(":")[0] ?? host;
+  // Never trust x-forwarded-* for loopback — local vite has Host: localhost:port.
+  const localHost = request.headers.get("host");
+  if (localHost) {
+    const localName = localHost.split(":")[0] ?? localHost;
+    if (isLoopbackHost(localName)) {
+      return `http://${localHost}`;
+    }
+  }
+  if (isLoopbackHost(hostname)) {
+    return `http://${host}`;
+  }
+  const proto =
+    request.headers.get("x-forwarded-proto") === "http" ? "http" : "https";
+  return `${proto}://${host}`;
+}
+
+/**
+ * Prefer the browser origin so login on localhost never bounces to production
+ * (PUBLIC_APP_URL / Site URL must not drive OAuth redirectTo).
+ */
+function resolveOAuthOrigin(request: Request, explicit?: string): string {
+  const fromExplicit = originOf(explicit);
+  const fromOrigin = originOf(request.headers.get("origin"));
+  const fromReferer = originOf(request.headers.get("referer"));
+  const fromHost = originFromHostHeader(request);
+  const fromRequest = originOf(request.url);
+
+  const hostHeader = request.headers.get("host");
+  const hostName = hostHeader?.split(":")[0] ?? "";
+
+  // Local vite / loopback: force local origin, ignore production PUBLIC_APP_URL noise.
+  if (hostName && isLoopbackHost(hostName)) {
+    const local =
+      (fromExplicit && isLoopbackHost(new URL(fromExplicit).hostname) && fromExplicit) ||
+      (fromOrigin && isLoopbackHost(new URL(fromOrigin).hostname) && fromOrigin) ||
+      (fromReferer && isLoopbackHost(new URL(fromReferer).hostname) && fromReferer) ||
+      fromHost ||
+      `http://${hostHeader}`;
+    return local;
+  }
+
+  const picked =
+    fromExplicit || fromOrigin || fromReferer || fromHost || fromRequest;
+  if (!picked) throw new Error("oauth_start_failed");
+  return picked;
+}
+
 /** Build Google OAuth authorize URL on the server (PKCE cookies set here). */
-export const startGoogleOAuth = createServerFn({ method: "GET" }).handler(async () =>
-  startProviderOAuth("google"),
-);
+export const startGoogleOAuth = createServerFn({ method: "GET" })
+  .validator((data: unknown) => startOAuthSchema.parse(data ?? {}))
+  .handler(async ({ data }) => startProviderOAuth("google", data.origin));
 
 export function isPublicAuthPath(pathname: string) {
   return (

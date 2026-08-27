@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ExternalLink, MessageSquare, Truck } from "lucide-react";
+import { ChevronLeft, MessageSquare, Truck } from "lucide-react";
 
+import shopifyMark from "@/assets/shopify-mark.png";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { Button } from "@/components/ui/button";
 import { formatOrderStamp } from "@/lib/i18n/date-locale";
@@ -12,11 +13,34 @@ import {
   SUPPLY_LABEL,
   type OperationalOrder,
 } from "@/lib/order-domain";
+import { cn } from "@/lib/utils";
 
 const btnOutline =
-  "h-9 rounded-[10px] border-[#E6E8EC] bg-white px-3 text-[13px] font-medium text-[#0A0C10] shadow-none hover:bg-[#F7F8FA]";
+  "h-9 rounded-[10px] border border-[#E6E8EC] bg-white px-3.5 text-[13px] font-medium text-[#0A0C10] shadow-none hover:bg-[#F7F8FA]";
 const btnPrimary =
-  "h-9 rounded-[10px] bg-[color:var(--elevate-blue)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[color:var(--elevate-blue-hover)]";
+  "h-9 rounded-[10px] bg-[#2563EB] px-3.5 text-[13px] font-medium text-white shadow-none hover:bg-[#1D4ED8]";
+
+/** Official Shopify bag mark in a round badge (brand asset — not a Lucide stand-in). */
+function ShopifyRoundIcon({ muted = false }: { muted?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "grid size-4 shrink-0 place-items-center overflow-hidden rounded-full border bg-white",
+        muted ? "border-[#E6E8EC]" : "border-[#D8E8C0]",
+      )}
+      aria-hidden
+    >
+      <img
+        src={shopifyMark}
+        alt=""
+        width={12}
+        height={12}
+        className={cn("size-3 object-contain", muted && "opacity-50 grayscale")}
+        decoding="async"
+      />
+    </span>
+  );
+}
 
 export function OrderDetailHeader({
   order,
@@ -34,16 +58,16 @@ export function OrderDetailHeader({
   const trackingHref = safeTrackingHref(order.tracking_url);
 
   return (
-    <header className="space-y-2.5">
+    <header className="space-y-3">
       <Link
         to="/orders"
-        className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-1 text-[13px] font-medium text-[#667085] transition-colors hover:text-[#0A0C10]"
       >
         <ChevronLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
         {t("orders.detail.back")}
       </Link>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-[22px] font-semibold tracking-tight text-[#0A0C10] md:text-[24px]">
@@ -58,12 +82,12 @@ export function OrderDetailHeader({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-3 lg:flex lg:shrink-0 lg:flex-wrap lg:justify-end">
+        <div className="flex w-full flex-col gap-2 min-[520px]:flex-row min-[520px]:flex-wrap lg:w-auto lg:justify-end">
           {trackingHref ? (
             <Button asChild className={btnPrimary}>
               <a href={trackingHref} target="_blank" rel="noopener noreferrer">
                 <Truck className="size-3.5 shrink-0" strokeWidth={1.5} />
-                <span className="truncate">{t("orders.detail.trackOrder")}</span>
+                {t("orders.detail.trackOrder")}
               </a>
             </Button>
           ) : (
@@ -74,15 +98,15 @@ export function OrderDetailHeader({
               className={`${btnPrimary} opacity-50`}
             >
               <Truck className="size-3.5 shrink-0" strokeWidth={1.5} />
-              <span className="truncate">{t("orders.detail.trackOrder")}</span>
+              {t("orders.detail.trackOrder")}
             </Button>
           )}
 
           {shopifyUrl ? (
             <Button asChild variant="outline" className={btnOutline}>
               <a href={shopifyUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.5} />
-                <span className="truncate">{t("orders.detail.viewOnShopify")}</span>
+                <ShopifyRoundIcon />
+                {t("orders.detail.viewOnShopify")}
               </a>
             </Button>
           ) : (
@@ -93,14 +117,14 @@ export function OrderDetailHeader({
               title={t("orders.detail.shopifyUnavailable")}
               className={btnOutline}
             >
-              <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.5} />
-              <span className="truncate">{t("orders.detail.viewOnShopify")}</span>
+              <ShopifyRoundIcon muted />
+              {t("orders.detail.viewOnShopify")}
             </Button>
           )}
 
           <Button type="button" variant="outline" className={btnOutline} onClick={onSendMessage}>
             <MessageSquare className="size-3.5 shrink-0" strokeWidth={1.5} />
-            <span className="truncate">{t("orders.detail.sendMessage")}</span>
+            {t("orders.detail.sendMessage")}
           </Button>
         </div>
       </div>

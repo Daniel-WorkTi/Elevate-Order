@@ -1,16 +1,20 @@
 import { MousePointer2, RotateCcw } from "lucide-react";
 import { useRef } from "react";
 
+import { TemplateLanguageSwitcher } from "@/components/templates/template-language-switcher";
 import { TemplateVariableChip } from "@/components/templates/template-variable-chip";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { LanguageCode } from "@/lib/i18n/languages";
 import { useI18n } from "@/lib/i18n/locale-context";
 import type { MessageTemplateRecord, TemplateVariableDef } from "@/lib/templates";
 
 export function TemplateEditor({
   template,
   draft,
+  language,
+  onLanguageChange,
   variables,
   errors,
   onDraftChange,
@@ -19,6 +23,8 @@ export function TemplateEditor({
 }: {
   template: MessageTemplateRecord;
   draft: string;
+  language: LanguageCode;
+  onLanguageChange: (code: LanguageCode) => void;
   variables: TemplateVariableDef[];
   errors: string[];
   dirty: boolean;
@@ -62,20 +68,25 @@ export function TemplateEditor({
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-5">
         <div className="flex min-h-0 flex-1 flex-col space-y-2">
-          <div className="flex shrink-0 items-center justify-between gap-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
             <Label htmlFor="template-message" className="text-[12px] font-medium text-muted-foreground">
               {t("templates.message")}
             </Label>
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-8 rounded-[8px] px-2 text-[12px] text-muted-foreground shadow-none hover:text-foreground"
-              onClick={onReset}
-            >
-              <RotateCcw className="size-3.5" strokeWidth={1.5} />
-              {t("templates.reset")}
-            </Button>
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              <TemplateLanguageSwitcher value={language} onChange={onLanguageChange} />
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 rounded-[8px] px-2 text-[12px] text-muted-foreground shadow-none hover:text-foreground"
+                onClick={onReset}
+              >
+                <RotateCcw className="size-3.5" strokeWidth={1.5} />
+                {t("templates.reset")}
+              </Button>
+            </div>
           </div>
+
+          <p className="text-[11px] leading-snug text-[#667085]">{t("templates.languageHint")}</p>
 
           <div className="flex min-h-[240px] flex-1 flex-col overflow-hidden rounded-[12px] border border-[#E6E8EC] bg-white focus-within:border-[#2563EB]/40 focus-within:ring-1 focus-within:ring-[#2563EB]/20">
             <Textarea

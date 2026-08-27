@@ -42,7 +42,8 @@ export function CurrencyConverterPanel({
   const toId = useId();
   const amountId = useId();
   const [amount, setAmount] = useState(1);
-  const [activeField, setActiveField] = useState<"from" | "to">("from");
+  /** Primary site currency (`to`) is the foreground control. */
+  const [activeField, setActiveField] = useState<"from" | "to">("to");
   const [swapSpin, setSwapSpin] = useState(false);
 
   const converted = useMemo(() => {
@@ -66,29 +67,35 @@ export function CurrencyConverterPanel({
       </div>
 
       <div className="relative space-y-3">
+        {/* Primary first — drives all page figures + header badge */}
         <div className="space-y-1.5">
-          <label htmlFor={amountId} className="text-[12px] font-medium text-[#667085]">
-            {t("currency.from")}
-          </label>
-          <div className="flex h-12 items-stretch overflow-hidden rounded-[12px] border border-[#E6E8EC] bg-white">
+          <span className="text-[12px] font-medium text-[#667085]">
+            {t("currency.to")}
+            <span className="ml-1 font-normal text-[#98A2B3]">· {t("currency.primaryLabel")}</span>
+          </span>
+          <div className="flex h-12 items-stretch overflow-hidden rounded-[12px] border border-[#2563EB]/35 bg-[#EFF6FF]/40">
             <CurrencySelector
-              id={fromId}
-              value={from}
+              id={toId}
+              value={to}
               embedded
-              aria-label={t("currency.fromAria")}
+              aria-label={t("currency.toAria")}
+              className="bg-transparent"
               onChange={(code) => {
-                setActiveField("from");
-                onFromChange(code);
+                setActiveField("to");
+                onToChange(code);
               }}
             />
             <div className="my-2 w-px bg-[#E6E8EC]" aria-hidden />
-            <CurrencyAmountInput
-              id={amountId}
-              value={amount}
-              onChange={setAmount}
-              aria-label={t("currency.amountAria")}
-              className="h-full flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
-            />
+            <div
+              className="flex min-w-0 flex-1 items-center justify-end px-3 text-right text-[15px] font-semibold tabular-nums tracking-tight text-[#0A0C10]"
+              aria-live="polite"
+            >
+              {loading ? (
+                <span className="inline-block h-5 w-28 animate-pulse rounded bg-[#E6E8EC]/80" />
+              ) : (
+                convertedLabel
+              )}
+            </div>
           </div>
         </div>
 
@@ -118,30 +125,28 @@ export function CurrencyConverterPanel({
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-[12px] font-medium text-[#667085]">{t("currency.to")}</span>
-          <div className="flex h-12 items-stretch overflow-hidden rounded-[12px] border border-[#E6E8EC] bg-[#F7F8FA]">
+          <label htmlFor={amountId} className="text-[12px] font-medium text-[#667085]">
+            {t("currency.from")}
+          </label>
+          <div className="flex h-12 items-stretch overflow-hidden rounded-[12px] border border-[#E6E8EC] bg-white">
             <CurrencySelector
-              id={toId}
-              value={to}
+              id={fromId}
+              value={from}
               embedded
-              aria-label={t("currency.toAria")}
-              className="bg-transparent"
+              aria-label={t("currency.fromAria")}
               onChange={(code) => {
-                setActiveField("to");
-                onToChange(code);
+                setActiveField("from");
+                onFromChange(code);
               }}
             />
             <div className="my-2 w-px bg-[#E6E8EC]" aria-hidden />
-            <div
-              className="flex min-w-0 flex-1 items-center justify-end px-3 text-right text-[15px] font-semibold tabular-nums tracking-tight text-[#0A0C10]"
-              aria-live="polite"
-            >
-              {loading ? (
-                <span className="inline-block h-5 w-28 animate-pulse rounded bg-[#E6E8EC]/80" />
-              ) : (
-                convertedLabel
-              )}
-            </div>
+            <CurrencyAmountInput
+              id={amountId}
+              value={amount}
+              onChange={setAmount}
+              aria-label={t("currency.amountAria")}
+              className="h-full flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:ring-0"
+            />
           </div>
         </div>
       </div>

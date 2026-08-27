@@ -1,8 +1,9 @@
-import { CreditCard, Mail, MapPin, Phone, User } from "lucide-react";
+import { CreditCard, ExternalLink, Hash, Mail, MapPin, Phone, Truck, User } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { resolveOrderCarrier } from "@/lib/carriers";
 import { useT } from "@/lib/i18n/locale-context";
-import type { OperationalOrder } from "@/lib/order-domain";
+import { safeTrackingHref, type OperationalOrder } from "@/lib/order-domain";
 import { cn } from "@/lib/utils";
 
 function DetailRow({
@@ -15,17 +16,29 @@ function DetailRow({
   children: ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[minmax(110px,150px)_minmax(0,1fr)] items-start gap-x-4 border-b border-[#E6E8EC] py-3 last:border-b-0",
-      )}
-    >
-      <div className="flex items-center gap-2 text-[13px] text-[#667085]">
+    <div className="flex items-start justify-between gap-3 border-b border-[#E6E8EC] py-3 last:border-b-0">
+      <div className="flex shrink-0 items-center gap-2 text-[13px] text-[#667085]">
         <span className="shrink-0 text-[#98A2B3]">{icon}</span>
         <span>{label}</span>
       </div>
-      <div className="min-w-0 text-[14px] font-medium leading-snug text-[#0A0C10]">{children}</div>
+      <div className="min-w-0 max-w-[65%] text-right text-[14px] font-medium leading-snug text-[#0A0C10]">
+        {children}
+      </div>
     </div>
+  );
+}
+
+function CarrierLink({ href, name }: { href: string; name: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex max-w-full items-center justify-end gap-1 text-[14px] font-medium text-[#2563EB] hover:text-[#1D4ED8] hover:underline"
+    >
+      <span className="truncate">{name}</span>
+      <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden />
+    </a>
   );
 }
 
@@ -39,21 +52,25 @@ export function CustomerDetailsCard({ order }: { order: OperationalOrder }) {
   const postalCode = order.postal_code?.trim();
   const address = order.address?.trim();
   const payment = order.payment_method?.trim();
+  const trackingCode = order.tracking_code?.trim() || null;
+  const trackingHref = safeTrackingHref(order.tracking_url);
+  const carrier = resolveOrderCarrier({
+    shipping_company: order.shipping_company,
+    tracking_url: order.tracking_url,
+  });
+  const hasCarrier = !carrier.missing && Boolean(carrier.name);
+  const carrierHref = carrier.website ?? trackingHref;
 
-  const addressText = [
-    address,
-    [postalCode, city].filter(Boolean).join(" "),
-    country,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const addressText = [address, postalCode, city, country].filter(Boolean).join(", ");
 
-  const hasAny = Boolean(name || phone || email || addressText || payment);
+  const hasAny = Boolean(
+    name || phone || email || addressText || payment || hasCarrier || trackingHref || trackingCode,
+  );
 
   return (
     <section
       aria-labelledby="customer-heading"
-      className="rounded-[12px] border border-[#E6E8EC] bg-white p-5 shadow-none"
+      className="rounded-[14px] border border-[#E6E8EC] bg-white p-5 shadow-none"
     >
       <div className="mb-3 flex items-center gap-2">
         <User className="size-4 text-[#667085]" strokeWidth={1.5} aria-hidden />
@@ -95,6 +112,30 @@ export function CustomerDetailsCard({ order }: { order: OperationalOrder }) {
               label={t("orders.detail.paymentMethod")}
             >
               {payment}
+            </DetailRow>
+          ) : null}
+
+          <DetailRow
+            icon={<Truck className="size-3.5" strokeWidth={1.5} />}
+            label={t("orders.detail.carrier")}
+          >
+            {hasCarrier && carrierHref ? (
+              <CarrierLink href={carrierHref} name={carrier.name} />
+            ) : hasCarrier ? (
+              <span>{carrier.name}</span>
+            ) : (
+              <span className={cn("font-normal text-[#667085]")}>
+                {t("orders.detail.carrierPending")}
+              </span>
+            )}
+          </DetailRow>
+
+          {trackingCode ? (
+            <DetailRow
+              icon={<Hash className="size-3.5" strokeWidth={1.5} />}
+              label={t("orders.detail.trackingCode")}
+            >
+              <span className="font-mono text-[13px]">{trackingCode}</span>
             </DetailRow>
           ) : null}
         </div>

@@ -4,15 +4,36 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { DROPI_WEBHOOK_PATH } from "@/lib/integrations/dropi/dropi-fields";
 import { randomWebhookToken } from "@/lib/integrations/webhook-token";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
 
 const PUBLIC_APP_URL =
   process.env["PUBLIC_APP_URL"]?.trim().replace(/\/+$/, "") ||
+  (process.env["VERCEL_PROJECT_PRODUCTION_URL"]
+    ? `https://${process.env["VERCEL_PROJECT_PRODUCTION_URL"].replace(/^https?:\/\//, "")}`
+    : "") ||
+  (process.env["VERCEL_URL"]
+    ? `https://${process.env["VERCEL_URL"].replace(/^https?:\/\//, "")}`
+    : "") ||
   "https://elevate-orders.vercel.app";
 
 const inputSchema = z.object({
   workspaceId: z.string().uuid(),
   supply: z.enum(["dropi", "dropea"]),
+  /** Optional HTTPS origin from the browser when PUBLIC_APP_URL is missing/wrong. */
+  publicBaseUrl: z.string().url().optional(),
 });
+
+function resolveWebhookBase(override?: string): string {
+  const candidate = override?.trim().replace(/\/+$/, "") ?? "";
+  if (
+    candidate &&
+    /^https:\/\//i.test(candidate) &&
+    !/localhost|127\.0\.0\.1/i.test(candidate)
+  ) {
+    return candidate;
+  }
+  return PUBLIC_APP_URL;
+}
 
 export type WorkspaceWebhookResult = {
   workspaceId: string;
@@ -25,7 +46,8 @@ export type WorkspaceWebhookResult = {
 export const getWorkspaceWebhookUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => inputSchema.parse(data))
-  .handler(async ({ data }): Promise<WorkspaceWebhookResult> => {
+  .handler(async ({ data, context }): Promise<WorkspaceWebhookResult> => {
+    await authorizeWorkspaceInput(context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: existing, error: lookupError } = await supabaseAdmin
@@ -65,11 +87,12 @@ export const getWorkspaceWebhookUrl = createServerFn({ method: "POST" })
     }
 
     const webhookRelativeUrl = `${DROPI_WEBHOOK_PATH}/${encodeURIComponent(token)}`;
+    const base = resolveWebhookBase(data.publicBaseUrl);
     return {
       workspaceId: data.workspaceId,
       supply: data.supply,
       webhookRelativeUrl,
-      webhookUrl: `${PUBLIC_APP_URL}${webhookRelativeUrl}`,
+      webhookUrl: `${base}${webhookRelativeUrl}`,
     };
   });
 

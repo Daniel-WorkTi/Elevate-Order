@@ -23,6 +23,36 @@ function json(body: unknown, status = 200) {
   });
 }
 
+/** Dropi may POST JSON, form-encoded JSON fields, or empty health probes. */
+async function readWebhookJson(request: Request): Promise<unknown> {
+  const contentType = request.headers.get("content-type") ?? "";
+  const text = await request.text();
+  if (!text.trim()) return {};
+
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    const params = new URLSearchParams(text);
+    const embedded =
+      params.get("payload") ??
+      params.get("data") ??
+      params.get("json") ??
+      params.get("body");
+    if (embedded) {
+      try {
+        return JSON.parse(embedded) as unknown;
+      } catch {
+        // fall through to flat params
+      }
+    }
+    return Object.fromEntries(params.entries());
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("Invalid JSON body");
+  }
+}
+
 type ExistingOrderRow = {
   order_id: number;
   customer_name: string | null;
@@ -53,9 +83,17 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
 
   let raw: unknown;
   try {
-    raw = await request.json();
+    raw = await readWebhookJson(request);
   } catch {
     return json({ error: "Invalid JSON body" }, 400);
+  }
+
+  // Empty body — treat as reachability probe after auth (Dropi URL checkers).
+  if (
+    raw == null ||
+    (typeof raw === "object" && !Array.isArray(raw) && Object.keys(raw as object).length === 0)
+  ) {
+    return json({ ok: true, probe: true });
   }
 
   const parsed = dropiWebhookPayloadSchema.safeParse(prepareDropiWebhookBody(raw));

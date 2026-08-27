@@ -129,26 +129,58 @@ export async function getExchangeRatePair(
  */
 export async function getEurRateTable(): Promise<EurRateTable | null> {
   const fresh = readFreshEurTableCache();
-  if (fresh) return fresh;
+  if (fresh) {
+    const complete = await ensureDisplayCurrencies(fresh);
+    if (complete.rateMap !== fresh.rateMap) writeEurTableCache(complete);
+    return complete;
+  }
 
   try {
     const live = await fetchFrankfurterEurTable();
-    writeEurTableCache(live);
-    for (const [key, rate] of Object.entries(live.rateMap)) {
+    const complete = await ensureDisplayCurrencies(live);
+    writeEurTableCache(complete);
+    for (const [key, rate] of Object.entries(complete.rateMap)) {
       const [from, to] = key.split("_");
       if (!from || !to || from === to) continue;
       writeRateCache({
         from,
         to,
         rate,
-        fetchedAt: live.fetchedAt,
-        provider: live.provider,
+        fetchedAt: complete.fetchedAt,
+        provider: complete.provider,
         cached: false,
       });
     }
-    return live;
+    return complete;
   } catch (error) {
     console.error("getEurRateTable failed", error);
-    return readEurTableCache();
+    const stale = readEurTableCache();
+    if (!stale) return null;
+    const complete = await ensureDisplayCurrencies(stale);
+    if (complete.rateMap !== stale.rateMap) writeEurTableCache(complete);
+    return complete;
   }
+}
+
+/**
+ * Frankfurter EUR bulk tables sometimes omit BRL (and a few others).
+ * Fill gaps with pair fetches so PLN→BRL (etc.) pivots work in the UI.
+ */
+async function ensureDisplayCurrencies(table: EurRateTable): Promise<EurRateTable> {
+  const needed = ["BRL", "USD", "GBP", "PLN", "EUR"] as const;
+  const rateMap = { ...table.rateMap };
+  let changed = false;
+
+  for (const code of needed) {
+    if (code === "EUR") continue;
+    if (typeof rateMap[`EUR_${code}`] === "number") continue;
+    const pair = await getExchangeRatePair("EUR", code);
+    if (!pair?.rate) continue;
+    rateMap[`EUR_${code}`] = pair.rate;
+    rateMap[`${code}_EUR`] = 1 / pair.rate;
+    changed = true;
+  }
+
+  if (!changed) return table;
+  return { ...table, rateMap };
 }

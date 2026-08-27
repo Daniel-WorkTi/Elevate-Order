@@ -58,7 +58,7 @@ export const getShopifyOauthStatus = createServerFn({ method: "GET" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data, error } = await supabaseAdmin
         .from("shopify_stores")
-        .select("shop_domain, last_sync_at, uninstalled_at")
+        .select("shop_domain, last_sync_at, uninstalled_at, workspace_id")
         .eq("user_id", userId)
         .is("uninstalled_at", null)
         .order("installed_at", { ascending: false })
@@ -67,17 +67,22 @@ export const getShopifyOauthStatus = createServerFn({ method: "GET" })
 
       if (error || !data?.shop_domain) return empty;
 
-      const countRes = await supabaseAdmin
-        .from("orders")
-        .select("order_id", { count: "exact", head: true })
-        .ilike("source", "%shopify%");
+      let orderCount: number | null = null;
+      if (data.workspace_id) {
+        const countRes = await supabaseAdmin
+          .from("orders")
+          .select("order_id", { count: "exact", head: true })
+          .eq("workspace_id", data.workspace_id)
+          .ilike("source", "%shopify%");
+        orderCount = countRes.count ?? 0;
+      }
 
       return {
         oauthConfigured,
         connected: true,
         shopDomain: data.shop_domain,
         lastSyncAt: data.last_sync_at,
-        orderCount: countRes.count ?? null,
+        orderCount,
       };
     } catch (error) {
       console.error("[shopify] oauth status failed", error);
@@ -99,6 +104,10 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
     if (!shop) throw new Error("Use a .myshopify.com Admin domain.");
 
     const userId = await requireUserId();
+    if (data.workspaceId) {
+      const { authorizeWorkspaceInput } = await import("@/lib/workspace/authorize-workspace-input");
+      await authorizeWorkspaceInput(userId, data.workspaceId);
+    }
     const state = oauth.createOauthNonce();
     const origin = getPublicAppUrl();
     const redirectUri = `${origin}/auth/shopify/callback`;
@@ -221,7 +230,9 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
     z.object({ workspaceId: z.string().uuid().optional() }).parse(data ?? {}),
   )
   .handler(
-    async ({ data }): Promise<{
+    async ({
+      data,
+    }): Promise<{
       ok: boolean;
       imported: number;
       enriched: number;
@@ -229,6 +240,8 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
     }> => {
       try {
         const userId = await requireUserId();
+        const { authorizeWorkspaceInput } =
+          await import("@/lib/workspace/authorize-workspace-input");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: store, error } = await supabaseAdmin
           .from("shopify_stores")
@@ -244,10 +257,20 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
         }
 
         const workspaceId = data.workspaceId ?? store.workspace_id;
+        if (!workspaceId) {
+          return {
+            ok: false,
+            imported: 0,
+            enriched: 0,
+            error: "Shopify store has no workspace. Reconnect after Phase 0 migration.",
+          };
+        }
+
+        const authorized = await authorizeWorkspaceInput(userId, workspaceId);
         if (data.workspaceId) {
           await supabaseAdmin
             .from("shopify_stores")
-            .update({ workspace_id: data.workspaceId })
+            .update({ workspace_id: authorized.id })
             .eq("user_id", userId)
             .eq("shop_domain", store.shop_domain);
         }
@@ -256,7 +279,7 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
           store.shop_domain,
           store.access_token,
           50,
-          workspaceId,
+          authorized.id,
         );
         await supabaseAdmin
           .from("shopify_stores")

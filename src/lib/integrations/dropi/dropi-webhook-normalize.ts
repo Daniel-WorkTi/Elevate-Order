@@ -6,18 +6,25 @@ import { z } from "zod";
  * Unknown keys are kept via passthrough and stored in raw/snapshot.
  */
 const nullableString = z.union([z.string(), z.number()]).nullable().optional();
-const nullableInt = z.number().int().nullable().optional();
+
+/** Dropi often sends ids as strings — coerce before int check. */
+const coercedNullableInt = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : value;
+  const parsed = Number.parseInt(String(value).trim(), 10);
+  return Number.isFinite(parsed) ? parsed : value;
+}, z.number().int().nullable().optional());
 
 export const dropiWebhookEventSchema = z
   .object({
     order_id: z.union([z.number().int(), z.string().regex(/^\d+$/)]),
-    event_date: z.string().min(1),
-    status_id: nullableInt,
+    event_date: z.union([z.string().min(1), z.number()]),
+    status_id: coercedNullableInt,
     status_name: z.string().nullable().optional(),
     details: z.string().nullable().optional(),
     tracking_code: z.string().nullable().optional(),
     tracking_url: z.string().nullable().optional(),
-    shopify_order_id: nullableInt,
+    shopify_order_id: coercedNullableInt,
     shipping_company: z.string().nullable().optional(),
     total: z.union([z.string(), z.number()]).nullable().optional(),
     source: z.string().nullable().optional(),
@@ -53,7 +60,18 @@ export const dropiWebhookPayloadSchema = z.union([
 
 export type DropiWebhookEvent = z.infer<typeof dropiWebhookEventSchema>;
 
-const WRAPPER_KEYS = ["data", "payload", "result", "order", "pedido", "notification", "body"] as const;
+const WRAPPER_KEYS = [
+  "data",
+  "payload",
+  "result",
+  "order",
+  "pedido",
+  "notification",
+  "body",
+  "orders",
+  "pedidos",
+  "events",
+] as const;
 
 function unwrapDropiWebhookBody(raw: unknown): unknown {
   if (Array.isArray(raw)) return raw;
@@ -61,9 +79,36 @@ function unwrapDropiWebhookBody(raw: unknown): unknown {
   const record = raw as Record<string, unknown>;
   for (const key of WRAPPER_KEYS) {
     const nested = record[key];
-    if (nested && typeof nested === "object") return nested;
+    if (Array.isArray(nested)) return nested;
+    if (nested && typeof nested === "object") {
+      const nestedRecord = nested as Record<string, unknown>;
+      for (const inner of WRAPPER_KEYS) {
+        const deeper = nestedRecord[inner];
+        if (Array.isArray(deeper) || (deeper && typeof deeper === "object")) return deeper;
+      }
+      return nested;
+    }
   }
   return raw;
+}
+
+function coerceEventDate(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const ms = value > 1e12 ? value : value * 1000;
+    return new Date(ms).toISOString();
+  }
+  if (typeof value === "string" && value.trim()) {
+    const trimmed = value.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const n = Number.parseInt(trimmed, 10);
+      if (Number.isFinite(n)) {
+        const ms = n > 1e12 ? n : n * 1000;
+        return new Date(ms).toISOString();
+      }
+    }
+    return trimmed;
+  }
+  return new Date().toISOString();
 }
 
 function coerceDropiWebhookEvent(raw: unknown): unknown {
@@ -75,16 +120,29 @@ function coerceDropiWebhookEvent(raw: unknown): unknown {
     record["id_pedido"] ??
     record["pedido_id"] ??
     record["id"];
-  const eventDate =
+  const eventDate = coerceEventDate(
     record["event_date"] ??
-    record["eventDate"] ??
-    record["fecha"] ??
-    record["date"] ??
-    record["created_at"] ??
-    record["updated_at"] ??
-    record["timestamp"] ??
-    new Date().toISOString();
-  return { ...record, order_id: orderId, event_date: eventDate };
+      record["eventDate"] ??
+      record["fecha"] ??
+      record["date"] ??
+      record["created_at"] ??
+      record["updated_at"] ??
+      record["timestamp"],
+  );
+  const statusId =
+    record["status_id"] ?? record["statusId"] ?? record["estado_id"] ?? record["id_estado"];
+  const shopifyOrderId =
+    record["shopify_order_id"] ??
+    record["shopifyOrderId"] ??
+    record["shopify_id"] ??
+    record["id_shopify"];
+  return {
+    ...record,
+    order_id: orderId,
+    event_date: eventDate,
+    ...(statusId !== undefined ? { status_id: statusId } : {}),
+    ...(shopifyOrderId !== undefined ? { shopify_order_id: shopifyOrderId } : {}),
+  };
 }
 
 /** Unwrap Dropi wrappers and fill official field names before schema parse. */
@@ -147,7 +205,7 @@ export function normalizeDropiWebhookEvent(raw: DropiWebhookEvent) {
     throw new Error("Invalid order_id");
   }
 
-  const eventDate = new Date(raw.event_date);
+  const eventDate = new Date(coerceEventDate(raw.event_date));
   if (Number.isNaN(eventDate.getTime())) {
     throw new Error("Invalid event_date");
   }

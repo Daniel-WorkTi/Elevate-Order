@@ -8,7 +8,9 @@ import {
   type DropeaDashboardResult,
 } from "@/lib/integrations/dropea/dropea-types";
 import { buildWebhookRelativeUrl } from "@/lib/integrations/webhook-auth";
-import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
+import { isMissingWorkspaceColumn } from "@/lib/workspace/parse-workspace-id";
+import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 
 function envPresent(name: string) {
   return Boolean(process.env[name]?.trim());
@@ -32,11 +34,10 @@ export const getDropeaDashboard = createServerFn({ method: "GET" })
     return { workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "" };
   })
   .handler(
-    async ({ data }): Promise<DropeaDashboardResult> => {
+    async ({ data, context }): Promise<DropeaDashboardResult> => {
     const serverConfigured =
       envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
     const webhookRelativeUrl = buildWebhookRelativeUrl();
-    const workspaceId = parseWorkspaceId(data.workspaceId);
 
     const empty = {
       status: deriveInfraStatus({
@@ -64,9 +65,7 @@ export const getDropeaDashboard = createServerFn({ method: "GET" })
       };
     }
 
-    if (!workspaceId) {
-      return { summary: empty, recentEvents: [], error: null };
-    }
+    const workspaceId = (await authorizeWorkspaceInput(context.userId, data.workspaceId)).id;
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -155,6 +154,7 @@ export const getDropeaDashboard = createServerFn({ method: "GET" })
         error: null,
       };
     } catch (error) {
+      if (isWorkspaceAccessError(error)) throw error;
       console.error("getDropeaDashboard failed", error);
       return {
         summary: {

@@ -4,7 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { operationalOrderToInboxItem } from "@/lib/inbox/order-to-inbox";
 import type { InboxItem } from "@/lib/inbox/inbox-types";
 import { getOrderSupply, type OperationalOrder } from "@/lib/order-domain";
-import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
+import { isMissingWorkspaceColumn } from "@/lib/workspace/parse-workspace-id";
+import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 
 export type InboxQueueResult = {
   dropi: InboxItem[];
@@ -57,11 +59,11 @@ export const queryInboxQueue = createServerFn({ method: "GET" })
     const raw = (data ?? {}) as Record<string, unknown>;
     return { workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "" };
   })
-  .handler(async ({ data }): Promise<InboxQueueResult> => {
-    const workspaceId = parseWorkspaceId(data.workspaceId);
-    if (!workspaceId) return { dropi: [], dropea: [], error: null };
-
+  .handler(async ({ data, context }): Promise<InboxQueueResult> => {
     try {
+      const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
+      const workspaceId = authorized.id;
+
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const full = await supabaseAdmin
         .from("orders")
@@ -106,6 +108,7 @@ export const queryInboxQueue = createServerFn({ method: "GET" })
 
       return { dropi, dropea, error: null };
     } catch (error) {
+      if (isWorkspaceAccessError(error)) throw error;
       console.error("queryInboxQueue failed", error);
       return { dropi: [], dropea: [], error: "Unable to load the inbox queue." };
     }

@@ -38,10 +38,11 @@ export function formatStoredAmount(
 
 export function formatOrderDisplayTotal(
   order: Pick<OperationalOrder, "total" | "currency">,
-  displayCurrency: string,
+  displayCurrency: string | null | undefined,
   rateMap: Record<string, number>,
   locale = "pt-PT",
 ): string | null {
+  if (!displayCurrency) return null;
   if (order.total === null || !Number.isFinite(order.total)) return null;
   const from = readIsoCurrency(order.currency);
   const to = readIsoCurrency(displayCurrency);

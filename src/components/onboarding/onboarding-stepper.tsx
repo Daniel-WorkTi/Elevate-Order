@@ -1,3 +1,5 @@
+import { Check } from "lucide-react";
+
 import { ONBOARDING_STEPS } from "@/components/onboarding/integrations";
 import type { OnboardingStepId } from "@/components/onboarding/types";
 import { useT } from "@/lib/i18n/locale-context";
@@ -43,16 +45,20 @@ export function OnboardingStepper({ currentStep = "store", className }: Onboardi
                   "relative z-[1] grid size-8 place-items-center rounded-full text-[13px] font-semibold tabular-nums transition-colors duration-150",
                   active
                     ? "bg-[color:var(--elevate-blue)] text-white"
-                    : "border border-border bg-card text-muted-foreground",
+                    : complete
+                      ? "bg-[color:var(--elevate-blue)] text-white"
+                      : "border border-border bg-card text-muted-foreground",
                 )}
               >
-                {step.number}
+                {complete ? <Check className="size-4" strokeWidth={2} /> : step.number}
               </span>
             </div>
             <span
               className={cn(
                 "mt-2.5 max-w-full truncate text-center text-[13px] font-medium",
-                active ? "text-[color:var(--elevate-blue)]" : "text-muted-foreground",
+                active || complete
+                  ? "text-[color:var(--elevate-blue)]"
+                  : "text-muted-foreground",
               )}
             >
               {t(`onboarding.step.${step.id}`)}

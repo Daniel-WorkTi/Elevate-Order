@@ -15,6 +15,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
+const GDPR_TOPICS = new Set([
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact",
+]);
+
 export const Route = createFileRoute("/api/public/webhooks/shopify")({
   server: {
     handlers: {
@@ -32,8 +38,14 @@ export const Route = createFileRoute("/api/public/webhooks/shopify")({
         const shop = request.headers.get("x-shopify-shop-domain") ?? "";
         console.info("[shopify] webhook", JSON.stringify({ topic, shop: shop ? "set" : "none" }));
 
-        if (topic === "app/uninstalled") {
+        if (topic === "app/uninstalled" || topic === "shop/redact") {
           await markShopifyShopUninstalled(shop);
+          return json({ ok: true });
+        }
+
+        if (GDPR_TOPICS.has(topic)) {
+          // Mandatory App Store compliance topics — acknowledge; no PII store beyond orders.
+          console.info("[shopify] compliance webhook acknowledged", topic);
           return json({ ok: true });
         }
 

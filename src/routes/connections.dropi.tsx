@@ -52,7 +52,15 @@ function DropiConnectionPage() {
     enabled: Boolean(workspaceId),
     queryFn: () =>
       getWorkspaceWebhookUrl({
-        data: { workspaceId, supply: "dropi" },
+        data: {
+          workspaceId,
+          supply: "dropi",
+          ...(typeof window !== "undefined" &&
+          /^https:\/\//i.test(window.location.origin) &&
+          !/localhost|127\.0\.0\.1/i.test(window.location.origin)
+            ? { publicBaseUrl: window.location.origin }
+            : {}),
+        },
       }),
   });
 

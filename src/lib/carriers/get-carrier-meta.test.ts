@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { getCarrierMeta } from "@/lib/carriers/get-carrier-meta";
+import { getCarrierMeta, inferCarrierFromTrackingUrl, resolveOrderCarrier } from "@/lib/carriers/get-carrier-meta";
 import { normalizeCarrierName } from "@/lib/carriers/normalize-carrier";
 import { normalizeDropeaOrder } from "@/lib/integrations/dropea/normalize-dropea-order";
 import { normalizeDropiOrder } from "@/lib/integrations/dropi/normalize-dropi-order";
@@ -12,6 +12,36 @@ test("normalizeCarrierName trims, lowercases, and collapses spaces", () => {
   assert.equal(normalizeCarrierName("In Post"), "in post");
   assert.equal(normalizeCarrierName("DPD Polska"), "dpd polska");
   assert.equal(normalizeCarrierName("GLS-Spain"), "gls spain");
+});
+
+test("inferCarrierFromTrackingUrl matches known hosts", () => {
+  assert.equal(inferCarrierFromTrackingUrl("https://inpost.pl/find-parcel?n=1").id, "inpost");
+  assert.equal(inferCarrierFromTrackingUrl("https://www.dpd.pl/tracking").id, "dpd");
+  assert.equal(inferCarrierFromTrackingUrl("https://gls-group.eu/track").id, "gls");
+  assert.equal(inferCarrierFromTrackingUrl("https://www.ctt.pt/feapl_2/app/open/objectSearch").id, "ctt");
+  assert.equal(inferCarrierFromTrackingUrl("https://unknown.example/track").missing, true);
+});
+
+test("resolveOrderCarrier prefers shipping_company and fills website from registry", () => {
+  const named = resolveOrderCarrier({
+    shipping_company: "DPD Polska",
+    tracking_url: null,
+  });
+  assert.equal(named.id, "dpd");
+  assert.equal(named.website, "https://www.dpd.com");
+
+  const fromUrl = resolveOrderCarrier({
+    shipping_company: null,
+    tracking_url: "https://tracking.dpd.de/status/en_US/parcel/123",
+  });
+  assert.equal(fromUrl.id, "dpd");
+  assert.ok(fromUrl.website);
+
+  const pending = resolveOrderCarrier({
+    shipping_company: null,
+    tracking_url: null,
+  });
+  assert.equal(pending.missing, true);
 });
 
 test("known aliases resolve to registry display names", () => {
@@ -26,6 +56,7 @@ test("known aliases resolve to registry display names", () => {
   assert.equal(getCarrierMeta("GLS").known, true);
   assert.equal(getCarrierMeta("GLS").missing, false);
   assert.ok(getCarrierMeta("GLS").logo?.startsWith("/carriers/"));
+  assert.equal(getCarrierMeta("GLS").website, "https://gls-group.com");
 });
 
 test("unknown carrier preserves the raw name and is not known", () => {

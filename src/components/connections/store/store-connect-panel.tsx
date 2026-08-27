@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { ConnectionHowTo } from "@/components/connections/workspace/connection-h
 import type { StoreConnectInput } from "@/hooks/use-store-connection-preference";
 import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
 import { useT } from "@/lib/i18n/locale-context";
+import { cn } from "@/lib/utils";
 
 export function StoreConnectPanel({
   linked,
@@ -35,10 +36,10 @@ export function StoreConnectPanel({
   syncing?: boolean;
 }) {
   const t = useT();
-  const [domain, setDomain] = useState("");
+  const [shopInput, setShopInput] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [showToken, setShowToken] = useState(false);
-  const [oauthShopInput, setOauthShopInput] = useState("");
+  const [tokenOpen, setTokenOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (linked) {
@@ -75,15 +76,24 @@ export function StoreConnectPanel({
 
   const showOauth = Boolean(oauthConfigured && onOauthInstall);
 
+  function startOauth() {
+    const host = normalizeShopifyDomain(shopInput);
+    if (!host) {
+      setError(t("connections.domainInvalid"));
+      return;
+    }
+    onOauthInstall!(host);
+  }
+
   function submitToken() {
-    const host = normalizeShopifyDomain(domain);
+    const host = normalizeShopifyDomain(shopInput);
     if (!host) {
       setError(t("connections.domainInvalid"));
       return;
     }
     const ok = onConnect({
       storeName: host,
-      storeDomain: domain,
+      storeDomain: shopInput,
       accessToken,
     });
     if (!ok) setError(t("connections.enterStoreFields"));
@@ -93,94 +103,128 @@ export function StoreConnectPanel({
     <div className="space-y-3">
       <ConnectionHowTo kind="shopify" />
       <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
-      {oauthError ? (
-        <p className="text-[13px] font-medium text-red-600">{t("connections.shopifyOauthError")}</p>
-      ) : null}
+        {oauthError ? (
+          <p className="text-[13px] font-medium text-red-600">{t("connections.shopifyOauthError")}</p>
+        ) : null}
 
-      {showOauth ? (
-        <>
-          <p className="text-[13px] leading-5 text-[#667085]">{t("connections.shopifyCookieHint")}</p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              id="shopify-shop"
-              value={oauthShopInput}
-              onChange={(event) => {
-                setOauthShopInput(event.target.value);
-                setError(null);
-              }}
-              placeholder={t("connections.shopifyShopPlaceholder")}
-              className="h-10 flex-1 rounded-[10px] border-[#E6E8EC] font-mono text-[13px] shadow-none"
+        {showOauth ? (
+          <>
+            <div>
+              <p className="text-[13px] font-semibold text-[#0A0C10]">
+                {t("connections.shopifyDomainLoginTitle")}
+              </p>
+              <p className="mt-1 text-[13px] leading-5 text-[#667085]">
+                {t("connections.shopifyDomainLoginHint")}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="shopify-shop"
+                value={shopInput}
+                onChange={(event) => {
+                  setShopInput(event.target.value);
+                  setError(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") startOauth();
+                }}
+                placeholder={t("connections.shopifyShopPlaceholder")}
+                className="h-10 flex-1 rounded-[10px] border-[#E6E8EC] font-mono text-[13px] shadow-none"
+              />
+              <Button
+                type="button"
+                onClick={startOauth}
+                className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
+              >
+                <Link2 className="size-3.5" strokeWidth={1.75} />
+                {t("connections.installShopify")}
+              </Button>
+            </div>
+            <p className="text-[11px] leading-snug text-[#667085]">
+              {t("connections.shopifyScopesNote")}
+            </p>
+          </>
+        ) : (
+          <p className="text-[13px] leading-5 text-[#667085]">{t("connections.shopifyOauthMissing")}</p>
+        )}
+
+        <div className="border-t border-[#E6E8EC] pt-3">
+          <button
+            type="button"
+            onClick={() => setTokenOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-2 text-left"
+            aria-expanded={tokenOpen}
+          >
+            <span className="text-[12px] font-medium text-[#667085]">
+              {t("connections.shopifyOtherWays")}
+            </span>
+            <ChevronDown
+              className={cn(
+                "size-3.5 shrink-0 text-[#667085] transition-transform",
+                tokenOpen && "rotate-180",
+              )}
+              strokeWidth={1.75}
+              aria-hidden
             />
-            <Button
-              type="button"
-              onClick={() => {
-                const host = normalizeShopifyDomain(oauthShopInput);
-                if (!host) {
-                  setError(t("connections.domainInvalid"));
-                  return;
-                }
-                onOauthInstall!(host);
-              }}
-              className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
-            >
-              <Link2 className="size-3.5" strokeWidth={1.75} />
-              {t("connections.installShopify")}
-            </Button>
-          </div>
-          <p className="text-[12px] font-medium text-[#667085]">{t("connections.orUseAdminToken")}</p>
-        </>
-      ) : null}
+          </button>
 
-      <Input
-        value={domain}
-        onChange={(event) => {
-          setDomain(event.target.value);
-          setError(null);
-        }}
-        placeholder={t("connections.shopifyShopPlaceholder")}
-        className="h-10 rounded-[10px] border-[#E6E8EC] font-mono text-[13px] shadow-none"
-      />
-      <div className="relative">
-        <Input
-          type={showToken ? "text" : "password"}
-          autoComplete="off"
-          spellCheck={false}
-          value={accessToken}
-          onChange={(event) => {
-            setAccessToken(event.target.value);
-            setError(null);
-          }}
-          placeholder="shpat_…"
-          className="h-10 rounded-[10px] border-[#E6E8EC] pr-10 font-mono text-[13px] shadow-none"
-        />
-        <button
-          type="button"
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#667085]"
-          onClick={() => setShowToken((value) => !value)}
-          aria-label={showToken ? t("connections.hideToken") : t("connections.showToken")}
-        >
-          {showToken ? (
-            <EyeOff className="size-4" strokeWidth={1.5} />
-          ) : (
-            <Eye className="size-4" strokeWidth={1.5} />
-          )}
-        </button>
-      </div>
-      <Button
-        type="button"
-        onClick={submitToken}
-        variant={showOauth ? "outline" : "default"}
-        className={
-          showOauth
-            ? "h-10 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
-            : "h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
-        }
-      >
-        <Link2 className="size-3.5" strokeWidth={1.75} />
-        {t("connections.connectStoreCta")}
-      </Button>
+          {tokenOpen ? (
+            <div className="mt-3 space-y-2.5">
+              <p className="text-[12px] leading-5 text-[#667085]">
+                {t("connections.shopifyFallbackTokenHint")}
+              </p>
+              {!showOauth ? (
+                <Input
+                  value={shopInput}
+                  onChange={(event) => {
+                    setShopInput(event.target.value);
+                    setError(null);
+                  }}
+                  placeholder={t("connections.shopifyShopPlaceholder")}
+                  className="h-10 rounded-[10px] border-[#E6E8EC] font-mono text-[13px] shadow-none"
+                />
+              ) : null}
+              <div className="relative">
+                <Input
+                  type={showToken ? "text" : "password"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={accessToken}
+                  onChange={(event) => {
+                    setAccessToken(event.target.value);
+                    setError(null);
+                  }}
+                  placeholder="shpat_…"
+                  className="h-10 rounded-[10px] border-[#E6E8EC] pr-10 font-mono text-[13px] shadow-none"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#667085]"
+                  onClick={() => setShowToken((value) => !value)}
+                  aria-label={showToken ? t("connections.hideToken") : t("connections.showToken")}
+                >
+                  {showToken ? (
+                    <EyeOff className="size-4" strokeWidth={1.5} />
+                  ) : (
+                    <Eye className="size-4" strokeWidth={1.5} />
+                  )}
+                </button>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={submitToken}
+                className="h-10 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
+              >
+                <Link2 className="size-3.5" strokeWidth={1.75} />
+                {t("connections.connectStoreCta")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
 
-      {error ? <p className="text-[12px] font-medium text-red-600">{error}</p> : null}
+        {error ? <p className="text-[12px] font-medium text-red-600">{error}</p> : null}
       </section>
     </div>
   );

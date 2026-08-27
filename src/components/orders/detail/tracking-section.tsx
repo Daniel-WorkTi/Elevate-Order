@@ -1,14 +1,20 @@
 import { ExternalLink, Truck } from "lucide-react";
 
 import { CarrierIdentity } from "@/components/carriers/carrier-identity";
+import { resolveOrderCarrier } from "@/lib/carriers";
 import { useT } from "@/lib/i18n/locale-context";
 import { safeTrackingHref, type OperationalOrder } from "@/lib/order-domain";
 
 export function TrackingSection({ order }: { order: OperationalOrder }) {
   const t = useT();
-  const company = order.shipping_company?.trim() || null;
+  const carrier = resolveOrderCarrier({
+    shipping_company: order.shipping_company,
+    tracking_url: order.tracking_url,
+  });
+  const company = carrier.missing ? null : carrier.name;
   const code = order.tracking_code?.trim() || null;
   const href = safeTrackingHref(order.tracking_url);
+  const website = carrier.website ?? null;
 
   return (
     <section aria-labelledby="tracking-heading" className="space-y-4">
@@ -26,11 +32,28 @@ export function TrackingSection({ order }: { order: OperationalOrder }) {
             <CarrierIdentity
               carrier={company}
               size="md"
-              unavailableLabel={t("orders.detail.carrierUnavailable")}
+              unavailableLabel={t("orders.detail.carrierPending")}
               unknownLabel={t("carriers.noInfo")}
             />
           </dd>
         </div>
+
+        {website ? (
+          <div>
+            <dt className="text-[12px] text-muted-foreground">{t("orders.detail.carrierWebsite")}</dt>
+            <dd className="mt-1">
+              <a
+                href={website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--elevate-blue)] hover:underline"
+              >
+                {website.replace(/^https?:\/\/(www\.)?/, "")}
+                <ExternalLink className="size-3.5" strokeWidth={1.5} aria-hidden />
+              </a>
+            </dd>
+          </div>
+        ) : null}
 
         <div>
           <dt className="text-[12px] text-muted-foreground">{t("orders.detail.trackingCode")}</dt>

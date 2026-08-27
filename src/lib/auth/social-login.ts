@@ -1,6 +1,8 @@
 /** Start Google OAuth via server route (keeps authorize URL out of client app code). */
 export async function startGoogleLogin(): Promise<void> {
-  window.location.assign("/auth/google");
+  const origin = window.location.origin;
+  const params = new URLSearchParams({ origin });
+  window.location.assign(`/auth/google?${params.toString()}`);
 }
 
 /** Sign out (browser cookies). */

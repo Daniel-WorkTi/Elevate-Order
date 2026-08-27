@@ -1,91 +1,104 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+import { resolveActiveWorkspace, type WorkspaceSummary } from "@/lib/workspace/workspace.functions";
 
-const WORKSPACE_KEY = "elevate-workspace-id";
+const PREFERENCE_KEY = "elevate-current-workspace-id";
 
-type Listener = () => void;
-const listeners = new Set<Listener>();
-
-function emit() {
-  listeners.forEach((listener) => listener());
-}
-
-function createId() {
-  const webCrypto = globalThis.crypto;
-  if (webCrypto && typeof webCrypto.randomUUID === "function") {
-    return webCrypto.randomUUID();
-  }
-  const bytes = new Uint8Array(16);
-  if (webCrypto && typeof webCrypto.getRandomValues === "function") {
-    webCrypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function readId(): string {
-  if (typeof window === "undefined") return "";
+function readPreference(): string | null {
+  if (typeof window === "undefined") return null;
   try {
-    const existing = window.localStorage.getItem(WORKSPACE_KEY)?.trim();
-    if (existing && parseWorkspaceId(existing)) return existing;
-    const next = createId();
-    window.localStorage.setItem(WORKSPACE_KEY, next);
-    return next;
+    return parseWorkspaceId(window.localStorage.getItem(PREFERENCE_KEY));
   } catch {
-    return createId();
+    return null;
   }
 }
 
-let cached = "";
-let hydrated = false;
-
-function getSnapshot() {
-  if (!hydrated && typeof window !== "undefined") {
-    cached = readId();
-    hydrated = true;
+function writePreference(id: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PREFERENCE_KEY, id);
+  } catch {
+    // ignore
   }
-  return cached;
 }
 
-function getServerSnapshot() {
-  return "";
-}
-
-function subscribe(listener: Listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-/** Stable browser workspace id until real auth/multi-tenant login exists. */
+/**
+ * UI preference for the active workspace.
+ * Authorization is always validated server-side — localStorage is never a tenant authority.
+ */
 export function useWorkspaceId() {
-  const workspaceId = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [workspaceId, setWorkspaceIdState] = useState("");
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const booting = useRef(false);
+
+  const refresh = useCallback(async () => {
+    const preferred = readPreference();
+    try {
+      const result = await resolveActiveWorkspace({
+        data: preferred ? { preferredWorkspaceId: preferred } : {},
+      });
+      setWorkspaces(result.workspaces);
+      setWorkspaceIdState(result.workspace.id);
+      writePreference(result.workspace.id);
+      setError(null);
+      setReady(true);
+      return result.workspace.id;
+    } catch (err) {
+      console.error("[workspace] resolveActiveWorkspace failed", err);
+      setError("Unable to resolve workspace.");
+      setWorkspaceIdState("");
+      setWorkspaces([]);
+      setReady(true);
+      return "";
+    }
+  }, []);
+
+  useEffect(() => {
+    if (booting.current) return;
+    booting.current = true;
+    void refresh();
+  }, [refresh]);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== WORKSPACE_KEY) return;
-      cached = readId();
-      emit();
+      if (event.key !== PREFERENCE_KEY) return;
+      void refresh();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [refresh]);
 
+  const setWorkspaceId = useCallback(
+    (nextId: string) => {
+      const parsed = parseWorkspaceId(nextId);
+      if (!parsed) return;
+      const owned = workspaces.some((w) => w.id === parsed);
+      if (!owned) {
+        void refresh();
+        return;
+      }
+      writePreference(parsed);
+      setWorkspaceIdState(parsed);
+    },
+    [refresh, workspaces],
+  );
+
+  /** @deprecated No longer creates random UUIDs. Resolves an authorized workspace instead. */
   const resetWorkspaceId = useCallback(() => {
-    const next = createId();
-    cached = next;
-    try {
-      window.localStorage.setItem(WORKSPACE_KEY, next);
-    } catch {
-      // ignore
-    }
-    emit();
-    return next;
-  }, []);
+    void refresh();
+    return workspaceId;
+  }, [refresh, workspaceId]);
 
-  return { workspaceId, resetWorkspaceId };
+  return {
+    workspaceId,
+    workspaces,
+    ready,
+    error,
+    setWorkspaceId,
+    refresh,
+    resetWorkspaceId,
+  };
 }

@@ -33,7 +33,7 @@ function eventTitle(
 function dotClass(state: ProgressStepState): string {
   switch (state) {
     case "done":
-      return "border-emerald-500 bg-emerald-500";
+      return "border-[color:var(--elevate-blue)] bg-[color:var(--elevate-blue)]";
     case "current":
       return "border-[color:var(--elevate-blue)] bg-[color:var(--elevate-blue)] ring-4 ring-[color:var(--elevate-blue-soft)]";
     case "problem":
@@ -57,10 +57,10 @@ function labelClass(state: ProgressStepState): string {
 }
 
 function connectorClass(state: ProgressStepState, nextState?: ProgressStepState): string {
-  if (state === "done") return "bg-emerald-400";
+  // Blue illuminates the path already covered (delivery-based progress). No green.
+  if (state === "done") return "bg-[color:var(--elevate-blue)]";
   if (state === "current" || state === "problem") {
-    // Partial progress toward the next step (matches mock: blue segment after current)
-    if (nextState === "upcoming") return "bg-[color:var(--elevate-blue)]";
+    if (nextState === "upcoming") return "bg-[color:var(--elevate-blue)]/35";
     return "bg-[color:var(--elevate-blue)]";
   }
   return "bg-[#E6E8EC]";
@@ -226,7 +226,7 @@ export function OrderProgress({
     <>
       <section
         aria-labelledby="progress-heading"
-        className="rounded-[12px] border border-[#E6E8EC] bg-white p-5 shadow-none"
+        className="rounded-[14px] border border-[#E6E8EC] bg-white p-5 shadow-none"
       >
         <div className="mb-3 flex items-center justify-between gap-3 lg:mb-4">
           <div className="flex items-center gap-2">
@@ -254,10 +254,14 @@ export function OrderProgress({
 
         {!error ? (
           <>
-            <div className="hidden lg:block">
-              <HorizontalProgress steps={steps} locale={locale} t={t} />
+            <div className="hidden md:block">
+              <div className="overflow-x-auto pb-1">
+                <div className="min-w-[640px]">
+                  <HorizontalProgress steps={steps} locale={locale} t={t} />
+                </div>
+              </div>
             </div>
-            <div className="lg:hidden">
+            <div className="md:hidden">
               <VerticalProgress steps={steps} locale={locale} t={t} />
             </div>
           </>

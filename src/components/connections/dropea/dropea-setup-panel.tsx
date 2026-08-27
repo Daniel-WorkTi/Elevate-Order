@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Eye, EyeOff, Link2, Unplug } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ export function DropeaSetupPanel({
   urlError,
   onConnect,
   onDisconnect,
+  onSync,
+  syncing = false,
 }: {
   linked: boolean;
   apiTokenConfigured: boolean;
@@ -28,6 +30,8 @@ export function DropeaSetupPanel({
   urlError?: string | null;
   onConnect: (credentials: DropeaConnectCredentials) => boolean;
   onDisconnect: () => void;
+  onSync?: () => void;
+  syncing?: boolean;
 }) {
   const t = useT();
   const [apiToken, setApiToken] = useState("");
@@ -80,15 +84,31 @@ export function DropeaSetupPanel({
       <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
         {webhookBlock}
         {urlError ? <p className="text-[12px] font-medium text-red-600">{urlError}</p> : null}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onDisconnect}
-          className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
-        >
-          <Unplug className="size-3.5" strokeWidth={1.75} />
-          {t("connections.disconnect")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {onSync ? (
+            <Button
+              type="button"
+              onClick={onSync}
+              disabled={syncing}
+              className="h-9 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
+            >
+              <RefreshCw
+                className={syncing ? "size-3.5 animate-spin" : "size-3.5"}
+                strokeWidth={1.75}
+              />
+              {t("connections.syncNow")}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onDisconnect}
+            className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
+          >
+            <Unplug className="size-3.5" strokeWidth={1.75} />
+            {t("connections.disconnect")}
+          </Button>
+        </div>
       </section>
     );
   }
@@ -128,7 +148,7 @@ export function DropeaSetupPanel({
 
         <Button
           type="button"
-          disabled={!serverReady}
+          disabled={!webhookUrl || Boolean(loadingUrl)}
           onClick={() => {
             const ok = onConnect({ apiToken, hmacSecret });
             if (!ok) {

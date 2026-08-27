@@ -82,7 +82,7 @@ export function DropiSetupPanel({
           <Button
             type="button"
             onClick={onConnect}
-            disabled={!serverReady || !webhookUrl || Boolean(loadingUrl)}
+            disabled={!webhookUrl || Boolean(loadingUrl)}
             className="h-9 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
           >
             <Link2 className="size-3.5" strokeWidth={1.75} />

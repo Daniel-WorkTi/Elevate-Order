@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -70,12 +71,10 @@ async function shopifyGet(host: string, token: string, path: string) {
 function authError(status: number, body: string, kind: "shop" | "orders"): Error {
   const hint =
     kind === "orders"
-      ? "Token reached Shopify, but read_orders is missing. Custom app → Configuration → Admin API scopes → read_orders. Save, reinstall, then copy the new shpat_ token."
+      ? "Token reached Shopify, but required scopes are missing. Custom app → Configuration → Admin API scopes → enable read_orders, read_customers, read_products. Save, reinstall, then copy the new shpat_ token."
       : "Shopify rejected this token. Install the custom app on the store, then copy Admin API access token (starts with shpat_) from API credentials — shown only once.";
   const snippet = body.replace(/\s+/g, " ").slice(0, 120);
-  return new Error(
-    snippet ? `${hint} (HTTP ${status}: ${snippet})` : `${hint} (HTTP ${status})`,
-  );
+  return new Error(snippet ? `${hint} (HTTP ${status}: ${snippet})` : `${hint} (HTTP ${status})`);
 }
 
 async function fetchShopifyOrders(domain: string, accessToken: string, limit: number) {
@@ -133,9 +132,13 @@ function toOrderRow(order: ShopifyNormalizedOrder, nowIso: string) {
  */
 export const syncShopifyOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: unknown) => shopifySyncInputSchema.parse(data))
-  .handler(async ({ data }): Promise<ShopifySyncResult> => {
+  .validator((data: unknown) =>
+    shopifySyncInputSchema.extend({ workspaceId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }): Promise<ShopifySyncResult> => {
     try {
+      const { authorizeWorkspaceInput } = await import("@/lib/workspace/authorize-workspace-input");
+      const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
       const limit = data.limit ?? 50;
       const host = requireAdminDomain(data.storeDomain);
       const token = requireAdminToken(data.accessToken);
@@ -149,7 +152,7 @@ export const syncShopifyOrders = createServerFn({ method: "POST" })
         return { ok: true, imported: 0, enriched: 0, error: null };
       }
 
-      const result = await persistShopifyNormalizedOrders(normalized, data.workspaceId ?? null);
+      const result = await persistShopifyNormalizedOrders(normalized, authorized.id);
       return {
         ok: true,
         imported: result.imported,
@@ -204,8 +207,7 @@ export const testShopifyConnection = createServerFn({ method: "POST" })
 
 export const getShopifyDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(
-  async (): Promise<ShopifyDashboardResult> => {
+  .handler(async ({ context }): Promise<ShopifyDashboardResult> => {
     const serverConfigured =
       Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim()) &&
       Boolean(process.env["SUPABASE_URL"]?.trim());
@@ -225,15 +227,34 @@ export const getShopifyDashboard = createServerFn({ method: "GET" })
     }
 
     try {
+      const { listOwnedWorkspaces } = await import("@/lib/workspace/workspace.functions");
+      const owned = await listOwnedWorkspaces(context.userId);
+      if (owned.length === 0) {
+        return {
+          summary: {
+            status: "configured",
+            method: "api",
+            serverConfigured: true,
+            lastSyncAt: null,
+            orderCount: 0,
+            errorMessage: null,
+          },
+          error: null,
+        };
+      }
+
+      const workspaceIds = owned.map((w) => w.id);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const [countRes, latestRes] = await Promise.all([
         supabaseAdmin
           .from("orders")
           .select("order_id", { count: "exact", head: true })
+          .in("workspace_id", workspaceIds)
           .ilike("source", "%shopify%"),
         supabaseAdmin
           .from("orders")
           .select("last_event_at")
+          .in("workspace_id", workspaceIds)
           .ilike("source", "%shopify%")
           .order("last_event_at", { ascending: false })
           .limit(1),
@@ -281,5 +302,4 @@ export const getShopifyDashboard = createServerFn({ method: "GET" })
         error: "Unable to load Shopify synchronization data.",
       };
     }
-  },
-);
+  });

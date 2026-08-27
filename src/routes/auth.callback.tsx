@@ -35,8 +35,8 @@ export const Route = createFileRoute("/auth/callback")({
       });
     }
 
-    // Drop ?code=… from history immediately.
-    throw redirect({ to: "/", replace: true });
+    // First landing after login: onboarding (root gate skips if already done).
+    throw redirect({ to: "/onboarding", replace: true });
   },
   component: AuthCallbackPending,
 });

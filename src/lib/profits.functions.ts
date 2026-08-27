@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   normalizeOrderFinancials,
   type OrderFinancials,
@@ -11,7 +12,9 @@ import {
   type ProfitPeriod,
   type ProfitsSupplyFilter,
 } from "@/lib/profits/profits-search";
-import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
+import { isMissingWorkspaceColumn } from "@/lib/workspace/parse-workspace-id";
+import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 
 type OrdersRow = {
   id: string;
@@ -79,6 +82,7 @@ function emptyResult(
 }
 
 export const queryProfitsOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: unknown) => {
     const raw = (data ?? {}) as Record<string, unknown>;
     const parsed: {
@@ -98,18 +102,16 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
     }
     return parsed;
   })
-  .handler(async ({ data }): Promise<ProfitsQueryResult> => {
+  .handler(async ({ data, context }): Promise<ProfitsQueryResult> => {
     const range = profitsDateRange({
       period: data.period,
       from: data.from,
       to: data.to,
     });
-    const workspaceId = parseWorkspaceId(data.workspaceId);
-    if (!workspaceId) {
-      return emptyResult(data.supply, data.period, data.from, data.to, "");
-    }
 
     try {
+      const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
+      const workspaceId = authorized.id;
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       const { data: rows, error } = await supabaseAdmin
@@ -176,6 +178,7 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
         },
       };
     } catch (error) {
+      if (isWorkspaceAccessError(error)) throw error;
       console.error("queryProfitsOrders failed", error);
       const detail =
         error instanceof Error && /Missing Supabase environment variable/i.test(error.message)

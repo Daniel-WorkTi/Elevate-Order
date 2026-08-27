@@ -17,6 +17,7 @@ export type ExchangeRateResult = {
 
 export type CurrencyPreference = {
   from: string;
+  /** Primary / foreground currency — drives all dashboard money figures. */
   to: string;
 };
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ContactHistory } from "@/components/orders/detail/contact-history";
-import { LanguageBadge } from "@/components/i18n/language-badge";
+import { TemplateLanguageSwitcher } from "@/components/templates/template-language-switcher";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,8 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import {
+  DEFAULT_TEMPLATE_LANGUAGE,
+  resolveTemplateLanguage,
+} from "@/lib/templates/default-templates";
 import { useT } from "@/lib/i18n/locale-context";
-import { languageFromCountry } from "@/lib/i18n/languages";
+import { languageFromCountry, type LanguageCode } from "@/lib/i18n/languages";
 import type { OperationalOrder } from "@/lib/order-domain";
 import {
   availableMessageChips,
@@ -39,6 +44,10 @@ const CHIP_LABEL_KEY: Record<string, string> = {
   total: "orders.detail.total",
 };
 
+function languageForOrder(order: OperationalOrder): LanguageCode {
+  return resolveTemplateLanguage(languageFromCountry(order.country)?.code ?? DEFAULT_TEMPLATE_LANGUAGE);
+}
+
 export function MessageComposer({
   order,
   events = [],
@@ -47,13 +56,19 @@ export function MessageComposer({
   events?: OrderEventRow[];
 }) {
   const t = useT();
+  const { workspaceId } = useWorkspaceId();
   const defaultId = pickDefaultTemplate(order);
   const [templateId, setTemplateId] = useState<MessageTemplateId>(defaultId);
   const [message, setMessage] = useState("");
+  const [language, setLanguage] = useState<LanguageCode>(() => languageForOrder(order));
 
   const templatesQuery = useQuery({
-    queryKey: ["message-templates"],
-    queryFn: () => listMessageTemplates(),
+    queryKey: ["message-templates", language, workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      listMessageTemplates({
+        data: { language, ...(workspaceId ? { workspaceId } : {}) },
+      }),
   });
 
   const templates = useMemo(() => {
@@ -64,13 +79,14 @@ export function MessageComposer({
         body: item.content,
       }));
     }
-    return templatesForOrder(order);
-  }, [templatesQuery.data, order]);
+    return templatesForOrder(order, language);
+  }, [templatesQuery.data, order, language]);
 
   const template = templates.find((item) => item.id === templateId) ?? templates[0]!;
 
   useEffect(() => {
     setTemplateId(pickDefaultTemplate(order));
+    setLanguage(languageForOrder(order));
   }, [order.order_id]);
 
   useEffect(() => {
@@ -104,11 +120,11 @@ export function MessageComposer({
       </div>
 
       <div className="mt-5 space-y-2">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Label htmlFor="order-template" className="text-[12px] text-muted-foreground">
             {t("orders.detail.template")}
           </Label>
-          <LanguageBadge language={languageFromCountry(order.country)} />
+          <TemplateLanguageSwitcher value={language} onChange={setLanguage} />
         </div>
         <Select
           value={templateId}

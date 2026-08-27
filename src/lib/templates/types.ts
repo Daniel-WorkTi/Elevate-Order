@@ -1,4 +1,5 @@
 import type { Supply } from "@/lib/order-domain";
+import type { LanguageCode } from "@/lib/i18n/languages";
 
 export type TemplateKind =
   | "confirmation"
@@ -17,9 +18,11 @@ export type MessageTemplateRecord = {
   description: string;
   /** Longer purpose line shown above the editor. */
   purpose: string;
+  /** Message language this content is written for. */
+  language: LanguageCode;
   content: string;
   updatedAt: string | null;
-  /** True when content differs from the built-in default for this kind. */
+  /** True when content differs from the built-in default for this kind + language. */
   isCustom: boolean;
 };
 

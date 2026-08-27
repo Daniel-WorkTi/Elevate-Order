@@ -85,11 +85,16 @@ function OrderDetailPage() {
     !order;
 
   const shopifyUrl = order
-    ? shopifyAdminOrderUrl(store.storeDomain, order.shopify_order_id)
+    ? isPreview
+      ? "https://admin.shopify.com/store/erono/orders/13707091935609"
+      : shopifyAdminOrderUrl(store.storeDomain, order.shopify_order_id)
     : null;
   const storeUrl = store.storeDomain
     ? `https://${store.storeDomain.replace(/^https?:\/\//, "")}`
-    : null;
+    : isPreview
+      ? "https://erono.myshopify.com"
+      : null;
+  const storeName = store.storeName ?? (isPreview ? "Erono Store" : null);
   const eventsError = isPreview ? null : (eventsQuery.data?.error ?? null);
 
   function focusMessage() {
@@ -133,31 +138,34 @@ function OrderDetailPage() {
             onSendMessage={focusMessage}
           />
 
-          {/* Desktop: Progress full → left (Cliente+Produtos) | right (Resumo+Mensagem)
-              Mobile: Progress → Cliente → Resumo → Produtos → Mensagem */}
-          <div className="hidden lg:block">
+          {/* Progresso full → Cliente|Resumo → Produtos|Mensagem (mesma altura na 2ª linha) */}
+          <div className="flex flex-col gap-4">
             <OrderProgress order={order} events={events} error={eventsError} />
-          </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
-            <div className="min-w-0 lg:row-start-1">
-              <CustomerDetailsCard order={order} />
-            </div>
-            <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-              <OrderSummaryCard
-                order={order}
-                storeName={store.storeName}
-                storeUrl={storeUrl}
-              />
-            </div>
-            <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-              <OrderProductsCard order={order} />
-            </div>
-            <div className="lg:hidden">
-              <OrderProgress order={order} events={events} error={eventsError} />
-            </div>
-            <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:sticky lg:top-24">
-              <OrderMessageCard order={order} messageRef={messageRef} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] xl:items-stretch">
+              <div className="min-w-0 md:col-start-1 md:row-start-1">
+                <CustomerDetailsCard order={order} />
+              </div>
+              <div className="min-w-0 md:col-start-2 md:row-start-1">
+                <OrderSummaryCard
+                  order={order}
+                  storeName={storeName}
+                  storeUrl={storeUrl}
+                  softBottom
+                />
+              </div>
+              <div className="hidden min-w-0 xl:col-start-1 xl:row-start-2 xl:flex">
+                <OrderProductsCard order={order} className="flex-1" softBottom />
+              </div>
+              <div className="hidden min-w-0 xl:col-start-2 xl:row-start-2 xl:flex">
+                <OrderMessageCard order={order} messageRef={messageRef} className="flex-1" />
+              </div>
+              <div className="min-w-0 md:col-span-2 xl:hidden">
+                <OrderProductsCard order={order} softBottom />
+              </div>
+              <div className="min-w-0 md:col-span-2 xl:hidden">
+                <OrderMessageCard order={order} messageRef={messageRef} />
+              </div>
             </div>
           </div>
         </div>

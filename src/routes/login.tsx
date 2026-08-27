@@ -1,9 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, isRedirect } from "@tanstack/react-router";
 
 import { LoginBrandPanel } from "@/components/auth/login-brand-panel";
 import { LoginCard } from "@/components/auth/login-card";
 import { LoginLanguageSwitcher } from "@/components/auth/login-language-switcher";
 import { getAuthUser } from "@/lib/auth/session.functions";
+import { getOnboardingGate } from "@/lib/onboarding/onboarding.functions";
 import { metaT } from "@/lib/i18n/meta";
 
 export type LoginSearch = {
@@ -25,9 +26,18 @@ export const Route = createFileRoute("/login")({
   }),
   beforeLoad: async () => {
     const user = await getAuthUser();
-    if (user) {
-      throw redirect({ to: "/" });
+    if (!user) return;
+
+    try {
+      const gate = await getOnboardingGate();
+      if (gate.needsOnboarding) {
+        throw redirect({ to: "/onboarding", replace: true });
+      }
+    } catch (error) {
+      if (isRedirect(error)) throw error;
     }
+
+    throw redirect({ to: "/", replace: true });
   },
   component: LoginPage,
 });

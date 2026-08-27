@@ -9,8 +9,10 @@ import {
   type RecoveryOrderInput,
   type RecoverySnapshot,
 } from "@/lib/inbox/aggregate-recovery";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
+import { isMissingWorkspaceColumn } from "@/lib/workspace/parse-workspace-id";
+import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 import { profitsDateRange, PROFIT_PERIODS, type ProfitPeriod } from "@/lib/profits/profits-search";
-import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 const inputSchema = z.object({
   period: z.enum(PROFIT_PERIODS).optional(),
@@ -101,7 +103,7 @@ async function loadEvents(
 export const queryRecoveryDashboard = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => inputSchema.parse(data ?? {}))
-  .handler(async ({ data }): Promise<RecoveryDashboardResult> => {
+  .handler(async ({ data, context }): Promise<RecoveryDashboardResult> => {
     const period = parsePeriod(data.period ?? "7d");
     const range = profitsDateRange({
       period,
@@ -111,13 +113,10 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
     const fetchedAt = new Date().toISOString();
     const fromMs = range.from ? Date.parse(range.from) : null;
     const toMs = range.to ? Date.parse(range.to) : null;
-    const workspaceId = parseWorkspaceId(data.workspaceId);
-
-    if (!workspaceId) {
-      return { snapshot: emptyRecoverySnapshot(), fetchedAt, error: null };
-    }
 
     try {
+      const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
+      const workspaceId = authorized.id;
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       const fullSelect =
@@ -205,6 +204,7 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
         error: null,
       };
     } catch (error) {
+      if (isWorkspaceAccessError(error)) throw error;
       console.error("queryRecoveryDashboard failed", error);
       return {
         snapshot: emptyRecoverySnapshot(),

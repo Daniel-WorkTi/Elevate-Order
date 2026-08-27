@@ -15,12 +15,11 @@ import {
   lineItemImageKey,
   resolveShopifyLineItemImages,
 } from "@/lib/integrations/shopify/shopify-product-images";
+import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
 import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
+import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 import { coalesceText, staticFieldsFromSnapshot } from "@/lib/orders/hydrate-static-fields";
-import {
-  paymentMethodFromSnapshot,
-  resolveOrderLineItems,
-} from "@/lib/orders/order-line-items";
+import { paymentMethodFromSnapshot, resolveOrderLineItems } from "@/lib/orders/order-line-items";
 
 export type SyncedOrder = {
   order_id: number;
@@ -174,7 +173,10 @@ async function enrichOrderProductImages(
       productSummary: order.product_summary,
       total: order.total,
     });
-    if (twinItems.some((item) => item.imageUrl) || (lineItems.length === 0 && twinItems.length > 0)) {
+    if (
+      twinItems.some((item) => item.imageUrl) ||
+      (lineItems.length === 0 && twinItems.length > 0)
+    ) {
       lineItems = twinItems.map((item, index) => ({
         ...item,
         imageUrl: item.imageUrl ?? lineItems[index]?.imageUrl ?? null,
@@ -262,7 +264,10 @@ async function enrichOrderProductImages(
           await supabaseAdmin
             .from("orders")
             .update({
-              snapshot: { ...snapshot, line_items: nextItems } as import("@/integrations/supabase/types").Json,
+              snapshot: {
+                ...snapshot,
+                line_items: nextItems,
+              } as import("@/integrations/supabase/types").Json,
             })
             .eq("id", row.id);
         } catch (error) {
@@ -420,37 +425,46 @@ function syncedOrdersErrorMessage(error: unknown): string {
 
 export const listSyncedOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
-      .from("orders")
-      .select(
-        "order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at",
-      )
-        .order("last_event_at", { ascending: false })
-      .limit(50);
+  .handler(async ({ context }) => {
+    try {
+      const { listOwnedWorkspaces } = await import("@/lib/workspace/workspace.functions");
+      const owned = await listOwnedWorkspaces(context.userId);
+      if (owned.length === 0) {
+        return { orders: [] as SyncedOrder[], error: null as string | null };
+      }
 
-    if (error) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
+        .from("orders")
+        .select(
+          "order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at",
+        )
+        .in(
+          "workspace_id",
+          owned.map((w) => w.id),
+        )
+        .order("last_event_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error("listSyncedOrders failed", error);
+        return { orders: [] as SyncedOrder[], error: syncedOrdersErrorMessage(error) };
+      }
+
+      return { orders: (data ?? []) as SyncedOrder[], error: null as string | null };
+    } catch (error) {
       console.error("listSyncedOrders failed", error);
       return { orders: [] as SyncedOrder[], error: syncedOrdersErrorMessage(error) };
     }
-
-    return { orders: (data ?? []) as SyncedOrder[], error: null as string | null };
-  } catch (error) {
-    console.error("listSyncedOrders failed", error);
-    return { orders: [] as SyncedOrder[], error: syncedOrdersErrorMessage(error) };
-  }
-});
+  });
 
 export const querySyncedOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => parseOrdersQuery(data))
-  .handler(async ({ data }): Promise<OrdersQueryResult> => {
-    const workspaceId = parseWorkspaceId(data.workspaceId);
-    if (!workspaceId) return emptyResult(null, data);
-
+  .handler(async ({ data, context }): Promise<OrdersQueryResult> => {
     try {
+      const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
+      const workspaceId = authorized.id;
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       const applyBase = <Q>(query: Q) => {
@@ -539,6 +553,7 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
         error: null,
       };
     } catch (error) {
+      if (isWorkspaceAccessError(error)) throw error;
       console.error("querySyncedOrders failed", error);
       const message =
         error instanceof Error && /Missing Supabase environment variable/i.test(error.message)
@@ -561,113 +576,95 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
       workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "",
     };
   })
-  .handler(async ({ data }): Promise<{ order: OperationalOrder | null; error: string | null }> => {
-    const workspaceId = parseWorkspaceId(data.workspaceId);
-    if (!workspaceId) return { order: null, error: null };
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<{ order: OperationalOrder | null; error: string | null }> => {
+      try {
+        const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
+        const workspaceId = authorized.id;
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const loadScoped = async (columns: string) =>
+          supabaseAdmin
+            .from("orders")
+            .select(columns)
+            .eq("order_id", data.orderId)
+            .eq("workspace_id", workspaceId)
+            .maybeSingle();
 
-      /** Prefer scoped row; fall back to legacy null workspace. Avoid raw `.or(uuid)` — hyphens break PostgREST. */
-      const loadScoped = async (columns: string) =>
-        supabaseAdmin
-          .from("orders")
-          .select(columns)
-          .eq("order_id", data.orderId)
-          .eq("workspace_id", workspaceId)
-          .maybeSingle();
+        const { data: scopedRow, error: scopedError } = await loadScoped(ORDER_COLUMNS_FULL);
+        let error = scopedError;
+        let row = (scopedRow as OrdersRow | null) ?? null;
 
-      const loadLegacyNull = async (columns: string) =>
-        supabaseAdmin
-          .from("orders")
-          .select(columns)
-          .eq("order_id", data.orderId)
-          .is("workspace_id", null)
-          .limit(1);
-
-      let { data: scopedRow, error } = await loadScoped(ORDER_COLUMNS_FULL);
-      let row = (scopedRow as OrdersRow | null) ?? null;
-
-      if (error && isMissingWorkspaceColumn(error.message)) {
-        return { order: null, error: null };
-      }
-
-      if (error && isMissingColumnError(error)) {
-        const fallback = await loadScoped(ORDER_COLUMNS_LEGACY);
-        error = fallback.error;
-        row = (fallback.data as OrdersRow | null) ?? null;
-      }
-
-      if (!row && !error) {
-        const legacy = await loadLegacyNull(ORDER_COLUMNS_FULL);
-        if (legacy.error && isMissingColumnError(legacy.error)) {
-          const legacyFallback = await loadLegacyNull(ORDER_COLUMNS_LEGACY);
-          error = legacyFallback.error;
-          row = ((legacyFallback.data ?? [])[0] as OrdersRow | undefined) ?? null;
-        } else {
-          error = legacy.error;
-          row = ((legacy.data ?? [])[0] as OrdersRow | undefined) ?? null;
+        if (error && isMissingWorkspaceColumn(error.message)) {
+          return { order: null, error: null };
         }
-      }
 
-      if (error) {
+        if (error && isMissingColumnError(error)) {
+          const fallback = await loadScoped(ORDER_COLUMNS_LEGACY);
+          error = fallback.error;
+          row = (fallback.data as OrdersRow | null) ?? null;
+        }
+
+        if (error) {
+          console.error("getSyncedOrder failed", error);
+          return { order: null, error: "Unable to load this order." };
+        }
+
+        if (!row) return { order: null, error: null };
+
+        let order = mapOrder(row);
+        if (!order.customer_name || !order.product_summary || (!order.phone && !order.email)) {
+          const events = await supabaseAdmin
+            .from("order_events")
+            .select("raw, shipping_company")
+            .eq("order_id", data.orderId)
+            .order("event_date", { ascending: false })
+            .limit(8);
+          for (const event of events.data ?? []) {
+            const extra = staticFieldsFromSnapshot((event as { raw?: unknown }).raw);
+            const carrier = (event as { shipping_company?: string | null }).shipping_company;
+            order = {
+              ...order,
+              customer_name: coalesceText(order.customer_name, extra.customer_name),
+              phone: coalesceText(order.phone, extra.phone),
+              email: coalesceText(order.email, extra.email),
+              city: coalesceText(order.city, extra.city),
+              postal_code: coalesceText(order.postal_code, extra.postal_code),
+              address: coalesceText(order.address, extra.address),
+              country: coalesceText(order.country, extra.country),
+              product_summary: coalesceText(order.product_summary, extra.product_summary),
+              shipping_company: coalesceText(
+                order.shipping_company,
+                extra.shipping_company,
+                carrier,
+              ),
+            };
+          }
+          order = {
+            ...order,
+            line_items:
+              order.line_items && order.line_items.length > 0
+                ? order.line_items
+                : resolveOrderLineItems({
+                    productSummary: order.product_summary,
+                    total: order.total,
+                  }),
+          };
+        }
+
+        order = await enrichOrderProductImages(supabaseAdmin, order, row, workspaceId);
+
+        return { order, error: null };
+      } catch (error) {
+        if (isWorkspaceAccessError(error)) throw error;
         console.error("getSyncedOrder failed", error);
         return { order: null, error: "Unable to load this order." };
       }
-
-      if (!row) return { order: null, error: null };
-
-      if (!row.workspace_id) {
-        await supabaseAdmin
-          .from("orders")
-          .update({ workspace_id: workspaceId })
-          .eq("id", row.id);
-      }
-
-      let order = mapOrder(row);
-      if (!order.customer_name || !order.product_summary || (!order.phone && !order.email)) {
-        const events = await supabaseAdmin
-          .from("order_events")
-          .select("raw, shipping_company")
-          .eq("order_id", data.orderId)
-          .order("event_date", { ascending: false })
-          .limit(8);
-        for (const event of events.data ?? []) {
-          const extra = staticFieldsFromSnapshot((event as { raw?: unknown }).raw);
-          const carrier = (event as { shipping_company?: string | null }).shipping_company;
-          order = {
-            ...order,
-            customer_name: coalesceText(order.customer_name, extra.customer_name),
-            phone: coalesceText(order.phone, extra.phone),
-            email: coalesceText(order.email, extra.email),
-            city: coalesceText(order.city, extra.city),
-            postal_code: coalesceText(order.postal_code, extra.postal_code),
-            address: coalesceText(order.address, extra.address),
-            country: coalesceText(order.country, extra.country),
-            product_summary: coalesceText(order.product_summary, extra.product_summary),
-            shipping_company: coalesceText(order.shipping_company, extra.shipping_company, carrier),
-          };
-        }
-        order = {
-          ...order,
-          line_items:
-            order.line_items && order.line_items.length > 0
-              ? order.line_items
-              : resolveOrderLineItems({
-                  productSummary: order.product_summary,
-                  total: order.total,
-                }),
-        };
-      }
-
-      order = await enrichOrderProductImages(supabaseAdmin, order, row, workspaceId);
-
-      return { order, error: null };
-    } catch (error) {
-      console.error("getSyncedOrder failed", error);
-      return { order: null, error: "Unable to load this order." };
-    }
-  });
+    },
+  );
 
 export type OrderEventRow = {
   id: string;
@@ -697,50 +694,38 @@ export const listOrderEvents = createServerFn({ method: "GET" })
       workspaceId: typeof raw["workspaceId"] === "string" ? raw["workspaceId"] : "",
     };
   })
-  .handler(async ({ data }): Promise<{ events: OrderEventRow[]; error: string | null }> => {
-    const workspaceId = parseWorkspaceId(data.workspaceId);
-    if (!workspaceId) return { events: [], error: null };
+  .handler(
+    async ({ data, context }): Promise<{ events: OrderEventRow[]; error: string | null }> => {
+      try {
+        const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
+        const workspaceId = authorized.id;
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const selectEvents = () =>
+          supabaseAdmin
+            .from("order_events")
+            .select(
+              "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at, workspace_id",
+            )
+            .eq("order_id", data.orderId)
+            .eq("workspace_id", workspaceId)
+            .order("event_date", { ascending: true });
 
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const selectEvents = () =>
-        supabaseAdmin
-          .from("order_events")
-          .select(
-            "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at, workspace_id",
-          )
-          .eq("order_id", data.orderId)
-          .order("event_date", { ascending: true });
+        const { data: rows, error } = await selectEvents();
 
-      let { data: rows, error } = await selectEvents();
+        if (error && isMissingWorkspaceColumn(error.message)) {
+          return { events: [], error: null };
+        }
 
-      if (error && isMissingWorkspaceColumn(error.message)) {
-        const legacy = await supabaseAdmin
-          .from("order_events")
-          .select(
-            "id, order_id, event_date, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, created_at",
-          )
-          .eq("order_id", data.orderId)
-          .order("event_date", { ascending: true });
-        rows = (legacy.data ?? []).map((event) => ({
-          ...event,
-          workspace_id: null as string | null,
-        }));
-        error = legacy.error;
-      }
+        if (error) {
+          console.error("listOrderEvents failed", error);
+          return { events: [], error: "Unable to load timeline." };
+        }
 
-      if (error) {
+        return { events: (rows ?? []) as OrderEventRow[], error: null };
+      } catch (error) {
+        if (isWorkspaceAccessError(error)) throw error;
         console.error("listOrderEvents failed", error);
         return { events: [], error: "Unable to load timeline." };
       }
-
-      const scoped = ((rows ?? []) as Array<OrderEventRow & { workspace_id?: string | null }>).filter(
-        (event) => event.workspace_id === workspaceId || event.workspace_id == null,
-      );
-
-      return { events: scoped, error: null };
-    } catch (error) {
-      console.error("listOrderEvents failed", error);
-      return { events: [], error: "Unable to load timeline." };
-    }
-  });
+    },
+  );

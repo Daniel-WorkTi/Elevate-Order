@@ -3,15 +3,29 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { startGoogleOAuth } from "@/lib/auth/session.functions";
 import { useT } from "@/lib/i18n/locale-context";
 
+type GoogleSearch = {
+  origin?: string;
+};
+
 /**
  * Starts Google OAuth via server RPC so authorize URL / client_id
  * are never constructed in client route modules.
+ * `?origin=` comes from the browser so localhost login stays local.
  */
 export const Route = createFileRoute("/auth/google")({
-  beforeLoad: async () => {
+  validateSearch: (search: Record<string, unknown>): GoogleSearch => {
+    const next: GoogleSearch = {};
+    if (typeof search["origin"] === "string" && search["origin"].length > 0) {
+      next.origin = search["origin"];
+    }
+    return next;
+  },
+  beforeLoad: async ({ search }) => {
     let url: string;
     try {
-      ({ url } = await startGoogleOAuth());
+      ({ url } = await startGoogleOAuth({
+        data: search.origin ? { origin: search.origin } : {},
+      }));
     } catch {
       throw redirect({
         to: "/login",

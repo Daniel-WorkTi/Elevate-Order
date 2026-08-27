@@ -4,14 +4,22 @@ import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-norma
 
 export const SHOPIFY_OAUTH_STATE_COOKIE = "elevate_shopify_oauth";
 /**
- * Order-management / call-center reads.
- * `read_orders` already includes Fulfillment + tracking.
- * `read_products` is required for product thumbnails on order detail.
- * `read_fulfillments` is FulfillmentService (warehouse apps) — do not request it.
- * `read_all_orders` needs Partner Dashboard approval before it can be declared.
+ * Minimal Admin API scopes for the ELEVATE call-center flow.
+ * - read_orders: pedidos, itens, valores, fulfillment, tracking, transações
+ * - read_customers: nome, telefone, e-mail, morada (protected customer data)
+ * - read_products: nome, variantes, imagens, coleções (thumbnails no detalhe)
+ *
+ * Do not add inventory/locations/write_* until a feature needs them.
+ * Protected customer fields also need Partner Dashboard approval when distributing the app.
  */
-export const SHOPIFY_DEFAULT_SCOPES =
-  "read_orders,read_products,read_customers,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders";
+export const SHOPIFY_DEFAULT_SCOPES = "read_orders,read_customers,read_products";
+
+/** Ordered list for UI — keep in sync with SHOPIFY_DEFAULT_SCOPES. */
+export const SHOPIFY_REQUIRED_SCOPES = [
+  "read_orders",
+  "read_customers",
+  "read_products",
+] as const;
 
 export type ShopifyAppConfig = {
   apiKey: string;

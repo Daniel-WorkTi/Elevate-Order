@@ -19,8 +19,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import type { LanguageCode } from "@/lib/i18n/languages";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
+import {
+  DEFAULT_TEMPLATE_LANGUAGE,
+  resolveTemplateLanguage,
+} from "@/lib/templates/default-templates";
 import {
   listMessageTemplates,
   resetMessageTemplate,
@@ -35,6 +41,25 @@ import {
   type MessageTemplateRecord,
 } from "@/lib/templates";
 import { cn } from "@/lib/utils";
+
+const TEMPLATE_LANGUAGE_KEY = "elevate-template-language";
+
+function readTemplateLanguage(): LanguageCode {
+  if (typeof window === "undefined") return DEFAULT_TEMPLATE_LANGUAGE;
+  try {
+    return resolveTemplateLanguage(window.localStorage.getItem(TEMPLATE_LANGUAGE_KEY));
+  } catch {
+    return DEFAULT_TEMPLATE_LANGUAGE;
+  }
+}
+
+function writeTemplateLanguage(code: LanguageCode) {
+  try {
+    window.localStorage.setItem(TEMPLATE_LANGUAGE_KEY, code);
+  } catch {
+    // ignore
+  }
+}
 
 export const Route = createFileRoute("/templates")({
   head: () => ({
@@ -69,9 +94,17 @@ function translateValidationErrors(
 
 function TemplatesPage() {
   const t = useT();
+  const { workspaceId } = useWorkspaceId();
+  const [language, setLanguage] = useState<LanguageCode>(readTemplateLanguage);
+  const [pendingLanguage, setPendingLanguage] = useState<LanguageCode | null>(null);
+
   const query = useQuery({
-    queryKey: ["message-templates"],
-    queryFn: () => listMessageTemplates(),
+    queryKey: ["message-templates", language, workspaceId],
+    queryFn: () =>
+      listMessageTemplates({
+        data: { language, ...(workspaceId ? { workspaceId } : {}) },
+      }),
+    enabled: Boolean(workspaceId),
     placeholderData: keepPreviousData,
   });
 
@@ -89,7 +122,11 @@ function TemplatesPage() {
     setTemplates(list);
     setSelectedId((current) => {
       const stillThere = list.some((item) => item.id === current);
-      if (stillThere && current) return current;
+      if (stillThere && current) {
+        const match = list.find((item) => item.id === current);
+        if (match) setDraft(match.content);
+        return current;
+      }
       const first = list[0] ?? null;
       if (first) setDraft(first.content);
       return first?.id ?? null;
@@ -120,6 +157,20 @@ function TemplatesPage() {
   const showSkeleton = query.isPending && templates.length === 0;
   const hasTemplates = templates.length > 0;
 
+  function applyLanguage(code: LanguageCode) {
+    writeTemplateLanguage(code);
+    setLanguage(code);
+  }
+
+  function requestLanguageChange(code: LanguageCode) {
+    if (code === language) return;
+    if (dirty) {
+      setPendingLanguage(code);
+      return;
+    }
+    applyLanguage(code);
+  }
+
   function selectTemplate(id: string) {
     if (dirty && id !== selectedId) {
       setPendingTemplateId(id);
@@ -133,14 +184,21 @@ function TemplatesPage() {
   }
 
   function discardAndContinue() {
-    if (!pendingTemplateId) return;
-    const id = pendingTemplateId;
-    setPendingTemplateId(null);
-    const next = templates.find((item) => item.id === id);
-    if (!next) return;
-    setSelectedId(next.id);
-    setDraft(next.content);
-    setMobilePane("edit");
+    if (pendingTemplateId) {
+      const id = pendingTemplateId;
+      setPendingTemplateId(null);
+      const next = templates.find((item) => item.id === id);
+      if (!next) return;
+      setSelectedId(next.id);
+      setDraft(next.content);
+      setMobilePane("edit");
+      return;
+    }
+    if (pendingLanguage) {
+      const code = pendingLanguage;
+      setPendingLanguage(null);
+      applyLanguage(code);
+    }
   }
 
   async function handleSave() {
@@ -151,6 +209,8 @@ function TemplatesPage() {
         data: {
           kind: selected.kind,
           content: draft,
+          language,
+          workspaceId,
         },
       });
       if (result.error || !result.template) {
@@ -175,7 +235,7 @@ function TemplatesPage() {
     setSaving(true);
     try {
       const result = await resetMessageTemplate({
-        data: { kind: selected.kind },
+        data: { kind: selected.kind, language, workspaceId },
       });
       if (result.error || !result.template) {
         toast.error(result.error ?? t("templates.resetError"));
@@ -184,7 +244,7 @@ function TemplatesPage() {
       setTemplates((prev) =>
         prev.map((item) => (item.id === result.template!.id ? result.template! : item)),
       );
-      setDraft(defaultContentFor(selected.kind));
+      setDraft(defaultContentFor(selected.kind, language));
       toast.success(t("templates.resetSuccess"));
       void query.refetch();
     } catch {
@@ -199,6 +259,8 @@ function TemplatesPage() {
     { id: "edit" as const, label: t("templates.tab.edit") },
     { id: "preview" as const, label: t("templates.tab.preview") },
   ];
+
+  const discardOpen = Boolean(pendingTemplateId || pendingLanguage);
 
   return (
     <AppShell title={t("templates.title")} subtitle={t("templates.subtitle")}>
@@ -313,6 +375,8 @@ function TemplatesPage() {
                 <TemplateEditor
                   template={selected}
                   draft={draft}
+                  language={language}
+                  onLanguageChange={requestLanguageChange}
                   variables={variables}
                   errors={editorErrors}
                   dirty={dirty}
@@ -350,9 +414,12 @@ function TemplatesPage() {
       </div>
 
       <AlertDialog
-        open={Boolean(pendingTemplateId)}
+        open={discardOpen}
         onOpenChange={(open) => {
-          if (!open) setPendingTemplateId(null);
+          if (!open) {
+            setPendingTemplateId(null);
+            setPendingLanguage(null);
+          }
         }}
       >
         <AlertDialogContent className="rounded-[16px]">

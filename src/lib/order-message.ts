@@ -7,7 +7,9 @@ import {
   type Supply,
 } from "@/lib/order-domain";
 import { displayCarrierName } from "@/lib/carriers";
+import type { LanguageCode } from "@/lib/i18n/languages";
 import {
+  DEFAULT_TEMPLATE_LANGUAGE,
   getTemplate,
   renderOrderTemplate,
   type TemplateKind,
@@ -32,7 +34,10 @@ const KIND_LABEL: Record<TemplateKind, string> = {
   cancelled: "Cancelled order",
 };
 
-export function templatesForOrder(_order: OperationalOrder): MessageTemplate[] {
+export function templatesForOrder(
+  _order: OperationalOrder,
+  language: LanguageCode = DEFAULT_TEMPLATE_LANGUAGE,
+): MessageTemplate[] {
   const kinds: TemplateKind[] = [
     "confirmation",
     "follow_up",
@@ -43,7 +48,7 @@ export function templatesForOrder(_order: OperationalOrder): MessageTemplate[] {
     "cancelled",
   ];
   return kinds.map((kind) => {
-    const record = getTemplate(kind);
+    const record = getTemplate(kind, language);
     return {
       id: kind,
       label: KIND_LABEL[kind],
