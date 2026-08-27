@@ -4,13 +4,13 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --port 8081 --strictPort",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "npx --yes tsx --test src/lib/carriers/get-carrier-meta.test.ts src/lib/inbox/aggregate-recovery.test.ts src/lib/inbox/order-to-inbox.test.ts src/lib/integrations/shopify/oauth.test.ts src/lib/integrations/shopify/shopify-normalize.test.ts src/lib/orders/hydrate-static-fields.test.ts src/lib/i18n/date-locale.test.ts src/lib/workspace/require-workspace-access.test.ts src/lib/whatsapp/domain-types.test.ts"
+    "test": "npx --yes tsx --test src/lib/carriers/get-carrier-meta.test.ts src/lib/inbox/aggregate-recovery.test.ts src/lib/inbox/order-to-inbox.test.ts src/lib/integrations/shopify/oauth.test.ts src/lib/integrations/shopify/shopify-normalize.test.ts src/lib/integrations/whatsapp/config.test.ts src/lib/integrations/whatsapp/errors.test.ts src/lib/integrations/whatsapp/graph.test.ts src/lib/integrations/whatsapp/meta-sdk.test.ts src/lib/integrations/whatsapp/token-crypto.test.ts src/lib/integrations/whatsapp/whatsapp-complete.test.ts src/lib/orders/hydrate-static-fields.test.ts src/lib/i18n/date-locale.test.ts src/lib/workspace/require-workspace-access.test.ts src/lib/whatsapp/domain-types.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

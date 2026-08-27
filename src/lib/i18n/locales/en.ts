@@ -162,6 +162,27 @@ export const en: TranslationDict = {
   "connections.orUseAdminToken": "Or connect with an Admin API token (shpat_)",
   "connections.dropiHint": "Order update webhooks — supply account",
   "connections.dropeaHint": "API token + HMAC — supply account",
+  "connections.whatsappTitle": "WhatsApp Business",
+  "connections.whatsappSubtitle": "Official Meta Cloud API via Embedded Signup",
+  "connections.whatsappPageBody":
+    "Connect your WhatsApp Business account to this workspace. Credentials are stored server-side — never in the browser.",
+  "connections.whatsappHint":
+    "Use Meta Embedded Signup to authorize ELEVATE on your WhatsApp Business account.",
+  "connections.whatsappPanelIntro":
+    "Connect your WhatsApp Business to send and track messages directly from Elevate.",
+  "connections.whatsappOfficialMeta": "Official connection through Meta.",
+  "connections.whatsappConnect": "Connect WhatsApp",
+  "connections.whatsappConnecting": "Connecting…",
+  "connections.whatsappCancelled": "The connection was cancelled.",
+  "connections.whatsappNotConfigured":
+    "WhatsApp Embedded Signup is not configured on this server (META_APP_ID / META_APP_SECRET / META_EMBEDDED_SIGNUP_CONFIG_ID).",
+  "connections.whatsappWorkspaceRequired": "Select a workspace before connecting WhatsApp.",
+  "connections.whatsappConnectedTitle": "WhatsApp connected",
+  "connections.whatsappConnectedToast": "WhatsApp connected to this workspace.",
+  "connections.whatsappConnectFailed": "Unable to connect WhatsApp.",
+  "connections.whatsappDisconnectedToast": "WhatsApp disconnected.",
+  "connections.whatsappDisconnectFailed": "Unable to disconnect WhatsApp.",
+  "connections.backToConnections": "Back to Connections",
   "connections.selectedFromSetup": "Selected from setup",
   "connections.linked": "Linked",
   "connections.notConnected": "Not connected",
@@ -796,7 +817,10 @@ export const en: TranslationDict = {
   "settings.saved": "Settings saved",
   "settings.whatsappApi": "WhatsApp Business API",
   "settings.whatsappApiHint":
-    "Saved in this browser. Sending via the WhatsApp Business API is not connected yet.",
+    "Connection is managed in Connections via Meta Embedded Signup. Below are local message preferences only.",
+  "settings.whatsappManagedHint":
+    "WhatsApp credentials are stored server-side per workspace. Connect or reconnect from Connections.",
+  "settings.manageWhatsAppConnection": "Manage WhatsApp connection",
   "settings.phoneNumberId": "Phone number ID",
   "settings.businessAccountId": "Business account ID",
   "settings.permanentToken": "Permanent access token",
@@ -872,8 +896,8 @@ export const en: TranslationDict = {
   "onboarding.orders.point.tracking.body":
     "Tracking and supply data flow into the customer message — no manual copy-paste.",
   "onboarding.whatsapp.headline": "Connect WhatsApp",
-  "onboarding.whatsapp.body":
-    "Connect the WhatsApp Business API to send confirmation messages to customers.",
+  "onboarding.whatsapp.bodyEmbedded":
+    "Authorize your WhatsApp Business account with Meta Embedded Signup. Tokens stay on the server.",
   "onboarding.whatsapp.point.message.title": "Context-aware message",
   "onboarding.whatsapp.point.message.body":
     "Name, order, incident, and tracking link come from that order’s supply.",
@@ -1001,6 +1025,9 @@ export const en: TranslationDict = {
   "meta.dropeaDescription": "Connect Dropea to ELEVATE Orders.",
   "meta.shopifyTitle": "Store — Connections — ELEVATE",
   "meta.shopifyDescription": "Connect your Shopify store and sync complete orders into ELEVATE.",
+  "meta.whatsappTitle": "WhatsApp — Connections — ELEVATE",
+  "meta.whatsappDescription":
+    "Connect WhatsApp Business to this workspace with Meta Embedded Signup.",
   "meta.settingsTitle": "Settings — ELEVATE",
   "meta.onboardingTitle": "Onboarding — ELEVATE",
   "meta.onboardingDescription": "Connect your first store to import orders into ELEVATE Orders.",

@@ -2,18 +2,13 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 export const WHATSAPP_SETTINGS_KEY = "elevate-whatsapp-settings";
 
-export type WhatsAppSettings = {
-  phoneNumberId: string;
-  businessAccountId: string;
-  permanentToken: string;
+/** Browser-only UI preferences — connection authority lives in Supabase. */
+export type WhatsAppUiPreferences = {
   defaultIncidentTemplate: string;
   autoMessage: boolean;
 };
 
-const DEFAULT: WhatsAppSettings = {
-  phoneNumberId: "",
-  businessAccountId: "",
-  permanentToken: "",
+const DEFAULT: WhatsAppUiPreferences = {
   defaultIncidentTemplate: "",
   autoMessage: false,
 };
@@ -25,17 +20,13 @@ function emit() {
   listeners.forEach((listener) => listener());
 }
 
-function readSettings(): WhatsAppSettings {
+function readPreferences(): WhatsAppUiPreferences {
   if (typeof window === "undefined") return DEFAULT;
   try {
     const raw = window.localStorage.getItem(WHATSAPP_SETTINGS_KEY);
     if (!raw) return DEFAULT;
-    const parsed = JSON.parse(raw) as Partial<WhatsAppSettings>;
+    const parsed = JSON.parse(raw) as Partial<WhatsAppUiPreferences & Record<string, unknown>>;
     return {
-      phoneNumberId: typeof parsed.phoneNumberId === "string" ? parsed.phoneNumberId : "",
-      businessAccountId:
-        typeof parsed.businessAccountId === "string" ? parsed.businessAccountId : "",
-      permanentToken: typeof parsed.permanentToken === "string" ? parsed.permanentToken : "",
       defaultIncidentTemplate:
         typeof parsed.defaultIncidentTemplate === "string" ? parsed.defaultIncidentTemplate : "",
       autoMessage: Boolean(parsed.autoMessage),
@@ -48,15 +39,15 @@ function readSettings(): WhatsAppSettings {
 let cached = DEFAULT;
 let hydrated = false;
 
-function getSnapshot(): WhatsAppSettings {
+function getSnapshot(): WhatsAppUiPreferences {
   if (!hydrated && typeof window !== "undefined") {
-    cached = readSettings();
+    cached = readPreferences();
     hydrated = true;
   }
   return cached;
 }
 
-function getServerSnapshot(): WhatsAppSettings {
+function getServerSnapshot(): WhatsAppUiPreferences {
   return DEFAULT;
 }
 
@@ -65,7 +56,7 @@ function subscribe(listener: Listener) {
   return () => listeners.delete(listener);
 }
 
-function writeSettings(next: WhatsAppSettings) {
+function writePreferences(next: WhatsAppUiPreferences) {
   cached = next;
   try {
     window.localStorage.setItem(WHATSAPP_SETTINGS_KEY, JSON.stringify(next));
@@ -75,25 +66,22 @@ function writeSettings(next: WhatsAppSettings) {
   emit();
 }
 
-/** WhatsApp Business fields stored in this browser. Sending via the API is not wired yet. */
+/** WhatsApp UI preferences stored in this browser only. */
 export function useWhatsAppSettings() {
   const settings = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== WHATSAPP_SETTINGS_KEY) return;
-      cached = readSettings();
+      cached = readPreferences();
       emit();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const save = useCallback((next: WhatsAppSettings) => {
-    writeSettings({
-      phoneNumberId: next.phoneNumberId.trim(),
-      businessAccountId: next.businessAccountId.trim(),
-      permanentToken: next.permanentToken.trim(),
+  const save = useCallback((next: WhatsAppUiPreferences) => {
+    writePreferences({
       defaultIncidentTemplate: next.defaultIncidentTemplate.trim(),
       autoMessage: Boolean(next.autoMessage),
     });
@@ -101,3 +89,6 @@ export function useWhatsAppSettings() {
 
   return { settings, save };
 }
+
+/** @deprecated Use WhatsAppUiPreferences — kept for gradual migration. */
+export type WhatsAppSettings = WhatsAppUiPreferences;

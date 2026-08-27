@@ -164,6 +164,27 @@ export const pt: TranslationDict = {
   "connections.orUseAdminToken": "Ou ligar com token Admin API (shpat_)",
   "connections.dropiHint": "Webhooks de atualização de pedidos — conta supply",
   "connections.dropeaHint": "Token API + HMAC — conta supply",
+  "connections.whatsappTitle": "WhatsApp Business",
+  "connections.whatsappSubtitle": "Meta Cloud API oficial via Embedded Signup",
+  "connections.whatsappPageBody":
+    "Ligue a sua conta WhatsApp Business a este workspace. As credenciais ficam no servidor — nunca no browser.",
+  "connections.whatsappHint":
+    "Use o Meta Embedded Signup para autorizar o ELEVATE na sua conta WhatsApp Business.",
+  "connections.whatsappPanelIntro":
+    "Conecte o seu WhatsApp Business para enviar e acompanhar mensagens diretamente pelo Elevate.",
+  "connections.whatsappOfficialMeta": "Conexão oficial através da Meta.",
+  "connections.whatsappConnect": "Conectar WhatsApp",
+  "connections.whatsappConnecting": "Conectando…",
+  "connections.whatsappCancelled": "A conexão foi cancelada.",
+  "connections.whatsappNotConfigured":
+    "O Embedded Signup WhatsApp não está configurado neste servidor (META_APP_ID / META_APP_SECRET / META_EMBEDDED_SIGNUP_CONFIG_ID).",
+  "connections.whatsappWorkspaceRequired": "Selecione um workspace antes de ligar o WhatsApp.",
+  "connections.whatsappConnectedTitle": "WhatsApp ligado",
+  "connections.whatsappConnectedToast": "WhatsApp ligado a este workspace.",
+  "connections.whatsappConnectFailed": "Não foi possível ligar o WhatsApp.",
+  "connections.whatsappDisconnectedToast": "WhatsApp desligado.",
+  "connections.whatsappDisconnectFailed": "Não foi possível desligar o WhatsApp.",
+  "connections.backToConnections": "Voltar às Conexões",
   "connections.selectedFromSetup": "Selecionado no setup",
   "connections.linked": "Ligado",
   "connections.notConnected": "Não ligado",
@@ -801,7 +822,10 @@ export const pt: TranslationDict = {
   "settings.saved": "Definições guardadas",
   "settings.whatsappApi": "WhatsApp Business API",
   "settings.whatsappApiHint":
-    "Guardado neste browser. O envio pela WhatsApp Business API ainda não está ligado.",
+    "A ligação é gerida em Conexões via Meta Embedded Signup. Abaixo ficam apenas preferências locais de mensagem.",
+  "settings.whatsappManagedHint":
+    "As credenciais WhatsApp ficam no servidor por workspace. Ligue ou religue em Conexões.",
+  "settings.manageWhatsAppConnection": "Gerir ligação WhatsApp",
   "settings.phoneNumberId": "ID do número de telefone",
   "settings.businessAccountId": "ID da conta Business",
   "settings.permanentToken": "Token de acesso permanente",
@@ -877,8 +901,8 @@ export const pt: TranslationDict = {
   "onboarding.orders.point.tracking.body":
     "Tracking e dados da supply entram na mensagem ao cliente — sem copiar à mão.",
   "onboarding.whatsapp.headline": "Ligue o WhatsApp",
-  "onboarding.whatsapp.body":
-    "Conecte a WhatsApp Business API para disparar mensagens de confirmação aos clientes.",
+  "onboarding.whatsapp.bodyEmbedded":
+    "Autorize a sua conta WhatsApp Business com o Meta Embedded Signup. Os tokens ficam no servidor.",
   "onboarding.whatsapp.point.message.title": "Mensagem com contexto",
   "onboarding.whatsapp.point.message.body":
     "Nome, pedido, incidência e link de rastreio vêm da supply desse pedido.",
@@ -1007,6 +1031,9 @@ export const pt: TranslationDict = {
   "meta.dropeaDescription": "Ligue a Dropea ao ELEVATE Orders.",
   "meta.shopifyTitle": "Loja — Conexões — ELEVATE",
   "meta.shopifyDescription": "Ligue a sua loja Shopify e sincronize pedidos completos no ELEVATE.",
+  "meta.whatsappTitle": "WhatsApp — Conexões — ELEVATE",
+  "meta.whatsappDescription":
+    "Ligue o WhatsApp Business a este workspace com Meta Embedded Signup.",
   "meta.settingsTitle": "Definições — ELEVATE",
   "meta.onboardingTitle": "Onboarding — ELEVATE",
   "meta.onboardingDescription": "Ligue a sua primeira loja para importar pedidos para o ELEVATE Orders.",

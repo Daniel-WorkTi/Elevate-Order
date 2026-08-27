@@ -42,3 +42,4 @@ dist-ssr
 # Phase 0 local fixture secrets (emails/passwords/ids)
 scripts/.phase0-fixture-state.json
 scripts/.phase1-whatsapp-fixture-state.json
+scripts/.phase2-whatsapp-fixture-state.json

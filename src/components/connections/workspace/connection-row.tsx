@@ -11,7 +11,7 @@ export function ConnectionRow({
   statusLabel,
   tone,
 }: {
-  to: "/connections/shopify" | "/connections/dropi" | "/connections/dropea";
+  to: "/connections/shopify" | "/connections/dropi" | "/connections/dropea" | "/connections/whatsapp";
   icon: ReactNode;
   title: string;
   statusLabel: string;

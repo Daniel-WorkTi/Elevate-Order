@@ -82,6 +82,7 @@ export function shouldShowOnboarding(input: {
 export function isOnboardingExemptPath(pathname: string): boolean {
   return (
     pathname === "/onboarding" ||
+    pathname.startsWith("/connections/whatsapp") ||
     pathname.startsWith("/auth/") ||
     pathname === "/login" ||
     pathname.startsWith("/api/")

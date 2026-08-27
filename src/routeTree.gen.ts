@@ -29,6 +29,7 @@ import { Route as ConnectionsIndexRouteImport } from './routes/connections.index
 import { Route as ConnectionsDropeaRouteImport } from './routes/connections.dropea'
 import { Route as ConnectionsDropiRouteImport } from './routes/connections.dropi'
 import { Route as ConnectionsShopifyRouteImport } from './routes/connections.shopify'
+import { Route as ConnectionsWhatsappRouteImport } from './routes/connections.whatsapp'
 import { Route as OrdersIndexRouteImport } from './routes/orders.index'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as AuthShopifyCallbackRouteImport } from './routes/auth.shopify.callback'
@@ -136,6 +137,11 @@ const ConnectionsShopifyRoute = ConnectionsShopifyRouteImport.update({
   path: '/shopify',
   getParentRoute: () => ConnectionsRoute,
 } as any)
+const ConnectionsWhatsappRoute = ConnectionsWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => ConnectionsRoute,
+} as any)
 const OrdersIndexRoute = OrdersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/connections/dropea': typeof ConnectionsDropeaRoute
   '/connections/dropi': typeof ConnectionsDropiRoute
   '/connections/shopify': typeof ConnectionsShopifyRoute
+  '/connections/whatsapp': typeof ConnectionsWhatsappRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
   '/orders/': typeof OrdersIndexRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/connections/dropea': typeof ConnectionsDropeaRoute
   '/connections/dropi': typeof ConnectionsDropiRoute
   '/connections/shopify': typeof ConnectionsShopifyRoute
+  '/connections/whatsapp': typeof ConnectionsWhatsappRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections': typeof ConnectionsIndexRoute
   '/orders': typeof OrdersIndexRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/connections/dropea': typeof ConnectionsDropeaRoute
   '/connections/dropi': typeof ConnectionsDropiRoute
   '/connections/shopify': typeof ConnectionsShopifyRoute
+  '/connections/whatsapp': typeof ConnectionsWhatsappRoute
   '/orders/$id': typeof OrdersIdRoute
   '/connections/': typeof ConnectionsIndexRoute
   '/orders/': typeof OrdersIndexRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/connections/dropea'
     | '/connections/dropi'
     | '/connections/shopify'
+    | '/connections/whatsapp'
     | '/orders/$id'
     | '/connections/'
     | '/orders/'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/connections/dropea'
     | '/connections/dropi'
     | '/connections/shopify'
+    | '/connections/whatsapp'
     | '/orders/$id'
     | '/connections'
     | '/orders'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '/connections/dropea'
     | '/connections/dropi'
     | '/connections/shopify'
+    | '/connections/whatsapp'
     | '/orders/$id'
     | '/connections/'
     | '/orders/'
@@ -500,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectionsShopifyRouteImport
       parentRoute: typeof ConnectionsRoute
     }
+    '/connections/whatsapp': {
+      id: '/connections/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/connections/whatsapp'
+      preLoaderRoute: typeof ConnectionsWhatsappRouteImport
+      parentRoute: typeof ConnectionsRoute
+    }
     '/orders/': {
       id: '/orders/'
       path: '/'
@@ -549,6 +568,7 @@ interface ConnectionsRouteChildren {
   ConnectionsDropeaRoute: typeof ConnectionsDropeaRoute
   ConnectionsDropiRoute: typeof ConnectionsDropiRoute
   ConnectionsShopifyRoute: typeof ConnectionsShopifyRoute
+  ConnectionsWhatsappRoute: typeof ConnectionsWhatsappRoute
   ConnectionsIndexRoute: typeof ConnectionsIndexRoute
 }
 
@@ -556,6 +576,7 @@ const ConnectionsRouteChildren: ConnectionsRouteChildren = {
   ConnectionsDropeaRoute: ConnectionsDropeaRoute,
   ConnectionsDropiRoute: ConnectionsDropiRoute,
   ConnectionsShopifyRoute: ConnectionsShopifyRoute,
+  ConnectionsWhatsappRoute: ConnectionsWhatsappRoute,
   ConnectionsIndexRoute: ConnectionsIndexRoute,
 }
 

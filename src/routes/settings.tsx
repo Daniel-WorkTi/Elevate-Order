@@ -4,17 +4,13 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
 import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
-import {
-  useWhatsAppSettings,
-  type WhatsAppSettings,
-} from "@/hooks/use-whatsapp-settings";
+import { useWhatsAppSettings, type WhatsAppUiPreferences } from "@/hooks/use-whatsapp-settings";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
 
@@ -35,13 +31,13 @@ function SettingsPage() {
   const { settings, save } = useWhatsAppSettings();
   const dropi = useDropiConnectionPreference();
   const dropea = useDropeaConnectionPreference();
-  const [draft, setDraft] = useState<WhatsAppSettings>(settings);
+  const [draft, setDraft] = useState<WhatsAppUiPreferences>(settings);
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
 
-  function update<K extends keyof WhatsAppSettings>(key: K, value: WhatsAppSettings[K]) {
+  function update<K extends keyof WhatsAppUiPreferences>(key: K, value: WhatsAppUiPreferences[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
@@ -65,51 +61,22 @@ function SettingsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{t("settings.whatsappApiHint")}</p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="phone-id">{t("settings.phoneNumberId")}</Label>
-              <Input
-                id="phone-id"
-                value={draft.phoneNumberId}
-                onChange={(event) => update("phoneNumberId", event.target.value)}
-                placeholder="109876543210987"
-                className="rounded-xl"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="waba-id">{t("settings.businessAccountId")}</Label>
-              <Input
-                id="waba-id"
-                value={draft.businessAccountId}
-                onChange={(event) => update("businessAccountId", event.target.value)}
-                placeholder="204567891234567"
-                className="rounded-xl"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="token">{t("settings.permanentToken")}</Label>
-              <Input
-                id="token"
-                type="password"
-                value={draft.permanentToken}
-                onChange={(event) => update("permanentToken", event.target.value)}
-                placeholder="••••••••••••••••"
-                className="rounded-xl"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="template">{t("settings.defaultIncidentTemplate")}</Label>
-              <Textarea
-                id="template"
-                rows={5}
-                className="rounded-xl"
-                value={draft.defaultIncidentTemplate || t("settings.defaultTemplateValue")}
-                onChange={(event) => update("defaultIncidentTemplate", event.target.value)}
-              />
-            </div>
+          <div className="rounded-xl border border-border bg-secondary/40 p-4">
+            <p className="text-sm text-muted-foreground">{t("settings.whatsappManagedHint")}</p>
+            <Button asChild variant="outline" size="sm" className="mt-3 rounded-[10px] shadow-none">
+              <Link to="/connections/whatsapp">{t("settings.manageWhatsAppConnection")}</Link>
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="template">{t("settings.defaultIncidentTemplate")}</Label>
+            <Textarea
+              id="template"
+              rows={5}
+              className="rounded-xl"
+              value={draft.defaultIncidentTemplate || t("settings.defaultTemplateValue")}
+              onChange={(event) => update("defaultIncidentTemplate", event.target.value)}
+            />
           </div>
 
           <Separator />
