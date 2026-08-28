@@ -1,14 +1,13 @@
 import dropiLogo from "@/assets/dropi-logo.png";
 import dropeaLogo from "@/assets/dropea-logo.png";
-import shopifyLogo from "@/assets/shopify-mark.png";
+import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import type { Supply } from "@/lib/order-domain";
 import { SUPPLY_LABEL } from "@/lib/order-domain";
 import { cn } from "@/lib/utils";
 
-const SRC: Record<Supply, string> = {
+const SRC: Record<Exclude<Supply, "shopify">, string> = {
   dropi: dropiLogo,
   dropea: dropeaLogo,
-  shopify: shopifyLogo,
 };
 
 export function SupplyLogo({
@@ -20,13 +19,18 @@ export function SupplyLogo({
   size?: number;
   className?: string;
 }) {
+  if (supply === "shopify") {
+    return <ShopifyLogo size={size} className={className} />;
+  }
+
   return (
     <img
       src={SRC[supply]}
       alt=""
       width={size}
       height={size}
-      className={cn("shrink-0 object-contain", className)}
+      className={cn("block shrink-0 object-contain", className)}
+      style={{ width: size, height: size }}
       decoding="async"
     />
   );

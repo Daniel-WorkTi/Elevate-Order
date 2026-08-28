@@ -38,11 +38,13 @@ describe("WhatsApp config", () => {
     const saved = saveEnv();
     process.env["META_APP_ID"] = "app123";
     process.env["META_WHATSAPP_CONFIG_ID"] = "cfg456";
+    process.env["META_GRAPH_API_VERSION"] = "v26.0";
     try {
       const pub = getWhatsAppPublicConfig();
-      assert.deepEqual(Object.keys(pub).sort(), ["appId", "configId"]);
+      assert.deepEqual(Object.keys(pub).sort(), ["appId", "configId", "sdkVersion"]);
       assert.equal(pub.appId, "app123");
       assert.equal(pub.configId, "cfg456");
+      assert.equal(pub.sdkVersion, "v26.0");
       assert.ok(!("appSecret" in pub));
       assert.ok(!("tokenEncryptionKeyBase64" in pub));
     } finally {
@@ -63,10 +65,7 @@ describe("WhatsApp config", () => {
   });
 
   it("normalizeEmbeddedSignupConfigId removes angle brackets", () => {
-    assert.equal(
-      normalizeEmbeddedSignupConfigId("<cfg123>", "app123"),
-      "cfg123",
-    );
+    assert.equal(normalizeEmbeddedSignupConfigId("<cfg123>", "app123"), "cfg123");
   });
 
   it("returns null when public env is incomplete", () => {

@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Info, MessageCircle, Pencil } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Check, ChevronDown, Info, MessageCircle, Pencil, RotateCcw } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,18 +13,31 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
-import { useT } from "@/lib/i18n/locale-context";
+import { useI18n, useMessageLanguage, useT } from "@/lib/i18n/locale-context";
 import type { OperationalOrder } from "@/lib/order-domain";
 import {
   buildWhatsAppLink,
+  defaultTemplateLabelFn,
   normalizeWhatsAppPhone,
   pickDefaultTemplate,
   resolveOrderMessage,
   templatesForOrder,
   type MessageTemplateId,
 } from "@/lib/order-message";
+import type { TemplateKind } from "@/lib/templates";
 import { listMessageTemplates } from "@/lib/templates.functions";
+import {
+  getWhatsAppConnectionStatus,
+  sendWhatsAppMessage,
+} from "@/lib/whatsapp/whatsapp.functions";
+import {
+  canSendWhatsAppInApp,
+  showWhatsAppMeFallback,
+  usesWhatsAppGateway,
+} from "@/lib/whatsapp/send-mode";
+import { whatsAppSendErrorMessage } from "@/lib/whatsapp/send-error-message";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -33,9 +47,10 @@ function WhatsAppGlyph({ className }: { className?: string }) {
   );
 }
 
+type SendUiState = "idle" | "sending" | "sent" | "error";
+
 /**
- * Order detail “Mensagem” card — layout locked to the ops reference:
- * header + select/edit + preview + Abrir WhatsApp + footer note.
+ * Order detail “Mensagem” card — template + preview + send via gateway or wa.me fallback.
  */
 export function OrderMessageCard({
   order,
@@ -47,6 +62,8 @@ export function OrderMessageCard({
   className?: string;
 }) {
   const t = useT();
+  const { locale } = useI18n();
+  const messageLanguage = useMessageLanguage();
   const { workspaceId } = useWorkspaceId();
   const templateTriggerId = useId();
   const localMessageRef = useRef<HTMLTextAreaElement | null>(null);
@@ -54,39 +71,118 @@ export function OrderMessageCard({
   const [templateId, setTemplateId] = useState<MessageTemplateId>(defaultId);
   const [message, setMessage] = useState("");
   const [selectOpen, setSelectOpen] = useState(false);
+  const [sendState, setSendState] = useState<SendUiState>("idle");
+  const [sendErrorMessage, setSendErrorMessage] = useState<string | null>(null);
+  const [clientMessageId, setClientMessageId] = useState<string | null>(null);
+
+  const whatsappQuery = useQuery({
+    queryKey: ["whatsapp", "connection", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () => getWhatsAppConnectionStatus({ data: { workspaceId: workspaceId! } }),
+    staleTime: 30_000,
+  });
 
   const templatesQuery = useQuery({
-    queryKey: ["message-templates", workspaceId],
+    queryKey: ["message-templates", messageLanguage, workspaceId],
     enabled: Boolean(workspaceId),
     queryFn: () =>
       listMessageTemplates({
-        data: { ...(workspaceId ? { workspaceId } : {}) },
+        data: { language: messageLanguage, ...(workspaceId ? { workspaceId } : {}) },
       }),
   });
+
+  const labelForKind = useMemo(() => defaultTemplateLabelFn(t), [t, locale]);
 
   const templates = useMemo(() => {
     if (templatesQuery.data?.templates?.length) {
       return templatesQuery.data.templates.map((item) => ({
         id: item.kind as MessageTemplateId,
-        label: item.name,
+        label: labelForKind(item.kind as TemplateKind),
         body: item.content,
       }));
     }
-    return templatesForOrder(order);
-  }, [templatesQuery.data, order]);
+    return templatesForOrder(order, messageLanguage, labelForKind);
+  }, [templatesQuery.data, order, messageLanguage, labelForKind]);
 
   const template = templates.find((item) => item.id === templateId) ?? templates[0]!;
 
   useEffect(() => {
     setTemplateId(pickDefaultTemplate(order));
-  }, [order.order_id]);
+    setSendState("idle");
+    setSendErrorMessage(null);
+    setClientMessageId(null);
+  }, [order]);
 
   useEffect(() => {
-    setMessage(resolveOrderMessage(template.body, order));
-  }, [order, template.body]);
+    setMessage(resolveOrderMessage(template.body, order, messageLanguage, t));
+    setSendState("idle");
+    setSendErrorMessage(null);
+  }, [order, template.body, messageLanguage, t]);
 
   const phone = normalizeWhatsAppPhone(order.phone);
   const waHref = phone ? buildWhatsAppLink(phone, message) : null;
+  const connection = whatsappQuery.data;
+  const gatewayMode = usesWhatsAppGateway(connection);
+  const canSendInApp = canSendWhatsAppInApp(connection, Boolean(phone) && Boolean(workspaceId));
+  const showWaMeFallback = showWhatsAppMeFallback(connection, Boolean(phone));
+  const recipientIsConnectedAccount =
+    Boolean(phone) &&
+    Boolean(connection?.displayPhoneNumber) &&
+    phone!.replace(/\D/g, "") === connection!.displayPhoneNumber!.replace(/\D/g, "");
+
+  const sendMutation = useMutation({
+    mutationFn: sendWhatsAppMessage,
+    onSuccess: (result) => {
+      if (result.status === "sent") {
+        setSendState("sent");
+        toast.success(t("orders.detail.messageSent"));
+        if (result.deliveryHint === "recipient_is_connected_account") {
+          toast.info(t("orders.detail.messageSentToSelfHint"), { duration: 8000 });
+        }
+      } else if (result.status === "failed") {
+        setSendState("error");
+        setSendErrorMessage(t("orders.detail.messageSendFailed"));
+      } else {
+        setSendState("sending");
+      }
+    },
+    onError: (error) => {
+      const message = whatsAppSendErrorMessage(error, t("orders.detail.messageSendFailed"));
+      setSendErrorMessage(message);
+      setSendState("error");
+      toast.error(message);
+    },
+  });
+
+  function ensureClientMessageId(): string {
+    if (clientMessageId) return clientMessageId;
+    const id = crypto.randomUUID();
+    setClientMessageId(id);
+    return id;
+  }
+
+  function handleSend() {
+    if (!workspaceId || !phone || sendMutation.isPending) return;
+    setSendState("sending");
+    setSendErrorMessage(null);
+    const id = ensureClientMessageId();
+    sendMutation.mutate({
+      data: {
+        workspaceId,
+        orderId: order.id,
+        clientMessageId: id,
+        recipientPhone: order.phone ?? phone,
+        text: message,
+      },
+    });
+  }
+
+  function handleRetry() {
+    if (!clientMessageId) {
+      setClientMessageId(crypto.randomUUID());
+    }
+    handleSend();
+  }
 
   function setTextareaRef(node: HTMLTextAreaElement | null) {
     localMessageRef.current = node;
@@ -94,6 +190,9 @@ export function OrderMessageCard({
       (messageRef as { current: HTMLTextAreaElement | null }).current = node;
     }
   }
+
+  const sendDisabled =
+    !message.trim() || sendMutation.isPending || sendState === "sent" || !canSendInApp;
 
   return (
     <section
@@ -104,11 +203,13 @@ export function OrderMessageCard({
         className,
       )}
     >
-      {/* Header */}
       <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MessageCircle className="size-4 text-[#2563EB]" strokeWidth={1.75} aria-hidden />
-          <h2 id="message-heading" className="text-[15px] font-semibold tracking-tight text-[#0A0C10]">
+          <h2
+            id="message-heading"
+            className="text-[15px] font-semibold tracking-tight text-[#0A0C10]"
+          >
             {t("orders.detail.message")}
           </h2>
         </div>
@@ -122,7 +223,6 @@ export function OrderMessageCard({
         </button>
       </div>
 
-      {/* Template select — full width, pencil instead of chevron */}
       <div className="mb-3 shrink-0">
         <Select
           value={templateId}
@@ -152,14 +252,17 @@ export function OrderMessageCard({
         </Select>
       </div>
 
-      {/* Preview */}
       <div className="relative min-h-0 flex-1">
         <Textarea
           ref={setTextareaRef}
           id="order-message"
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          onChange={(event) => {
+            setMessage(event.target.value);
+            if (sendState === "sent") setSendState("idle");
+          }}
           rows={7}
+          disabled={sendMutation.isPending}
           className={cn(
             "h-full min-h-[160px] w-full resize-none overflow-y-auto rounded-[10px]",
             "border border-[#E6E8EC] bg-white px-3.5 py-3",
@@ -169,9 +272,59 @@ export function OrderMessageCard({
         />
       </div>
 
-      {/* CTA */}
-      <div className="mt-3 shrink-0">
-        {waHref ? (
+      <div className="mt-3 shrink-0 space-y-2">
+        {gatewayMode ? (
+          <>
+            {sendState === "sent" ? (
+              <p className="flex items-center justify-center gap-1.5 text-[13px] font-medium text-emerald-700">
+                <Check className="size-4" strokeWidth={2} aria-hidden />
+                {t("orders.detail.messageSent")}
+              </p>
+            ) : sendState === "error" ? (
+              <div className="space-y-2">
+                <p className="text-center text-[13px] text-[#DC2626]">
+                  {sendErrorMessage ?? t("orders.detail.messageSendFailed")}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full gap-2 rounded-[10px] border-[#E6E8EC] text-[14px] font-medium"
+                  onClick={handleRetry}
+                >
+                  <RotateCcw className="size-4" strokeWidth={1.75} />
+                  {t("orders.detail.messageRetry")}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                disabled={sendDisabled}
+                onClick={handleSend}
+                className="h-11 w-full gap-2 rounded-[10px] bg-[#2563EB] text-[14px] font-medium text-white shadow-none hover:bg-[#1D4ED8] disabled:opacity-50"
+              >
+                <WhatsAppGlyph className="size-4 shrink-0" />
+                {sendMutation.isPending || sendState === "sending"
+                  ? t("orders.detail.sendingMessage")
+                  : t("orders.detail.sendMessage")}
+              </Button>
+            )}
+            {!canSendInApp && phone ? (
+              <p className="text-center text-[12px] text-[#667085]">
+                {t("orders.detail.whatsappConnectRequired")}{" "}
+                <Link
+                  to="/connections/whatsapp"
+                  className="font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                >
+                  {t("nav.connections")}
+                </Link>
+              </p>
+            ) : recipientIsConnectedAccount ? (
+              <p className="text-center text-[12px] text-amber-700">
+                {t("orders.detail.messageSentToSelfHint")}
+              </p>
+            ) : null}
+          </>
+        ) : showWaMeFallback && waHref ? (
           <Button
             asChild
             className="h-11 w-full gap-2 rounded-[10px] bg-[#2563EB] text-[14px] font-medium text-white shadow-none hover:bg-[#1D4ED8]"
@@ -193,11 +346,16 @@ export function OrderMessageCard({
         )}
       </div>
 
-      {/* Footer note */}
       <p className="mt-2.5 flex shrink-0 items-center gap-1.5 text-[12px] leading-snug text-[#667085]">
         <Info className="size-3.5 shrink-0 text-[#98A2B3]" strokeWidth={1.75} aria-hidden />
         <span>
-          {phone ? t("orders.detail.whatsappOnlyOnClick") : t("orders.detail.phoneUnavailable")}
+          {canSendInApp
+            ? t("orders.detail.sendViaElevateHint")
+            : gatewayMode && phone
+              ? t("orders.detail.sendViaElevateHint")
+              : phone
+                ? t("orders.detail.whatsappOnlyOnClick")
+                : t("orders.detail.phoneUnavailable")}
         </span>
       </p>
     </section>

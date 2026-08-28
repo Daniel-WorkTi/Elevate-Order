@@ -12,7 +12,9 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { ThemeBoot } from "../components/theme-boot";
 import { Toaster } from "../components/ui/sonner";
+import { WorkspaceProvider } from "@/components/workspace/workspace-provider";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import {
   getAuthUser,
@@ -149,11 +151,12 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(window.top&&window.top!==window){window.top.location.replace(window.location.href);}}catch(e){}try{var t=localStorage.getItem('elevate-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');}document.documentElement.style.colorScheme=t;}catch(e){}})();`,
+            __html: `(function(){try{if(window.top&&window.top!==window){window.top.location.replace(window.location.href);}}catch(e){}})();`,
           }}
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
+        <ThemeBoot />
         <LocaleProvider>{children}</LocaleProvider>
         <Scripts />
       </body>
@@ -166,9 +169,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster position="top-right" richColors />
+      <WorkspaceProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster position="top-right" richColors />
+      </WorkspaceProvider>
     </QueryClientProvider>
   );
 }

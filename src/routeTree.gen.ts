@@ -33,6 +33,7 @@ import { Route as ConnectionsWhatsappRouteImport } from './routes/connections.wh
 import { Route as OrdersIndexRouteImport } from './routes/orders.index'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as AuthShopifyCallbackRouteImport } from './routes/auth.shopify.callback'
+import { Route as ApiInternalWhatsappInboundRouteImport } from './routes/api/internal/whatsapp/inbound'
 import { Route as ApiPublicWebhooksOrdersRouteImport } from './routes/api/public/webhooks/orders'
 import { Route as ApiPublicWebhooksShopifyRouteImport } from './routes/api/public/webhooks/shopify'
 import { Route as ApiPublicWebhooksOrdersTokenRouteImport } from './routes/api/public/webhooks/orders.$token'
@@ -157,6 +158,12 @@ const AuthShopifyCallbackRoute = AuthShopifyCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => AuthShopifyRoute,
 } as any)
+const ApiInternalWhatsappInboundRoute =
+  ApiInternalWhatsappInboundRouteImport.update({
+    id: '/api/internal/whatsapp/inbound',
+    path: '/api/internal/whatsapp/inbound',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicWebhooksOrdersRoute = ApiPublicWebhooksOrdersRouteImport.update({
   id: '/api/public/webhooks/orders',
   path: '/api/public/webhooks/orders',
@@ -200,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/connections/': typeof ConnectionsIndexRoute
   '/orders/': typeof OrdersIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
+  '/api/internal/whatsapp/inbound': typeof ApiInternalWhatsappInboundRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
   '/api/public/webhooks/orders/$token': typeof ApiPublicWebhooksOrdersTokenRoute
@@ -227,6 +235,7 @@ export interface FileRoutesByTo {
   '/connections': typeof ConnectionsIndexRoute
   '/orders': typeof OrdersIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
+  '/api/internal/whatsapp/inbound': typeof ApiInternalWhatsappInboundRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
   '/api/public/webhooks/orders/$token': typeof ApiPublicWebhooksOrdersTokenRoute
@@ -257,6 +266,7 @@ export interface FileRoutesById {
   '/connections/': typeof ConnectionsIndexRoute
   '/orders/': typeof OrdersIndexRoute
   '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
+  '/api/internal/whatsapp/inbound': typeof ApiInternalWhatsappInboundRoute
   '/api/public/webhooks/orders': typeof ApiPublicWebhooksOrdersRouteWithChildren
   '/api/public/webhooks/shopify': typeof ApiPublicWebhooksShopifyRoute
   '/api/public/webhooks/orders/$token': typeof ApiPublicWebhooksOrdersTokenRoute
@@ -288,6 +298,7 @@ export interface FileRouteTypes {
     | '/connections/'
     | '/orders/'
     | '/auth/shopify/callback'
+    | '/api/internal/whatsapp/inbound'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
     | '/api/public/webhooks/orders/$token'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/orders'
     | '/auth/shopify/callback'
+    | '/api/internal/whatsapp/inbound'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
     | '/api/public/webhooks/orders/$token'
@@ -344,6 +356,7 @@ export interface FileRouteTypes {
     | '/connections/'
     | '/orders/'
     | '/auth/shopify/callback'
+    | '/api/internal/whatsapp/inbound'
     | '/api/public/webhooks/orders'
     | '/api/public/webhooks/shopify'
     | '/api/public/webhooks/orders/$token'
@@ -366,6 +379,7 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthGoogleRoute: typeof AuthGoogleRoute
   AuthShopifyRoute: typeof AuthShopifyRouteWithChildren
+  ApiInternalWhatsappInboundRoute: typeof ApiInternalWhatsappInboundRoute
   ApiPublicWebhooksOrdersRoute: typeof ApiPublicWebhooksOrdersRouteWithChildren
   ApiPublicWebhooksShopifyRoute: typeof ApiPublicWebhooksShopifyRoute
 }
@@ -540,6 +554,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthShopifyCallbackRouteImport
       parentRoute: typeof AuthShopifyRoute
     }
+    '/api/internal/whatsapp/inbound': {
+      id: '/api/internal/whatsapp/inbound'
+      path: '/api/internal/whatsapp/inbound'
+      fullPath: '/api/internal/whatsapp/inbound'
+      preLoaderRoute: typeof ApiInternalWhatsappInboundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/webhooks/orders': {
       id: '/api/public/webhooks/orders'
       path: '/api/public/webhooks/orders'
@@ -640,6 +661,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   AuthGoogleRoute: AuthGoogleRoute,
   AuthShopifyRoute: AuthShopifyRouteWithChildren,
+  ApiInternalWhatsappInboundRoute: ApiInternalWhatsappInboundRoute,
   ApiPublicWebhooksOrdersRoute: ApiPublicWebhooksOrdersRouteWithChildren,
   ApiPublicWebhooksShopifyRoute: ApiPublicWebhooksShopifyRoute,
 }

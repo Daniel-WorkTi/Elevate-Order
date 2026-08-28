@@ -5,8 +5,14 @@ import {
   sanitizeMetaErrorForLog,
   toWhatsAppUserError,
   WhatsAppUserError,
-} from "@/lib/integrations/whatsapp/errors";
-import type { WhatsAppCompleteSignupResponse } from "@/lib/integrations/whatsapp/whatsapp.functions";
+} from "@/lib/whatsapp/errors";
+
+export type WhatsAppCompleteSignupResponse = {
+  ok: true;
+  status: "connected";
+  verifiedName: string | null;
+  displayPhoneNumber: string | null;
+};
 
 const completeSignupInput = z.object({
   workspaceId: z.string().uuid(),
@@ -14,6 +20,7 @@ const completeSignupInput = z.object({
   wabaId: z.string().min(1).max(128).optional(),
   phoneNumberId: z.string().min(1).max(128).optional(),
   metaBusinessId: z.string().min(1).max(128).optional(),
+  redirectUri: z.string().url().optional(),
 });
 
 async function requireUserId(): Promise<string> {
@@ -27,7 +34,7 @@ async function requireUserId(): Promise<string> {
 export async function runCompleteWhatsAppEmbeddedSignup(
   input: z.infer<typeof completeSignupInput>,
   options: {
-    fetchImpl?: import("@/lib/integrations/whatsapp/graph").GraphFetch;
+    fetchImpl?: import("@/lib/whatsapp/providers/meta-cloud/graph").GraphFetch;
     userId?: string;
   } = {},
 ): Promise<WhatsAppCompleteSignupResponse> {
@@ -35,14 +42,14 @@ export async function runCompleteWhatsAppEmbeddedSignup(
   const workspaceId = input.workspaceId;
 
   try {
-    const { getWhatsAppServerConfig } = await import("@/lib/integrations/whatsapp/config");
+    const { getWhatsAppServerConfig } = await import("@/lib/whatsapp/providers/meta-cloud/config");
     const {
       assertWorkspaceCanConnectWhatsApp,
       createPendingWhatsAppConnection,
       finalizeWhatsAppConnection,
-    } = await import("@/lib/integrations/whatsapp/persist-connection.server");
+    } = await import("@/lib/whatsapp/providers/meta-cloud/persist-connection.server");
     const { exchangeEmbeddedSignupCode, resolveAuthorizedWhatsAppResources } =
-      await import("@/lib/integrations/whatsapp/graph");
+      await import("@/lib/whatsapp/providers/meta-cloud/graph");
 
     const config = getWhatsAppServerConfig();
     const userId = options.userId ?? (await requireUserId());
@@ -54,7 +61,12 @@ export async function runCompleteWhatsAppEmbeddedSignup(
     const pending = await createPendingWhatsAppConnection(supabaseAdmin, workspaceId);
     connectionId = pending.connectionId;
 
-    const token = await exchangeEmbeddedSignupCode(config, input.code, options.fetchImpl);
+    const token = await exchangeEmbeddedSignupCode(
+      config,
+      input.code,
+      options.fetchImpl,
+      input.redirectUri,
+    );
 
     const authorization = await resolveAuthorizedWhatsAppResources(
       config,
@@ -82,10 +94,18 @@ export async function runCompleteWhatsAppEmbeddedSignup(
       displayPhoneNumber: authorization.displayPhoneNumber,
     };
   } catch (error) {
+    console.error("[whatsapp] complete embedded signup failed", {
+      workspace_id: workspaceId,
+      has_waba_hint: Boolean(input.wabaId),
+      has_phone_hint: Boolean(input.phoneNumberId),
+      has_redirect_uri: Boolean(input.redirectUri),
+      error: sanitizeMetaErrorForLog(error),
+      message: error instanceof Error ? error.message : String(error),
+    });
     if (connectionId) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { markWhatsAppConnectionError } =
-        await import("@/lib/integrations/whatsapp/persist-connection.server");
+        await import("@/lib/whatsapp/providers/meta-cloud/persist-connection.server");
       await markWhatsAppConnectionError(
         supabaseAdmin,
         connectionId,

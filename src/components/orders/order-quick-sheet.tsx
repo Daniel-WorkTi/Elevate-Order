@@ -1,4 +1,5 @@
-import { ExternalLink, MessageCircle, Package, MapPin, User } from "lucide-react";
+import { ExternalLink, MessageCircle, Package, MapPin, User, RotateCcw, Check } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 import { CarrierIdentity } from "@/components/carriers/carrier-identity";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
@@ -9,7 +10,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useT } from "@/lib/i18n/locale-context";
+import { useOrderWhatsAppSend } from "@/hooks/use-order-whatsapp-send";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import { useMessageLanguage, useT } from "@/lib/i18n/locale-context";
 import {
   formatOrderId,
   formatOrderTotal,
@@ -18,6 +21,7 @@ import {
 } from "@/lib/order-domain";
 import {
   buildWhatsAppLink,
+  defaultTemplateLabelFn,
   normalizeWhatsAppPhone,
   pickDefaultTemplate,
   resolveOrderMessage,
@@ -43,6 +47,8 @@ export function OrderQuickSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
+  const messageLanguage = useMessageLanguage();
+  const { workspaceId } = useWorkspaceId();
   if (!order) return null;
 
   const total = formatOrderTotal(order);
@@ -52,12 +58,24 @@ export function OrderQuickSheet({
   const product = order.product_summary?.trim() || null;
   const incident = order.details?.trim() || order.status_name?.trim() || null;
   const phone = normalizeWhatsAppPhone(order.phone);
+  const labelForKind = defaultTemplateLabelFn(t);
   const templateId = pickDefaultTemplate(order);
   const template =
-    templatesForOrder(order).find((item) => item.id === templateId) ??
-    templatesForOrder(order)[0];
-  const message = template ? resolveOrderMessage(template.body, order) : "";
+    templatesForOrder(order, messageLanguage, labelForKind).find((item) => item.id === templateId) ??
+    templatesForOrder(order, messageLanguage, labelForKind)[0];
+  const message = template ? resolveOrderMessage(template.body, order, messageLanguage, t) : "";
   const waHref = phone ? buildWhatsAppLink(phone, message) : null;
+  const {
+    gatewayMode,
+    canSendInApp,
+    showWaMeFallback,
+    sendState,
+    sendErrorMessage,
+    sendMutation,
+    sendDisabled,
+    handleSend,
+    handleRetry,
+  } = useOrderWhatsAppSend({ order, message, phone, workspaceId });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -140,7 +158,54 @@ export function OrderQuickSheet({
         </div>
 
         <div className="sticky bottom-0 border-t border-[#E6E8EC] bg-white px-5 py-4">
-          {waHref ? (
+          {gatewayMode ? (
+            <div className="space-y-2">
+              {sendState === "sent" ? (
+                <p className="flex items-center justify-center gap-1.5 text-[13px] font-medium text-emerald-700">
+                  <Check className="size-4" strokeWidth={2} aria-hidden />
+                  {t("orders.detail.messageSent")}
+                </p>
+              ) : sendState === "error" ? (
+                <>
+                  <p className="text-center text-[13px] text-[#DC2626]">
+                    {sendErrorMessage ?? t("orders.detail.messageSendFailed")}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full gap-2 rounded-[10px] border-[#E6E8EC]"
+                    onClick={handleRetry}
+                  >
+                    <RotateCcw className="size-4" strokeWidth={1.75} />
+                    {t("orders.detail.messageRetry")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={sendDisabled}
+                  onClick={handleSend}
+                  className="h-11 w-full gap-2 rounded-[10px] bg-whatsapp text-[14px] text-white shadow-none hover:bg-whatsapp/90 disabled:opacity-50"
+                >
+                  <MessageCircle className="size-4" strokeWidth={1.75} />
+                  {sendMutation.isPending || sendState === "sending"
+                    ? t("orders.detail.sendingMessage")
+                    : t("orders.detail.sendMessage")}
+                </Button>
+              )}
+              {!canSendInApp && phone ? (
+                <p className="text-center text-[12px] text-[#667085]">
+                  {t("orders.detail.whatsappConnectRequired")}{" "}
+                  <Link
+                    to="/connections/whatsapp"
+                    className="font-medium text-[#2563EB] hover:text-[#1D4ED8]"
+                  >
+                    {t("nav.connections")}
+                  </Link>
+                </p>
+              ) : null}
+            </div>
+          ) : showWaMeFallback && waHref ? (
             <Button
               asChild
               className="h-11 w-full rounded-[10px] bg-whatsapp text-[14px] text-white shadow-none hover:bg-whatsapp/90"

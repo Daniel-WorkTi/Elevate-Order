@@ -3,6 +3,7 @@ import {
   formatOrderTotal,
   getOrderStatus,
   getOrderSupply,
+  ORDER_STATUS_I18N_KEY,
   type OperationalOrder,
   type Supply,
 } from "@/lib/order-domain";
@@ -14,29 +15,28 @@ import {
   renderOrderTemplate,
   type TemplateKind,
 } from "@/lib/templates";
+import { TEMPLATE_KIND_I18N } from "@/lib/templates/template-kind-i18n";
 
 export type MessageTemplateId = TemplateKind;
 
-/** @deprecated Prefer MessageTemplateRecord from @/lib/templates — kept for Select labels. */
 export type MessageTemplate = {
   id: MessageTemplateId;
   label: string;
   body: string;
 };
 
-const KIND_LABEL: Record<TemplateKind, string> = {
-  confirmation: "Order confirmation",
-  follow_up: "No response follow-up",
-  address_problem: "Address problem",
-  delivery_attempt: "Delivery attempt",
-  tracking_update: "Tracking update",
-  incident: "Incident",
-  cancelled: "Cancelled order",
-};
+export type TemplateLabelFn = (kind: TemplateKind) => string;
+
+export function defaultTemplateLabelFn(
+  t: (key: string) => string,
+): TemplateLabelFn {
+  return (kind) => t(TEMPLATE_KIND_I18N[kind].name);
+}
 
 export function templatesForOrder(
   _order: OperationalOrder,
   language: LanguageCode = DEFAULT_TEMPLATE_LANGUAGE,
+  labelForKind?: TemplateLabelFn,
 ): MessageTemplate[] {
   const kinds: TemplateKind[] = [
     "confirmation",
@@ -47,32 +47,16 @@ export function templatesForOrder(
     "incident",
     "cancelled",
   ];
+  const label = labelForKind ?? ((kind) => kind);
   return kinds.map((kind) => {
     const record = getTemplate(kind, language);
     return {
       id: kind,
-      label: KIND_LABEL[kind],
+      label: label(kind),
       body: record?.content ?? "",
     };
   });
 }
-
-/** Fallback list for SSR / first paint before localStorage merges. */
-export const ORDER_MESSAGE_TEMPLATES: readonly MessageTemplate[] = (
-  [
-    "confirmation",
-    "follow_up",
-    "address_problem",
-    "delivery_attempt",
-    "tracking_update",
-    "incident",
-    "cancelled",
-  ] as const
-).map((id) => ({
-  id,
-  label: KIND_LABEL[id],
-  body: getTemplate(id)?.content ?? "",
-}));
 
 export function pickDefaultTemplate(order: OperationalOrder): MessageTemplateId {
   const status = getOrderStatus(order);
@@ -87,15 +71,22 @@ export function pickDefaultTemplate(order: OperationalOrder): MessageTemplateId 
   return "confirmation";
 }
 
-export function orderToTemplateContext(order: OperationalOrder) {
+export function orderToTemplateContext(
+  order: OperationalOrder,
+  t?: (key: string) => string,
+) {
   const supply: Supply = getOrderSupply(order) ?? "dropi";
   const status = getOrderStatus(order);
+  const statusName =
+    order.status_name?.trim() ||
+    (t ? t(ORDER_STATUS_I18N_KEY[status.key]) : status.label);
+
   return {
     supply,
     customerName: order.customer_name,
     orderId: formatOrderId(order),
     shopifyOrderId: order.shopify_order_id,
-    statusName: order.status_name?.trim() || status.label,
+    statusName,
     details: order.details,
     trackingCode: order.tracking_code,
     trackingUrl: order.tracking_url,
@@ -105,10 +96,16 @@ export function orderToTemplateContext(order: OperationalOrder) {
   };
 }
 
-export function resolveOrderMessage(templateBody: string, order: OperationalOrder): string {
+export function resolveOrderMessage(
+  templateBody: string,
+  order: OperationalOrder,
+  language: LanguageCode = DEFAULT_TEMPLATE_LANGUAGE,
+  t?: (key: string) => string,
+): string {
   const { text } = renderOrderTemplate({
     template: templateBody,
-    context: orderToTemplateContext(order),
+    context: orderToTemplateContext(order, t),
+    language,
   });
   return text;
 }
@@ -130,26 +127,62 @@ export type MessageFieldChip = {
   value: string;
 };
 
-export function availableMessageChips(order: OperationalOrder): MessageFieldChip[] {
+const CHIP_LABEL_KEY: Record<string, string> = {
+  order_id: "orders.detail.orderId",
+  status: "common.status",
+  reason: "orders.detail.reason",
+  tracking: "orders.detail.tracking",
+  carrier: "orders.detail.carrier",
+  total: "orders.detail.total",
+};
+
+export function availableMessageChips(
+  order: OperationalOrder,
+  t?: (key: string) => string,
+): MessageFieldChip[] {
+  const status = getOrderStatus(order);
+  const statusLabel =
+    order.status_name?.trim() || (t ? t(ORDER_STATUS_I18N_KEY[status.key]) : status.label);
+
   const chips: MessageFieldChip[] = [
-    { id: "order_id", label: "Order ID", value: formatOrderId(order) },
-    { id: "status", label: "Status", value: getOrderStatus(order).label },
+    {
+      id: "order_id",
+      label: t?.(CHIP_LABEL_KEY["order_id"]!) ?? "order_id",
+      value: formatOrderId(order),
+    },
+    {
+      id: "status",
+      label: t?.(CHIP_LABEL_KEY["status"]!) ?? "status",
+      value: statusLabel,
+    },
   ];
   if (order.details?.trim()) {
-    chips.push({ id: "reason", label: "Reason", value: order.details.trim() });
+    chips.push({
+      id: "reason",
+      label: t?.(CHIP_LABEL_KEY["reason"]!) ?? "reason",
+      value: order.details.trim(),
+    });
   }
   if (order.tracking_code?.trim()) {
-    chips.push({ id: "tracking", label: "Tracking", value: order.tracking_code.trim() });
+    chips.push({
+      id: "tracking",
+      label: t?.(CHIP_LABEL_KEY["tracking"]!) ?? "tracking",
+      value: order.tracking_code.trim(),
+    });
   }
   if (order.shipping_company?.trim()) {
     chips.push({
       id: "carrier",
-      label: "Carrier",
+      label: t?.(CHIP_LABEL_KEY["carrier"]!) ?? "carrier",
       value: displayCarrierName(order.shipping_company),
     });
   }
   if (order.total != null) {
-    chips.push({ id: "total", label: "Total", value: formatOrderTotal(order) ?? String(order.total) });
+    chips.push({
+      id: "total",
+      label: t?.(CHIP_LABEL_KEY["total"]!) ?? "total",
+      value: formatOrderTotal(order) ?? String(order.total),
+    });
   }
   return chips;
 }

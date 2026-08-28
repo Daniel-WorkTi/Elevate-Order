@@ -4,7 +4,7 @@ import { ChevronDown, Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react
 import { useState } from "react";
 import { toast } from "sonner";
 
-import shopifyMark from "@/assets/shopify-mark.png";
+import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -80,15 +80,8 @@ function SidebarChip({
       )}
       aria-label={t("shell.workspaceAria", { name: workspace.name, id: workspace.id })}
     >
-      <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-[8px] bg-white/[0.06]">
-        <img
-          src={shopifyMark}
-          alt=""
-          width={28}
-          height={28}
-          className="size-7 object-contain"
-          decoding="async"
-        />
+      <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-[8px] bg-white">
+        <ShopifyLogo size={28} />
       </span>
       {!collapsed ? (
         <span className="min-w-0 flex-1">
@@ -242,14 +235,7 @@ function HeaderShopifyChip({
           }
         >
           <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[8px] bg-white">
-            <img
-              src={shopifyMark}
-              alt=""
-              width={24}
-              height={24}
-              className="size-6 object-contain"
-              decoding="async"
-            />
+            <ShopifyLogo size={24} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-medium text-[#0A0C10]">

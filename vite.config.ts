@@ -5,12 +5,15 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
 export default defineConfig({
   vite: {
+    plugins: [basicSsl()],
     server: {
       port: 8081,
       strictPort: true,
+      https: true,
     },
   },
   tanstackStart: {

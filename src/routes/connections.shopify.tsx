@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { StoreConnectPanel } from "@/components/connections/store/store-connect-panel";
-import shopifyMark from "@/assets/shopify-mark.png";
+import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { getShopifyDashboard, syncShopifyOrders } from "@/lib/integrations/shopify/shopify.functions";
@@ -139,7 +139,7 @@ function StoreConnectionPage() {
               <ArrowLeft className="size-4" strokeWidth={1.75} />
             </Link>
             <span className="grid size-9 place-items-center overflow-hidden rounded-[10px] border border-[#E6E8EC] bg-white">
-              <img src={shopifyMark} alt="" width={20} height={20} className="size-5 object-contain" />
+              <ShopifyLogo size={28} />
             </span>
             <h1 className="text-[18px] font-semibold tracking-tight text-[#0A0C10]">Shopify</h1>
           </div>

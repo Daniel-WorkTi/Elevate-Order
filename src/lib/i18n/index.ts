@@ -38,8 +38,10 @@ export function translate(
   params?: Record<string, string | number | null | undefined>,
 ): string {
   const dict = dictionaries[locale] ?? dictionaries[DEFAULT_LOCALE];
-  const fallback = dictionaries.en;
-  const template = dict[key] ?? fallback[key] ?? key;
+  const template =
+    locale === "pt"
+      ? (dict[key] ?? key)
+      : (dict[key] ?? dictionaries[DEFAULT_LOCALE][key] ?? key);
   return interpolate(template, params);
 }
 

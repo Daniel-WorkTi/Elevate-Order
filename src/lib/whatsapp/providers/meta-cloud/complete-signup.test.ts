@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { describe, it } from "node:test";
 
 import { encryptWhatsAppToken } from "@/lib/integrations/whatsapp/token-crypto.server";
-import type { WhatsAppCompleteSignupResponse } from "@/lib/integrations/whatsapp/whatsapp.functions";
+import type { WhatsAppCompleteSignupResponse } from "@/lib/whatsapp/providers/meta-cloud/complete-signup.server";
 
 describe("WhatsApp complete signup public response", () => {
   it("never includes token or internal ids", () => {

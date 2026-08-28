@@ -1,4 +1,5 @@
 import { displayCarrierName } from "@/lib/carriers";
+import type { LanguageCode } from "@/lib/i18n/languages";
 import { formatOrderTotal, getOrderCurrency, safeTrackingHref } from "@/lib/order-domain";
 import {
   extractPlaceholders,
@@ -6,14 +7,37 @@ import {
 } from "@/lib/templates/template-variables";
 import type { RenderTemplateResult, TemplateRenderContext } from "@/lib/templates/types";
 
-function buildTrackingSection(ctx: TemplateRenderContext): string {
+type RenderLocale = "pt" | "en";
+
+const RENDER_LABELS: Record<
+  RenderLocale,
+  { trackingCode: string; trackingUrl: string; unavailable: string }
+> = {
+  pt: {
+    trackingCode: "Código de rastreio:",
+    trackingUrl: "Rastreio:",
+    unavailable: "variável indisponível",
+  },
+  en: {
+    trackingCode: "Tracking code:",
+    trackingUrl: "Tracking:",
+    unavailable: "unavailable variable",
+  },
+};
+
+function renderLocale(language?: LanguageCode): RenderLocale {
+  return language === "en" ? "en" : "pt";
+}
+
+function buildTrackingSection(ctx: TemplateRenderContext, language?: LanguageCode): string {
+  const labels = RENDER_LABELS[renderLocale(language)];
   const code = ctx.trackingCode?.trim() || "";
   const url = safeTrackingHref(ctx.trackingUrl);
   if (!code && !url) return "";
 
   const lines: string[] = [];
-  if (code) lines.push(`Código de rastreio: ${code}`);
-  if (url) lines.push(`Rastreio: ${url}`);
+  if (code) lines.push(`${labels.trackingCode} ${code}`);
+  if (url) lines.push(`${labels.trackingUrl} ${url}`);
   return lines.join("\n");
 }
 
@@ -27,7 +51,11 @@ function formatTotal(ctx: TemplateRenderContext): string {
   );
 }
 
-function valueForKey(key: string, ctx: TemplateRenderContext): string | null {
+function valueForKey(
+  key: string,
+  ctx: TemplateRenderContext,
+  language?: LanguageCode,
+): string | null {
   switch (key) {
     case "customer_name":
       return ctx.customerName?.trim() || "";
@@ -56,7 +84,7 @@ function valueForKey(key: string, ctx: TemplateRenderContext): string | null {
           ? getOrderCurrency({ currency: ctx.currency ?? null })
           : "";
     case "tracking_section":
-      return buildTrackingSection(ctx);
+      return buildTrackingSection(ctx, language);
     default:
       return null;
   }
@@ -64,29 +92,29 @@ function valueForKey(key: string, ctx: TemplateRenderContext): string | null {
 
 /**
  * Central template resolver. Never invents tracking URLs. Omits empty optional sections cleanly.
- * Unsupported variables are reported and left as a safe warning marker in output.
  */
 export function renderOrderTemplate(input: {
   template: string;
   context: TemplateRenderContext;
+  language?: LanguageCode;
 }): RenderTemplateResult {
-  const { template, context } = input;
+  const { template, context, language } = input;
+  const labels = RENDER_LABELS[renderLocale(language)];
   const unsupported: string[] = [];
 
   let text = template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, key: string) => {
     if (!isVariableSupported(key)) {
       if (!unsupported.includes(key)) unsupported.push(key);
-      return `[variável indisponível: ${key}]`;
+      return `[${labels.unavailable}: ${key}]`;
     }
-    const value = valueForKey(key, context);
+    const value = valueForKey(key, context, language);
     if (value === null) {
       if (!unsupported.includes(key)) unsupported.push(key);
-      return `[variável indisponível: ${key}]`;
+      return `[${labels.unavailable}: ${key}]`;
     }
     return value;
   });
 
-  // Collapse blank lines left by omitted optional sections (e.g. tracking_section).
   text = text
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, MessageSquare, Truck } from "lucide-react";
 
-import shopifyMark from "@/assets/shopify-mark.png";
+import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { Button } from "@/components/ui/button";
 import { formatOrderStamp } from "@/lib/i18n/date-locale";
@@ -30,14 +30,7 @@ function ShopifyRoundIcon({ muted = false }: { muted?: boolean }) {
       )}
       aria-hidden
     >
-      <img
-        src={shopifyMark}
-        alt=""
-        width={12}
-        height={12}
-        className={cn("size-3 object-contain", muted && "opacity-50 grayscale")}
-        decoding="async"
-      />
+      <ShopifyLogo size={12} className={cn(muted && "opacity-50 grayscale")} />
     </span>
   );
 }

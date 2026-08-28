@@ -2,25 +2,16 @@ import { Moon, Sun } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-
-type Theme = "light" | "dark";
-
-const STORAGE_KEY = "elevate-theme";
-
-function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
-}
+import { useT } from "@/lib/i18n/locale-context";
+import { applyTheme, readInitialTheme, THEME_STORAGE_KEY, type Theme } from "@/lib/theme/apply-theme";
 
 export function ThemeToggle() {
+  const t = useT();
   const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const initial: Theme =
-      stored ??
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const initial = readInitialTheme();
     setTheme(initial);
     applyTheme(initial);
     setMounted(true);
@@ -29,7 +20,7 @@ export function ThemeToggle() {
   const toggle = useCallback(() => {
     setTheme((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
-      localStorage.setItem(STORAGE_KEY, next);
+      localStorage.setItem(THEME_STORAGE_KEY, next);
       applyTheme(next);
       return next;
     });
@@ -41,8 +32,8 @@ export function ThemeToggle() {
       size="icon"
       onClick={toggle}
       className="rounded-xl"
-      aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
-      title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+      aria-label={theme === "dark" ? t("theme.lightMode") : t("theme.darkMode")}
+      title={theme === "dark" ? t("theme.lightMode") : t("theme.darkMode")}
     >
       {mounted && theme === "dark" ? (
         <Sun className="size-5" />

@@ -1,20 +1,17 @@
 import { MousePointer2, RotateCcw } from "lucide-react";
 import { useRef } from "react";
 
-import { TemplateLanguageSwitcher } from "@/components/templates/template-language-switcher";
 import { TemplateVariableChip } from "@/components/templates/template-variable-chip";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { LanguageCode } from "@/lib/i18n/languages";
 import { useI18n } from "@/lib/i18n/locale-context";
 import type { MessageTemplateRecord, TemplateVariableDef } from "@/lib/templates";
+import { TEMPLATE_KIND_I18N } from "@/lib/templates/template-kind-i18n";
 
 export function TemplateEditor({
   template,
   draft,
-  language,
-  onLanguageChange,
   variables,
   errors,
   onDraftChange,
@@ -23,8 +20,6 @@ export function TemplateEditor({
 }: {
   template: MessageTemplateRecord;
   draft: string;
-  language: LanguageCode;
-  onLanguageChange: (code: LanguageCode) => void;
   variables: TemplateVariableDef[];
   errors: string[];
   dirty: boolean;
@@ -38,6 +33,7 @@ export function TemplateEditor({
   const { t, locale } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const numberLocale = locale === "pt" ? "pt-PT" : "en-US";
+  const kindKeys = TEMPLATE_KIND_I18N[template.kind];
 
   function insertToken(token: string) {
     const el = textareaRef.current;
@@ -61,9 +57,9 @@ export function TemplateEditor({
     >
       <div className="shrink-0 px-5 pt-5 pb-4">
         <h2 id="template-editor-heading" className="text-[18px] font-semibold tracking-tight">
-          {template.name}
+          {t(kindKeys.name)}
         </h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">{template.purpose}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{t(kindKeys.purpose)}</p>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-5">
@@ -72,18 +68,15 @@ export function TemplateEditor({
             <Label htmlFor="template-message" className="text-[12px] font-medium text-muted-foreground">
               {t("templates.message")}
             </Label>
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-              <TemplateLanguageSwitcher value={language} onChange={onLanguageChange} />
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 rounded-[8px] px-2 text-[12px] text-muted-foreground shadow-none hover:text-foreground"
-                onClick={onReset}
-              >
-                <RotateCcw className="size-3.5" strokeWidth={1.5} />
-                {t("templates.reset")}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-8 rounded-[8px] px-2 text-[12px] text-muted-foreground shadow-none hover:text-foreground"
+              onClick={onReset}
+            >
+              <RotateCcw className="size-3.5" strokeWidth={1.5} />
+              {t("templates.reset")}
+            </Button>
           </div>
 
           <p className="text-[11px] leading-snug text-[#667085]">{t("templates.languageHint")}</p>

@@ -64,7 +64,38 @@ describe("Graph client", () => {
     assert.deepEqual(debug.phoneNumberIds, ["1234567890"]);
   });
 
-  it("resolveAuthorizedWhatsAppResources prefers Graph over session hints", async () => {
+  it("retries token exchange with redirect_uri when the first attempt fails", async () => {
+    let attempts = 0;
+    const fetchImpl: GraphFetch = async (input) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      attempts += 1;
+      if (!url.includes("redirect_uri=")) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              message:
+                "Error validating verification code. Please make sure your redirect_uri is identical.",
+            },
+          }),
+          { status: 400 },
+        );
+      }
+      return new Response(JSON.stringify({ access_token: "bis-token", token_type: "bearer" }), {
+        status: 200,
+      });
+    };
+
+    const token = await exchangeEmbeddedSignupCode(
+      config,
+      "auth-code",
+      fetchImpl,
+      "https://localhost:8081/connections/whatsapp",
+    );
+    assert.equal(token.accessToken, "bis-token");
+    assert.equal(attempts, 2);
+  });
+
+  it("resolveAuthorizedWhatsAppResources prefers session hints when debug_token has no ids", async () => {
     const fetchImpl = mockFetch({
       "/debug_token": {
         data: {
@@ -93,5 +124,33 @@ describe("Graph client", () => {
     assert.equal(resolved.wabaId, "waba-graph");
     assert.equal(resolved.phoneNumberId, "9876543210");
     assert.equal(resolved.verifiedName, "Elevate Test");
+  });
+
+  it("resolveAuthorizedWhatsAppResources uses session hints when debug_token is empty", async () => {
+    const fetchImpl = mockFetch({
+      "/debug_token": {
+        data: {
+          is_valid: true,
+          granular_scopes: [],
+        },
+      },
+      "/1111111111": {
+        id: "1111111111",
+        display_phone_number: "+351900000000",
+        verified_name: "Session Hint",
+      },
+    });
+
+    const resolved = await resolveAuthorizedWhatsAppResources(
+      config,
+      "bis-token",
+      null,
+      { wabaId: "waba-browser", phoneNumberId: "1111111111" },
+      fetchImpl,
+    );
+
+    assert.equal(resolved.wabaId, "waba-browser");
+    assert.equal(resolved.phoneNumberId, "1111111111");
+    assert.equal(resolved.verifiedName, "Session Hint");
   });
 });

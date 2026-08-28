@@ -20,18 +20,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
-import type { LanguageCode } from "@/lib/i18n/languages";
-import { useT } from "@/lib/i18n/locale-context";
+import { useMessageLanguage, useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
-import {
-  DEFAULT_TEMPLATE_LANGUAGE,
-  resolveTemplateLanguage,
-} from "@/lib/templates/default-templates";
-import {
-  listMessageTemplates,
-  resetMessageTemplate,
-  saveMessageTemplate,
-} from "@/lib/templates.functions";
 import {
   createPreviewContext,
   defaultContentFor,
@@ -40,26 +30,12 @@ import {
   validateTemplateContent,
   type MessageTemplateRecord,
 } from "@/lib/templates";
+import {
+  listMessageTemplates,
+  resetMessageTemplate,
+  saveMessageTemplate,
+} from "@/lib/templates.functions";
 import { cn } from "@/lib/utils";
-
-const TEMPLATE_LANGUAGE_KEY = "elevate-template-language";
-
-function readTemplateLanguage(): LanguageCode {
-  if (typeof window === "undefined") return DEFAULT_TEMPLATE_LANGUAGE;
-  try {
-    return resolveTemplateLanguage(window.localStorage.getItem(TEMPLATE_LANGUAGE_KEY));
-  } catch {
-    return DEFAULT_TEMPLATE_LANGUAGE;
-  }
-}
-
-function writeTemplateLanguage(code: LanguageCode) {
-  try {
-    window.localStorage.setItem(TEMPLATE_LANGUAGE_KEY, code);
-  } catch {
-    // ignore
-  }
-}
 
 export const Route = createFileRoute("/templates")({
   head: () => ({
@@ -94,9 +70,8 @@ function translateValidationErrors(
 
 function TemplatesPage() {
   const t = useT();
+  const language = useMessageLanguage();
   const { workspaceId } = useWorkspaceId();
-  const [language, setLanguage] = useState<LanguageCode>(readTemplateLanguage);
-  const [pendingLanguage, setPendingLanguage] = useState<LanguageCode | null>(null);
 
   const query = useQuery({
     queryKey: ["message-templates", language, workspaceId],
@@ -144,7 +119,7 @@ function TemplatesPage() {
   const editorErrors = translateValidationErrors(t, validation.errors);
 
   const previewContext = createPreviewContext({ withTracking });
-  const rendered = renderOrderTemplate({ template: draft, context: previewContext });
+  const rendered = renderOrderTemplate({ template: draft, context: previewContext, language });
   const unsupportedKeys = [
     ...validation.unsupported,
     ...rendered.unsupported.filter((key) => !validation.unsupported.includes(key)),
@@ -156,20 +131,6 @@ function TemplatesPage() {
   const loadError = query.data?.error ?? (query.isError ? t("templates.loadError") : null);
   const showSkeleton = query.isPending && templates.length === 0;
   const hasTemplates = templates.length > 0;
-
-  function applyLanguage(code: LanguageCode) {
-    writeTemplateLanguage(code);
-    setLanguage(code);
-  }
-
-  function requestLanguageChange(code: LanguageCode) {
-    if (code === language) return;
-    if (dirty) {
-      setPendingLanguage(code);
-      return;
-    }
-    applyLanguage(code);
-  }
 
   function selectTemplate(id: string) {
     if (dirty && id !== selectedId) {
@@ -193,11 +154,6 @@ function TemplatesPage() {
       setDraft(next.content);
       setMobilePane("edit");
       return;
-    }
-    if (pendingLanguage) {
-      const code = pendingLanguage;
-      setPendingLanguage(null);
-      applyLanguage(code);
     }
   }
 
@@ -260,7 +216,7 @@ function TemplatesPage() {
     { id: "preview" as const, label: t("templates.tab.preview") },
   ];
 
-  const discardOpen = Boolean(pendingTemplateId || pendingLanguage);
+  const discardOpen = Boolean(pendingTemplateId);
 
   return (
     <AppShell title={t("templates.title")} subtitle={t("templates.subtitle")}>
@@ -375,8 +331,6 @@ function TemplatesPage() {
                 <TemplateEditor
                   template={selected}
                   draft={draft}
-                  language={language}
-                  onLanguageChange={requestLanguageChange}
                   variables={variables}
                   errors={editorErrors}
                   dirty={dirty}
@@ -418,7 +372,6 @@ function TemplatesPage() {
         onOpenChange={(open) => {
           if (!open) {
             setPendingTemplateId(null);
-            setPendingLanguage(null);
           }
         }}
       >

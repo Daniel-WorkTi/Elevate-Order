@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Copy, MessageCircle } from "lucide-react";
+import { Check, Copy, MessageCircle, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
 
 import { ContactHistory } from "@/components/orders/detail/contact-history";
-import { TemplateLanguageSwitcher } from "@/components/templates/template-language-switcher";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,17 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useOrderWhatsAppSend } from "@/hooks/use-order-whatsapp-send";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
-import {
-  DEFAULT_TEMPLATE_LANGUAGE,
-  resolveTemplateLanguage,
-} from "@/lib/templates/default-templates";
-import { useT } from "@/lib/i18n/locale-context";
-import { languageFromCountry, type LanguageCode } from "@/lib/i18n/languages";
+import { useMessageLanguage, useT } from "@/lib/i18n/locale-context";
 import type { OperationalOrder } from "@/lib/order-domain";
 import {
   availableMessageChips,
   buildWhatsAppLink,
+  defaultTemplateLabelFn,
   normalizeWhatsAppPhone,
   pickDefaultTemplate,
   resolveOrderMessage,
@@ -34,19 +31,7 @@ import {
 } from "@/lib/order-message";
 import type { OrderEventRow } from "@/lib/synced-orders.functions";
 import { listMessageTemplates } from "@/lib/templates.functions";
-
-const CHIP_LABEL_KEY: Record<string, string> = {
-  order_id: "orders.detail.orderId",
-  status: "common.status",
-  reason: "orders.detail.reason",
-  tracking: "orders.detail.tracking",
-  carrier: "orders.detail.carrier",
-  total: "orders.detail.total",
-};
-
-function languageForOrder(order: OperationalOrder): LanguageCode {
-  return resolveTemplateLanguage(languageFromCountry(order.country)?.code ?? DEFAULT_TEMPLATE_LANGUAGE);
-}
+import type { TemplateKind } from "@/lib/templates";
 
 export function MessageComposer({
   order,
@@ -56,18 +41,20 @@ export function MessageComposer({
   events?: OrderEventRow[];
 }) {
   const t = useT();
+  const messageLanguage = useMessageLanguage();
   const { workspaceId } = useWorkspaceId();
   const defaultId = pickDefaultTemplate(order);
   const [templateId, setTemplateId] = useState<MessageTemplateId>(defaultId);
   const [message, setMessage] = useState("");
-  const [language, setLanguage] = useState<LanguageCode>(() => languageForOrder(order));
+
+  const labelForKind = useMemo(() => defaultTemplateLabelFn(t), [t]);
 
   const templatesQuery = useQuery({
-    queryKey: ["message-templates", language, workspaceId],
+    queryKey: ["message-templates", messageLanguage, workspaceId],
     enabled: Boolean(workspaceId),
     queryFn: () =>
       listMessageTemplates({
-        data: { language, ...(workspaceId ? { workspaceId } : {}) },
+        data: { language: messageLanguage, ...(workspaceId ? { workspaceId } : {}) },
       }),
   });
 
@@ -75,27 +62,37 @@ export function MessageComposer({
     if (templatesQuery.data?.templates?.length) {
       return templatesQuery.data.templates.map((item) => ({
         id: item.kind as MessageTemplateId,
-        label: item.name,
+        label: labelForKind(item.kind as TemplateKind),
         body: item.content,
       }));
     }
-    return templatesForOrder(order, language);
-  }, [templatesQuery.data, order, language]);
+    return templatesForOrder(order, messageLanguage, labelForKind);
+  }, [templatesQuery.data, order, messageLanguage, labelForKind]);
 
   const template = templates.find((item) => item.id === templateId) ?? templates[0]!;
 
   useEffect(() => {
     setTemplateId(pickDefaultTemplate(order));
-    setLanguage(languageForOrder(order));
   }, [order.order_id]);
 
   useEffect(() => {
-    setMessage(resolveOrderMessage(template.body, order));
-  }, [order, template.body]);
+    setMessage(resolveOrderMessage(template.body, order, messageLanguage, t));
+  }, [order, template.body, messageLanguage, t]);
 
   const phone = normalizeWhatsAppPhone(order.phone);
   const waHref = phone ? buildWhatsAppLink(phone, message) : null;
-  const chips = availableMessageChips(order);
+  const {
+    gatewayMode,
+    canSendInApp,
+    showWaMeFallback,
+    sendState,
+    sendErrorMessage,
+    sendMutation,
+    sendDisabled,
+    handleSend,
+    handleRetry,
+  } = useOrderWhatsAppSend({ order, message, phone, workspaceId });
+  const chips = availableMessageChips(order, t);
   const preview = message.trim();
 
   async function copyMessage() {
@@ -124,7 +121,6 @@ export function MessageComposer({
           <Label htmlFor="order-template" className="text-[12px] text-muted-foreground">
             {t("orders.detail.template")}
           </Label>
-          <TemplateLanguageSwitcher value={language} onChange={setLanguage} />
         </div>
         <Select
           value={templateId}
@@ -151,7 +147,7 @@ export function MessageComposer({
               title={chip.value}
               className="inline-flex rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
             >
-              {CHIP_LABEL_KEY[chip.id] ? t(CHIP_LABEL_KEY[chip.id]!) : chip.label}
+              {chip.label}
             </span>
           ))}
         </div>
@@ -178,7 +174,36 @@ export function MessageComposer({
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
-        {waHref ? (
+        {gatewayMode ? (
+          sendState === "sent" ? (
+            <p className="flex items-center justify-center gap-1.5 text-[13px] font-medium text-emerald-700 sm:col-span-2">
+              <Check className="size-4" strokeWidth={2} aria-hidden />
+              {t("orders.detail.messageSent")}
+            </p>
+          ) : sendState === "error" ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-[10px] sm:col-span-2"
+              onClick={handleRetry}
+            >
+              <RotateCcw className="size-4" strokeWidth={1.5} />
+              {t("orders.detail.messageRetry")}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={sendDisabled}
+              onClick={handleSend}
+              className="h-10 rounded-[10px] bg-whatsapp text-white shadow-none hover:bg-whatsapp/90 disabled:opacity-50"
+            >
+              <MessageCircle className="size-4" strokeWidth={1.5} />
+              {sendMutation.isPending || sendState === "sending"
+                ? t("orders.detail.sendingMessage")
+                : t("orders.detail.sendMessage")}
+            </Button>
+          )
+        ) : showWaMeFallback && waHref ? (
           <Button
             asChild
             className="h-10 rounded-[10px] bg-whatsapp text-white shadow-none hover:bg-whatsapp/90"
@@ -208,6 +233,15 @@ export function MessageComposer({
           {t("orders.detail.copyMessage")}
         </Button>
       </div>
+
+      {gatewayMode && !canSendInApp && phone ? (
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {t("orders.detail.whatsappConnectRequired")}{" "}
+          <Link to="/connections/whatsapp" className="font-medium text-[#2563EB] hover:text-[#1D4ED8]">
+            {t("nav.connections")}
+          </Link>
+        </p>
+      ) : null}
 
       {!phone ? (
         <p className="mt-2 text-[12px] text-muted-foreground">

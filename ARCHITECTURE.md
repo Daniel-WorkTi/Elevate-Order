@@ -45,12 +45,7 @@ Produto = **máquina de recuperação de entrega**, não dashboard financeiro ge
 
 ### Depois do núcleo (fase 2+)
 
-- WhatsApp Business API (envio em massa sem abrir `wa.me`)
-- Auth multi-loja / multi-user
-- Billing
-- Meta Ads / lucro líquido com ads
-- Analytics reais (taxa de resposta, % incidências resolvidas)
-- Follow-ups automáticos se cliente não responder
+- Depois do núcleo: WhatsApp Web gateway (Baileys), auth multi-loja, billing, analytics reais
 
 ---
 
@@ -138,12 +133,33 @@ O “buscador de frete” no MVP = **painel do pedido** que mostra: status suppl
 
 ### WhatsApp
 
-| Fase | Como |
-| --- | --- |
-| MVP | `wa.me` + texto renderizado do template (1 clique por pedido) + bulk “abrir próximos N” |
-| Escala | WhatsApp Cloud API / BSP: fila, rate limit, template aprovado Meta |
+| Fase | Provider | Como |
+| --- | --- | --- |
+| MVP | `wa.me` | Template renderizado + 1 clique por pedido |
+| Fase 1 (atual) | `whatsapp_web` (infra) | Gateway Node + schema sessions/keys; UI QR stub; Meta isolado em `meta_cloud` |
+| Fase 2+ | `whatsapp_web` | Baileys no gateway: QR real, scan, send/receive, reconnect |
+| Legado | `meta_cloud` | Meta Embedded Signup + Cloud API — **UI desactivada**, dados preservados |
 
-Layout da mensagem **não muda** entre fases — só o transport (link vs API).
+**Arquitectura provider (Fase 1):**
+
+```
+src/lib/whatsapp/
+  domain-types.ts
+  providers/
+    registry.ts          ← WHATSAPP_PROVIDER (default whatsapp_web)
+    whatsapp-web/        ← facade activa (stub Fase 1)
+    meta-cloud/          ← legado isolado (Embedded Signup, Graph, tokens)
+services/whatsapp-gateway/
+  GET /health → 200      ← scaffold; Baileys na Fase 2
+```
+
+- Credenciais Baileys: `whatsapp_sessions` + `whatsapp_session_keys` (RLS service_role only)
+- Tokens Meta legado: `whatsapp_connection_secrets` (RESTRICT on delete — non-blocker documentado)
+- QR **nunca** persistido — SSE ephemeral (Fase 2)
+- Status `whatsapp_connections` via Supabase Realtime
+- Gateway single instance (`replicas = 1`); `WHATSAPP_SESSION_ENCRYPTION_KEY` só no gateway
+
+Layout da mensagem **não muda** entre fases — só o transport (`wa.me` → gateway).
 
 ---
 
@@ -155,7 +171,10 @@ src/
   integrations/
     dropea/         # client + mapper
     dropi/          # webhook parse + mapper
-    whatsapp/       # render template + link ou API send
+  lib/whatsapp/
+    providers/
+      whatsapp-web/ # active QR gateway facade
+      meta-cloud/   # legacy Meta Cloud API (UI inactive)
   sync/             # jobs: poll, normalize, upsert
   features/
     inbox/          # fila de trabalho (substitui mock board)

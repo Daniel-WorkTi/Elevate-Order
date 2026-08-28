@@ -36,3 +36,12 @@ Radius: container 16 · card 14 · input/button 10 · small 8 · badge pill.
 Avoid: card grids, glass, neon, heavy gradients, marketing art, oversized type, fake analytics/notifications/automation, heavy shadows.
 
 Desktop: 1440×1024. Stack: shadcn + Tailwind 4 · TanStack Table · Motion (controlled) · 21st.dev inspiration only.
+
+## WhatsApp (Connections)
+
+- Active provider: **`whatsapp_web`** — QR via gateway (`services/whatsapp-gateway/`)
+- UI: **Connect your WhatsApp** · *Link your account using a QR code.* · green CTA `[ Connect WhatsApp ]`
+- Phase 1: QR panel stub; button may be disabled until Phase 2
+- **Never show in active UI:** Meta, Facebook, WABA, Config ID, Embedded Signup, business verification, quality gates
+- Legacy `meta_cloud` data preserved; Meta code isolated under `src/lib/whatsapp/providers/meta-cloud/`
+- WhatsApp green **only** on WhatsApp connect/send actions — not on generic chrome

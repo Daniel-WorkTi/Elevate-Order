@@ -2,24 +2,26 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Clock, MessageCircle } from "lucide-react";
 
 import { CarrierIdentity } from "@/components/carriers/carrier-identity";
-import { LanguageBadge } from "@/components/i18n/language-badge";
 import { Button } from "@/components/ui/button";
 import { useCurrencyPreference } from "@/hooks/use-currency-preference";
 import { useEurRateTable } from "@/hooks/use-eur-rate-table";
 import { formatInboxMoney, formatInboxTime, inboxPriorityAccent } from "@/lib/inbox/inbox-format";
 import type { InboxItem } from "@/lib/inbox/inbox-types";
-import { languageFromCountry } from "@/lib/i18n/languages";
 import { useI18n } from "@/lib/i18n/locale-context";
 import { suggestedMessage, whatsappLink } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 
-function CountryFlag({ code }: { code: string }) {
+function CountryFlag({ code, label }: { code: string; label: string }) {
   const iso = code.trim().toLowerCase();
-  if (iso.length !== 2 || iso === "un") return null;
+  const hasFlag = iso.length === 2 && iso !== "un";
+  if (!hasFlag) {
+    return label ? <span className="truncate">{label}</span> : null;
+  }
   return (
     <img
       src={`https://flagcdn.com/w40/${iso}.png`}
-      alt=""
+      alt={label || iso.toUpperCase()}
+      title={label || iso.toUpperCase()}
       width={16}
       height={12}
       className="h-3 w-4 shrink-0 rounded-[2px] object-cover"
@@ -49,7 +51,6 @@ export function InboxQueueRow({ item }: { item: InboxItem }) {
     displayCurrency,
     rateMap: fx.rateMap,
   });
-  const language = languageFromCountry(item.country);
   const accent = inboxPriorityAccent(item.priority);
   const issueLabel = demoLabel(item.issueLabel, t);
   const issueDetail = demoLabel(item.issueDetail, t);
@@ -115,9 +116,7 @@ export function InboxQueueRow({ item }: { item: InboxItem }) {
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold text-[#0A0C10]">{item.customer}</p>
             <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#667085]">
-              <CountryFlag code={item.countryCode} />
-              <LanguageBadge language={language} />
-              <span className="truncate">{item.country}</span>
+              <CountryFlag code={item.countryCode} label={item.country} />
             </p>
           </div>
           <div className="min-w-0">
@@ -196,9 +195,7 @@ export function InboxQueueRow({ item }: { item: InboxItem }) {
             {item.customer}
           </p>
           <p className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-4 text-[#667085]">
-            <CountryFlag code={item.countryCode} />
-            <LanguageBadge language={language} />
-            <span className="truncate">{item.country}</span>
+            <CountryFlag code={item.countryCode} label={item.country} />
           </p>
         </div>
 

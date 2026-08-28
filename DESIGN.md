@@ -104,6 +104,18 @@ Operational screens:
 - Profits may aggregate both supplies using filters.  
 - Customer messages may only use information from the supply associated with that specific order.
 
+## WhatsApp (Connections)
+
+Active transport: **WhatsApp Web via QR** (`whatsapp_web` provider + `services/whatsapp-gateway/`).
+
+| Show | Hide (active UI) |
+| --- | --- |
+| WhatsApp · Connect your WhatsApp · QR stub | Meta · Facebook · WABA · Config ID · Embedded Signup · business verification |
+
+- Green `#128C7E` only on WhatsApp connect/send CTAs  
+- Phase 1: conceptual QR panel + disabled connect button OK  
+- Legacy Meta Cloud (`meta_cloud`) isolated — data preserved, UI removed  
+
 ## Stack (visual implementation)
 
 - **shadcn/ui + Tailwind 4** — base components in-repo  

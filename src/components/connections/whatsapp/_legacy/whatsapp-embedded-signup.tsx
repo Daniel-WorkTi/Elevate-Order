@@ -2,26 +2,30 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { DEFAULT_META_SDK_VERSION } from "@/lib/integrations/whatsapp/config";
 import { loadMetaSdk, startWhatsAppEmbeddedSignup } from "@/lib/integrations/whatsapp/meta-sdk";
-import type { WhatsAppEmbeddedSignupCompletePayload } from "@/lib/integrations/whatsapp/meta-sdk";
+import type {
+  WhatsAppEmbeddedSignupCompletePayload,
+  WhatsAppEmbeddedSignupCancelReason,
+} from "@/lib/integrations/whatsapp/meta-sdk";
 import { cn } from "@/lib/utils";
 
 type WhatsAppEmbeddedSignupButtonProps = {
   appId: string;
   configId: string;
+  sdkVersion: string;
   disabled?: boolean;
   className?: string;
   connectLabel: string;
   loadingLabel: string;
   onComplete: (payload: WhatsAppEmbeddedSignupCompletePayload) => void;
-  onCancel: () => void;
+  onCancel: (reason: WhatsAppEmbeddedSignupCancelReason) => void;
   onError: (message: string) => void;
 };
 
 export function WhatsAppEmbeddedSignupButton({
   appId,
   configId,
+  sdkVersion,
   disabled,
   className,
   connectLabel,
@@ -35,7 +39,7 @@ export function WhatsAppEmbeddedSignupButton({
 
   useEffect(() => {
     let cancelled = false;
-    loadMetaSdk(appId, DEFAULT_META_SDK_VERSION)
+    loadMetaSdk(appId, sdkVersion)
       .then(() => {
         if (!cancelled) setSdkReady(true);
       })
@@ -45,7 +49,7 @@ export function WhatsAppEmbeddedSignupButton({
     return () => {
       cancelled = true;
     };
-  }, [appId, onError]);
+  }, [appId, sdkVersion, onError]);
 
   function launch() {
     if (!sdkReady || disabled || connecting) return;
@@ -56,9 +60,9 @@ export function WhatsAppEmbeddedSignupButton({
         setConnecting(false);
         onComplete(payload);
       },
-      onCancel: () => {
+      onCancel: (reason) => {
         setConnecting(false);
-        onCancel();
+        onCancel(reason);
       },
     });
   }

@@ -326,42 +326,51 @@ export type Database = {
         Row: {
           id: string;
           workspace_id: string;
+          provider: string;
           meta_business_id: string | null;
-          waba_id: string;
-          phone_number_id: string;
+          waba_id: string | null;
+          phone_number_id: string | null;
           display_phone_number: string | null;
           verified_name: string | null;
           status: string;
           connected_at: string | null;
           disconnected_at: string | null;
+          last_seen_at: string | null;
+          last_error_code: number | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           workspace_id: string;
+          provider?: string;
           meta_business_id?: string | null;
-          waba_id: string;
-          phone_number_id: string;
+          waba_id?: string | null;
+          phone_number_id?: string | null;
           display_phone_number?: string | null;
           verified_name?: string | null;
           status?: string;
           connected_at?: string | null;
           disconnected_at?: string | null;
+          last_seen_at?: string | null;
+          last_error_code?: number | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           workspace_id?: string;
+          provider?: string;
           meta_business_id?: string | null;
-          waba_id?: string;
-          phone_number_id?: string;
+          waba_id?: string | null;
+          phone_number_id?: string | null;
           display_phone_number?: string | null;
           verified_name?: string | null;
           status?: string;
           connected_at?: string | null;
           disconnected_at?: string | null;
+          last_seen_at?: string | null;
+          last_error_code?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -384,6 +393,8 @@ export type Database = {
           customer_phone_e164: string;
           status: string;
           last_message_at: string | null;
+          unread_count: number;
+          last_message_preview: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -395,6 +406,8 @@ export type Database = {
           customer_phone_e164: string;
           status?: string;
           last_message_at?: string | null;
+          unread_count?: number;
+          last_message_preview?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -406,6 +419,8 @@ export type Database = {
           customer_phone_e164?: string;
           status?: string;
           last_message_at?: string | null;
+          unread_count?: number;
+          last_message_preview?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -426,6 +441,102 @@ export type Database = {
           },
           {
             foreignKeyName: "whatsapp_conversations_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_session_keys: {
+        Row: {
+          id: string;
+          session_id: string;
+          key_type: string;
+          key_id: string;
+          encrypted_value: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          key_type: string;
+          key_id: string;
+          encrypted_value: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          key_type?: string;
+          key_id?: string;
+          encrypted_value?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_session_keys_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "whatsapp_sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      whatsapp_sessions: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          connection_id: string;
+          provider: string;
+          encrypted_creds: string;
+          session_version: number;
+          last_seen_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          connection_id: string;
+          provider?: string;
+          encrypted_creds: string;
+          session_version?: number;
+          last_seen_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          connection_id?: string;
+          provider?: string;
+          encrypted_creds?: string;
+          session_version?: number;
+          last_seen_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_sessions_connection_id_fkey";
+            columns: ["connection_id"];
+            isOneToOne: false;
+            referencedRelation: "whatsapp_connections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "whatsapp_sessions_connection_workspace_fkey";
+            columns: ["connection_id", "workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "whatsapp_connections";
+            referencedColumns: ["id", "workspace_id"];
+          },
+          {
+            foreignKeyName: "whatsapp_sessions_workspace_id_fkey";
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "workspaces";
@@ -454,6 +565,8 @@ export type Database = {
           delivered_at: string | null;
           read_at: string | null;
           failed_at: string | null;
+          client_message_id: string | null;
+          send_started_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -477,6 +590,8 @@ export type Database = {
           delivered_at?: string | null;
           read_at?: string | null;
           failed_at?: string | null;
+          client_message_id?: string | null;
+          send_started_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -500,6 +615,8 @@ export type Database = {
           delivered_at?: string | null;
           read_at?: string | null;
           failed_at?: string | null;
+          client_message_id?: string | null;
+          send_started_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -539,7 +656,54 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      enqueue_whatsapp_outbound_message: {
+        Args: {
+          p_workspace_id: string;
+          p_connection_id: string;
+          p_order_id: string | null;
+          p_client_message_id: string;
+          p_recipient_phone_e164: string;
+          p_message_body: string;
+        };
+        Returns: {
+          message_id: string;
+          should_send: boolean;
+          status: string;
+          whatsapp_message_id: string | null;
+        }[];
+      };
+      upsert_whatsapp_inbound_message: {
+        Args: {
+          p_workspace_id: string;
+          p_connection_id: string;
+          p_external_message_id: string;
+          p_sender_phone_e164: string;
+          p_message_body: string;
+          p_message_at?: string;
+        };
+        Returns: {
+          inserted: boolean;
+          message_id: string;
+          conversation_id: string;
+          duplicate: boolean;
+        }[];
+      };
+      mark_whatsapp_conversation_read: {
+        Args: {
+          p_workspace_id: string;
+          p_conversation_id: string;
+        };
+        Returns: undefined;
+      };
+      ensure_whatsapp_conversation: {
+        Args: {
+          p_workspace_id: string;
+          p_connection_id: string;
+          p_customer_phone_e164: string;
+          p_order_id?: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       [_ in never]: never;
