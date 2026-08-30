@@ -22,10 +22,22 @@ export type OrderLineItem = {
   variantId?: number | null;
 };
 
+export type CodReplyIntent = "confirm" | "reject" | "needs_operator";
+
 export type OperationalOrder = {
   id: string;
   order_id: number;
   shopify_order_id: number | null;
+  /** Elevate-side COD confirmation — authoritative over supply status_name regex. */
+  confirmed_at?: string | null;
+  /** Latest WhatsApp COD reply classification (customer text, not Dropi accept). */
+  cod_reply_intent?: CodReplyIntent | null;
+  cod_reply_at?: string | null;
+  cod_reply_text?: string | null;
+  cod_request_sent_at?: string | null;
+  /** Operator marked manual Dropi action done (Phase 7). */
+  cod_handled_at?: string | null;
+  cod_handled_by_user_id?: string | null;
   status_id: number | null;
   status_name: string | null;
   details: string | null;
@@ -114,13 +126,28 @@ export function supplyMatchesSource(supply: Supply, source: string): boolean {
   const normalized = source.trim().toLowerCase();
   if (supply === "dropea") return normalized.includes("dropea");
   if (supply === "shopify") return normalized.includes("shopify");
-  return normalized.includes("dropi") && !normalized.includes("dropea") && !normalized.includes("shopify");
+  return (
+    normalized.includes("dropi") &&
+    !normalized.includes("dropea") &&
+    !normalized.includes("shopify")
+  );
 }
 
-export function getOrderStatus(order: Pick<OperationalOrder, "status_name" | "details">): {
+export function getOrderStatus(
+  order: Pick<OperationalOrder, "status_name" | "details"> & {
+    confirmed_at?: string | null;
+  },
+): {
   key: OrderStatusKey;
   label: string;
 } {
+  if (order.confirmed_at) {
+    return {
+      key: "confirmed",
+      label: STATUS_LABEL.confirmed,
+    };
+  }
+
   const haystack = `${order.status_name ?? ""} ${order.details ?? ""}`.trim();
   const match = STATUS_RULES.find((rule) => rule.pattern.test(haystack));
   if (match) {

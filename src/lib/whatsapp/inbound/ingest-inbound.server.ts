@@ -71,6 +71,8 @@ export async function ingestInboundMessage(
 
   const match = await matchOrderForInboundPhone(event.workspaceId, event.from);
 
+  let linkedOrderId = match.orderId;
+
   if (match.orderId && row.conversation_id) {
     await supabaseAdmin
       .from("whatsapp_conversations")
@@ -84,6 +86,33 @@ export async function ingestInboundMessage(
       .update({ order_id: match.orderId })
       .eq("id", row.message_id)
       .eq("workspace_id", event.workspaceId);
+  } else if (row.conversation_id) {
+    const { data: conversation } = await supabaseAdmin
+      .from("whatsapp_conversations")
+      .select("order_id")
+      .eq("id", row.conversation_id)
+      .eq("workspace_id", event.workspaceId)
+      .maybeSingle();
+    linkedOrderId = conversation?.order_id ?? null;
+  }
+
+  try {
+    const { processInboundConfirmation } =
+      await import("@/lib/whatsapp/inbound/process-inbound-confirmation.server");
+    await processInboundConfirmation({
+      workspaceId: event.workspaceId,
+      messageId: row.message_id,
+      conversationId: row.conversation_id,
+      text: event.text,
+      orderId: linkedOrderId,
+      ambiguousOrderCount: match.ambiguousOrderCount,
+    });
+  } catch (error) {
+    console.error("[whatsapp] inbound confirmation engine failed", {
+      workspaceId: event.workspaceId,
+      messageId: row.message_id,
+      error,
+    });
   }
 
   return {
@@ -92,7 +121,7 @@ export async function ingestInboundMessage(
     duplicate: false,
     messageId: row.message_id,
     conversationId: row.conversation_id,
-    orderId: match.orderId,
+    orderId: linkedOrderId,
     ambiguousOrderCount: match.ambiguousOrderCount,
   };
 }

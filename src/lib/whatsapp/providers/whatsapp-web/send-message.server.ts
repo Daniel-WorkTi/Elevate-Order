@@ -173,6 +173,15 @@ export async function runSendWhatsAppTextMessage(
       });
     }
 
+    if (input.orderId) {
+      await supabaseAdmin
+        .from("orders")
+        .update({ cod_request_sent_at: now })
+        .eq("id", input.orderId)
+        .eq("workspace_id", input.workspaceId)
+        .is("cod_request_sent_at", null);
+    }
+
     return {
       ok: true,
       messageId: enqueue.message_id,

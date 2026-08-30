@@ -1,10 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n/locale-context";
-import {
-  getOrderStatus,
-  ORDER_STATUS_I18N_KEY,
-  type OperationalOrder,
-} from "@/lib/order-domain";
+import { getOrderStatus, ORDER_STATUS_I18N_KEY, type OperationalOrder } from "@/lib/order-domain";
 
 const STATUS_CLASS: Record<ReturnType<typeof getOrderStatus>["key"], string> = {
   incident: "bg-red-50 text-red-800",
@@ -21,17 +17,21 @@ export function OrderStatusBadge({
   order,
   className,
 }: {
-  order: Pick<OperationalOrder, "status_name" | "details">;
+  order: Pick<OperationalOrder, "status_name" | "details"> & {
+    confirmed_at?: string | null;
+  };
   className?: string;
 }) {
   const t = useT();
   const status = getOrderStatus(order);
   const rawLabel = order.status_name?.trim();
-  const label = rawLabel
-    ? rawLabel.startsWith("inbox.demo.")
-      ? t(rawLabel)
-      : rawLabel
-    : t(ORDER_STATUS_I18N_KEY[status.key]);
+  const label = order.confirmed_at
+    ? t(ORDER_STATUS_I18N_KEY.confirmed)
+    : rawLabel
+      ? rawLabel.startsWith("inbox.demo.")
+        ? t(rawLabel)
+        : rawLabel
+      : t(ORDER_STATUS_I18N_KEY[status.key]);
 
   return (
     <span

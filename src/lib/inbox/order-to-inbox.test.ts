@@ -9,6 +9,7 @@ function order(overrides: Partial<OperationalOrder> = {}): OperationalOrder {
     id: "1",
     order_id: 1001,
     shopify_order_id: null,
+    confirmed_at: null,
     status_id: null,
     status_name: "Incident",
     details: "Wrong address",

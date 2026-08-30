@@ -24,5 +24,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 loadEnv(join(root, ".env"));
 loadEnv(join(root, ".env.local"));
 
+// Local dev: Vite uses HTTPS with a self-signed cert on :8081.
+if (
+  process.env["ELEVATE_INBOUND_URL"]?.includes("localhost") ||
+  process.env["ELEVATE_INBOUND_URL"]?.includes("127.0.0.1")
+) {
+  process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
+}
+
 const port = Number(process.env["WHATSAPP_GATEWAY_PORT"] ?? 8787);
 startGateway(Number.isFinite(port) ? port : 8787);

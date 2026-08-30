@@ -1,10 +1,11 @@
-import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
 import { OrdersPageHeader } from "@/components/orders/orders-page-header";
+import { OrdersCodTabs } from "@/components/orders/orders-cod-tabs";
 import { OrdersTable } from "@/components/orders/orders-table";
 import { OrdersTableSkeleton } from "@/components/orders/orders-table-skeleton";
 import { OrdersToolbar } from "@/components/orders/orders-toolbar";
@@ -13,6 +14,7 @@ import { useCurrencyPreference } from "@/hooks/use-currency-preference";
 import { useEurRateTable } from "@/hooks/use-eur-rate-table";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import { supabase } from "@/integrations/supabase/client";
 import { syncConnectedShopifyStore } from "@/lib/integrations/shopify/oauth.functions";
 import { syncShopifyOrders } from "@/lib/integrations/shopify/shopify.functions";
 import { querySyncedOrders } from "@/lib/synced-orders.functions";
@@ -111,6 +113,7 @@ function importedToast(
 
 function OrdersPage() {
   const t = useT();
+  const queryClient = useQueryClient();
   const search = ordersRoute.useSearch();
   const navigate = useNavigate({ from: "/orders/" });
   const { workspaceId } = useWorkspaceId();
@@ -120,6 +123,47 @@ function OrdersPage() {
   const store = useStoreConnectionPreference();
   const [syncing, setSyncing] = useState(false);
   const supply = operationalSupply(search.supply);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const invalidate = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      }, 600);
+    };
+
+    const channel = supabase
+      .channel(`orders-cod-${workspaceId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        invalidate,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "order_confirmation_events",
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        invalidate,
+      )
+      .subscribe();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [workspaceId, queryClient]);
 
   const setSearch = (next: OrdersSearch) => {
     void navigate({ search: next });
@@ -178,6 +222,22 @@ function OrdersPage() {
             onRefresh={() => void refresh()}
             refreshing={query.isFetching || syncing}
           />
+          <OrdersCodTabs
+            active={search.codReply ?? "all"}
+            {...(result?.codReplyCounts ? { counts: result.codReplyCounts } : {})}
+            supply={supply}
+            onChange={(codReply) => setSearch({ ...search, codReply, page: 1 })}
+          />
+          {search.codReply === "dropi_pending" ? (
+            <p className="rounded-[10px] border border-[#E6E8EC] bg-[#FAFBFC] px-3 py-2 text-[12px] text-[#667085]">
+              {t("orders.codReply.hintDropiPending")}
+            </p>
+          ) : null}
+          {search.codReply === "yes" ? (
+            <p className="rounded-[10px] border border-[#E6E8EC] bg-[#FAFBFC] px-3 py-2 text-[12px] text-[#667085]">
+              {t("orders.codReply.hintYes")}
+            </p>
+          ) : null}
           <OrdersToolbar
             search={search}
             facets={result?.facets ?? EMPTY_FACETS}

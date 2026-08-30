@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   ORDER_SORT_FIELDS,
   PAGE_SIZES,
+  type CodReplyIntent,
   type OperationalOrder,
   type OrderLineItem,
   type OrderSortField,
@@ -19,6 +20,7 @@ import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-inp
 import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 import { coalesceText, staticFieldsFromSnapshot } from "@/lib/orders/hydrate-static-fields";
+import { isDropiCodPendingAction } from "@/lib/orders/cod-operation";
 import { paymentMethodFromSnapshot, resolveOrderLineItems } from "@/lib/orders/order-line-items";
 
 export type SyncedOrder = {
@@ -36,7 +38,7 @@ export type SyncedOrder = {
 };
 
 const ORDER_COLUMNS_FULL =
-  "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, created_at, workspace_id";
+  "id, order_id, shopify_order_id, confirmed_at, cod_reply_intent, cod_reply_at, cod_reply_text, cod_request_sent_at, cod_handled_at, cod_handled_by_user_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, created_at, workspace_id";
 
 const ORDER_COLUMNS_LEGACY =
   "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at, created_at";
@@ -44,6 +46,8 @@ const ORDER_COLUMNS_LEGACY =
 function isMissingColumnError(error: { message?: string } | null | undefined) {
   return /column|schema cache|does not exist/i.test(error?.message ?? "");
 }
+
+export type CodReplyFilter = "all" | "dropi_pending" | "yes" | "no" | "awaiting";
 
 export type OrdersQueryInput = {
   supply: Supply;
@@ -54,6 +58,7 @@ export type OrdersQueryInput = {
   to?: string | undefined;
   shipping?: string | undefined;
   hasTracking?: "yes" | "no" | undefined;
+  codReply?: CodReplyFilter | undefined;
   workspaceId?: string | undefined;
   page: number;
   pageSize: PageSize;
@@ -72,6 +77,12 @@ export type OrdersQueryResult = {
     shippingCompanies: string[];
     countries: string[];
   };
+  codReplyCounts?: {
+    dropi_pending: number;
+    yes: number;
+    no: number;
+    awaiting: number;
+  };
   error: string | null;
 };
 
@@ -79,6 +90,13 @@ type OrdersRow = {
   id: string;
   order_id: number;
   shopify_order_id: number | null;
+  confirmed_at?: string | null;
+  cod_reply_intent?: CodReplyIntent | null;
+  cod_reply_at?: string | null;
+  cod_reply_text?: string | null;
+  cod_request_sent_at?: string | null;
+  cod_handled_at?: string | null;
+  cod_handled_by_user_id?: string | null;
   status_id: number | null;
   status_name: string | null;
   details: string | null;
@@ -116,6 +134,13 @@ function mapOrder(row: OrdersRow): OperationalOrder {
     id: row.id,
     order_id: row.order_id,
     shopify_order_id: row.shopify_order_id,
+    confirmed_at: row.confirmed_at ?? null,
+    cod_reply_intent: row.cod_reply_intent ?? null,
+    cod_reply_at: row.cod_reply_at ?? null,
+    cod_reply_text: row.cod_reply_text ?? null,
+    cod_request_sent_at: row.cod_request_sent_at ?? null,
+    cod_handled_at: row.cod_handled_at ?? null,
+    cod_handled_by_user_id: row.cod_handled_by_user_id ?? null,
     status_id: row.status_id,
     status_name: row.status_name,
     details: row.details,
@@ -339,6 +364,16 @@ export function parseOrdersQuery(data: unknown): OrdersQueryInput {
 
   if (hasTracking) parsed.hasTracking = hasTracking;
 
+  const codReply = raw["codReply"];
+  if (
+    codReply === "dropi_pending" ||
+    codReply === "yes" ||
+    codReply === "no" ||
+    codReply === "awaiting"
+  ) {
+    parsed.codReply = codReply;
+  }
+
   const workspaceId = typeof raw["workspaceId"] === "string" ? raw["workspaceId"].trim() : "";
   if (workspaceId) parsed.workspaceId = workspaceId;
 
@@ -367,6 +402,77 @@ function applyDateFilter<
   if (from) next = next.gte("last_event_at", from);
   if (to) next = next.lte("last_event_at", to);
   return next;
+}
+
+function applyCodReplyFilter<
+  Q extends {
+    eq: (column: string, value: string) => Q;
+    not: (column: string, op: string, value: null) => Q;
+    is: (column: string, value: null) => Q;
+    or: (filters: string) => Q;
+  },
+>(query: Q, codReply?: CodReplyFilter): Q {
+  if (!codReply || codReply === "all") return query;
+  if (codReply === "dropi_pending") {
+    return query.eq("cod_reply_intent", "confirm").is("cod_handled_at", null);
+  }
+  if (codReply === "yes") return query.eq("cod_reply_intent", "confirm");
+  if (codReply === "no") return query.eq("cod_reply_intent", "reject");
+  return query
+    .not("cod_request_sent_at", "is", null)
+    .or("cod_reply_intent.is.null,cod_reply_intent.eq.needs_operator");
+}
+
+async function loadDropiPendingCount(
+  supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
+  workspaceId: string,
+): Promise<number> {
+  const { isDropiExternallyConfirmed } = await import("@/lib/orders/cod-operation");
+
+  const { data, error } = await supabaseAdmin
+    .from("orders")
+    .select("status_name, details")
+    .eq("workspace_id", workspaceId)
+    .eq("cod_reply_intent", "confirm")
+    .is("cod_handled_at", null)
+    .or("source.ilike.%dropi%,source.ilike.%Dropi%")
+    .not("source", "ilike", "%dropea%")
+    .limit(500);
+
+  if (error) throw error;
+
+  return (data ?? []).filter((row) => !isDropiExternallyConfirmed(row)).length;
+}
+
+async function loadCodReplyCounts(
+  supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
+  workspaceId: string,
+  supply: Supply,
+): Promise<{ dropi_pending: number; yes: number; no: number; awaiting: number }> {
+  const base = () =>
+    applySupplyFilter(
+      supabaseAdmin
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId),
+      supply,
+    );
+
+  const [yesRes, noRes, awaitingRes, dropiPending] = await Promise.all([
+    base().eq("cod_reply_intent", "confirm"),
+    base().eq("cod_reply_intent", "reject"),
+    base()
+      .not("cod_request_sent_at", "is", null)
+      .or("cod_reply_intent.is.null,cod_reply_intent.eq.needs_operator"),
+    supply === "dropi" ? loadDropiPendingCount(supabaseAdmin, workspaceId) : Promise.resolve(0),
+  ]);
+
+  return {
+    dropi_pending: dropiPending,
+    yes: yesRes.count ?? 0,
+    no: noRes.count ?? 0,
+    awaiting: awaitingRes.count ?? 0,
+  };
 }
 
 function applySearchFilter<T extends { or: (filters: string) => T }>(query: T, search?: string): T {
@@ -483,6 +589,7 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
           eq: (column: string, value: string) => Q;
           not: (column: string, op: string, value: null) => Q;
           is: (column: string, value: null) => Q;
+          or: (filters: string) => Q;
         },
       >(
         query: Q,
@@ -493,6 +600,7 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
         if (data.country) next = next.eq("country", data.country);
         if (data.hasTracking === "yes") next = next.not("tracking_code", "is", null);
         if (data.hasTracking === "no") next = next.is("tracking_code", null);
+        next = applyCodReplyFilter(next as never, data.codReply) as Q;
         return next;
       };
 
@@ -529,7 +637,17 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
         return emptyResult(syncedOrdersErrorMessage(error), data);
       }
 
-      const total = count ?? 0;
+      let codReplyCounts: OrdersQueryResult["codReplyCounts"];
+      try {
+        codReplyCounts = await loadCodReplyCounts(supabaseAdmin, workspaceId, data.supply);
+      } catch {
+        codReplyCounts = undefined;
+      }
+
+      const total =
+        data.codReply === "dropi_pending"
+          ? (codReplyCounts?.dropi_pending ?? count ?? 0)
+          : (count ?? 0);
       const pageCount = Math.max(1, Math.ceil(total / data.pageSize));
 
       const facetBase = applyBase(
@@ -537,7 +655,10 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
       );
       const { data: facetRows } = await facetBase.limit(2000);
 
-      const orders = ((rows ?? []) as OrdersRow[]).map(mapOrder);
+      let orders = ((rows ?? []) as OrdersRow[]).map(mapOrder);
+      if (data.codReply === "dropi_pending") {
+        orders = orders.filter(isDropiCodPendingAction);
+      }
 
       return {
         orders,
@@ -550,6 +671,7 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
           shippingCompanies: uniqueSorted((facetRows ?? []).map((row) => row.shipping_company)),
           countries: uniqueSorted(orders.map((order) => order.country)),
         },
+        ...(codReplyCounts ? { codReplyCounts } : {}),
         error: null,
       };
     } catch (error) {

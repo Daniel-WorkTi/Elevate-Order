@@ -108,7 +108,10 @@ function statusToStageIndex(key: OrderStatusKey): number {
  */
 export function buildOrderProgress(
   events: OrderEventRow[],
-  order: Pick<OperationalOrder, "status_name" | "details" | "created_at" | "last_event_at">,
+  order: Pick<
+    OperationalOrder,
+    "status_name" | "details" | "created_at" | "last_event_at" | "confirmed_at"
+  >,
   t: (key: string) => string,
 ): OrderProgressStep[] {
   const chronological = [...events].sort(

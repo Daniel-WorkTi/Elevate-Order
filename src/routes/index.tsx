@@ -19,7 +19,7 @@ function InboxPage() {
   const t = useT();
 
   return (
-    <AppShell title={t("inbox.title")} subtitle={t("inbox.subtitle")}>
+    <AppShell title={t("inbox.title")} subtitle={t("inbox.whatsapp.pageSubtitle")}>
       <InboxPageContent />
     </AppShell>
   );

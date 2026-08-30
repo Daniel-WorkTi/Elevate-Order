@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
+import { CodConfirmationPanel } from "@/components/orders/detail/cod-confirmation-panel";
 import { CustomerDetailsCard } from "@/components/orders/detail/customer-details-card";
 import { OrderDetailHeader } from "@/components/orders/detail/order-detail-header";
 import { OrderDetailSkeleton } from "@/components/orders/detail/order-detail-skeleton";
@@ -21,6 +23,7 @@ import {
   ORDER_DETAIL_PREVIEW_ID,
 } from "@/lib/orders/order-detail-preview";
 import { shopifyAdminOrderUrl } from "@/lib/orders/shopify-admin-order-url";
+import { confirmOrderCodManual } from "@/lib/orders/confirmation.functions";
 import { getSyncedOrder, listOrderEvents } from "@/lib/synced-orders.functions";
 
 export const Route = createFileRoute("/orders/$id")({
@@ -32,6 +35,7 @@ export const Route = createFileRoute("/orders/$id")({
 
 function OrderDetailPage() {
   const t = useT();
+  const queryClient = useQueryClient();
   const { id } = Route.useParams();
   const { workspaceId } = useWorkspaceId();
   const store = useStoreConnectionPreference();
@@ -97,6 +101,28 @@ function OrderDetailPage() {
   const storeName = store.storeName ?? (isPreview ? "Erono Store" : null);
   const eventsError = isPreview ? null : (eventsQuery.data?.error ?? null);
 
+  const confirmMutation = useMutation({
+    mutationFn: () =>
+      confirmOrderCodManual({
+        data: {
+          workspaceId: workspaceId!,
+          orderUuid: order!.id,
+        },
+      }),
+    onSuccess: (result) => {
+      if (result.alreadyConfirmed) {
+        toast.info(t("orders.detail.alreadyConfirmed"));
+      } else if (result.applied) {
+        toast.success(t("orders.detail.confirmOrderSuccess"));
+      }
+      void queryClient.invalidateQueries({ queryKey: ["order", orderId, workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["order-events", orderId, workspaceId] });
+    },
+    onError: () => {
+      toast.error(t("orders.detail.confirmOrderFailed"));
+    },
+  });
+
   function focusMessage() {
     const el = document.getElementById("order-message-card");
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -136,7 +162,17 @@ function OrderDetailPage() {
             order={order}
             shopifyUrl={shopifyUrl}
             onSendMessage={focusMessage}
+            {...(!isPreview && workspaceId
+              ? {
+                  onConfirmOrder: () => confirmMutation.mutate(),
+                  confirmingOrder: confirmMutation.isPending,
+                }
+              : {})}
           />
+
+          {!isPreview && workspaceId ? (
+            <CodConfirmationPanel order={order} workspaceId={workspaceId} />
+          ) : null}
 
           {/* Progresso full → Cliente|Resumo → Produtos|Mensagem (mesma altura na 2ª linha) */}
           <div className="flex flex-col gap-4">

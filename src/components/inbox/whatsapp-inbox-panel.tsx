@@ -1,115 +1,102 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Send } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { useWorkspaceId } from "@/hooks/use-workspace-id";
-import { supabase } from "@/integrations/supabase/client";
-import { formatIsoRelative } from "@/lib/i18n/date-locale";
-import { useI18n, useT } from "@/lib/i18n/locale-context";
+import { ConversationChat } from "@/components/inbox/whatsapp/conversation-chat";
+import { ConversationList } from "@/components/inbox/whatsapp/conversation-list";
+import { InboxFilters } from "@/components/inbox/whatsapp/inbox-filters";
+import { InboxHeader } from "@/components/inbox/whatsapp/inbox-header";
+import { OrderDetailsSidebar } from "@/components/inbox/whatsapp/order-details-sidebar";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import {
+  filterInboxConversations,
+  inboxFilterCounts,
+  searchInboxConversations,
+  type InboxFilterId,
+} from "@/lib/inbox/inbox-display";
+import { useT } from "@/lib/i18n/locale-context";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  deleteWhatsAppInboxConversations,
+  deleteWhatsAppInboxMessage,
   getWhatsAppConversation,
   queryWhatsAppConversations,
   sendWhatsAppInboxMessage,
-  type WhatsAppConversationListItem,
 } from "@/lib/whatsapp/inbox.functions";
 import { cn } from "@/lib/utils";
 
-function displayName(item: WhatsAppConversationListItem): string {
-  if (item.customerName?.trim()) return item.customerName.trim();
-  return item.customerPhone;
-}
-
-function ConversationListItem({
-  item,
-  active,
-  onSelect,
-}: {
-  item: WhatsAppConversationListItem;
-  active: boolean;
-  onSelect: () => void;
-}) {
+export function WhatsAppInboxPanel() {
   const t = useT();
-  const { locale } = useI18n();
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "w-full rounded-[12px] border px-3 py-3 text-left transition-colors",
-        active
-          ? "border-[#2563EB]/30 bg-[#EFF6FF]"
-          : "border-transparent bg-white hover:border-[#E6E8EC] hover:bg-[#F7F8FA]",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-semibold text-[#0A0C10]">{displayName(item)}</p>
-          {item.orderLabel ? (
-            <p className="mt-0.5 text-[12px] text-[#667085]">
-              {t("inbox.whatsapp.order", { order: item.orderLabel })}
-            </p>
-          ) : item.ambiguousOrderCount > 1 ? (
-            <p className="mt-0.5 text-[12px] text-amber-700">
-              {t("inbox.whatsapp.ambiguousOrders", { count: item.ambiguousOrderCount })}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {item.lastMessageAt ? (
-            <span className="text-[11px] text-[#98A2B3]">
-              {formatIsoRelative(item.lastMessageAt, locale)}
-            </span>
-          ) : null}
-          {item.unreadCount > 0 ? (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#2563EB] px-1.5 text-[11px] font-semibold text-white">
-              {item.unreadCount}
-            </span>
-          ) : null}
-        </div>
-      </div>
-      {item.lastMessagePreview ? (
-        <p className="mt-2 line-clamp-2 text-[13px] leading-snug text-[#667085]">
-          {item.lastMessagePreview}
-        </p>
-      ) : null}
-    </button>
-  );
-}
-
-function ConversationThread({
-  conversationId,
-  workspaceId,
-  onBack,
-}: {
-  conversationId: string;
-  workspaceId: string;
-  onBack?: () => void;
-}) {
-  const t = useT();
+  const { workspaceId } = useWorkspaceId();
   const queryClient = useQueryClient();
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  const [filter, setFilter] = useState<InboxFilterId>("all");
   const [draft, setDraft] = useState("");
   const [clientMessageId, setClientMessageId] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const [orderPanelOpen, setOrderPanelOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const [pendingDeleteMessageId, setPendingDeleteMessageId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [pendingDeleteContactIds, setPendingDeleteContactIds] = useState<string[] | null>(null);
+
+  const listQuery = useQuery({
+    queryKey: ["whatsapp", "conversations", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () => queryWhatsAppConversations({ data: { workspaceId: workspaceId! } }),
+    retry: 1,
+  });
+
+  const allConversations = useMemo(
+    () => listQuery.data?.conversations ?? [],
+    [listQuery.data?.conversations],
+  );
+
+  const filterCounts = useMemo(() => inboxFilterCounts(allConversations), [allConversations]);
+
+  const visibleConversations = useMemo(() => {
+    const filtered = filterInboxConversations(allConversations, filter);
+    return searchInboxConversations(filtered, search);
+  }, [allConversations, filter, search]);
+
+  const selectedListItem = useMemo(
+    () =>
+      visibleConversations.find((c) => c.id === selectedId) ??
+      allConversations.find((c) => c.id === selectedId) ??
+      null,
+    [visibleConversations, allConversations, selectedId],
+  );
 
   const detailQuery = useQuery({
-    queryKey: ["whatsapp", "conversation", workspaceId, conversationId],
+    queryKey: ["whatsapp", "conversation", workspaceId, selectedId],
     queryFn: () =>
       getWhatsAppConversation({
-        data: { workspaceId, conversationId },
+        data: { workspaceId: workspaceId!, conversationId: selectedId! },
       }),
-    enabled: Boolean(workspaceId && conversationId),
+    enabled: Boolean(workspaceId && selectedId),
   });
 
   const sendMutation = useMutation({
     mutationFn: sendWhatsAppInboxMessage,
     onSuccess: async () => {
       setDraft("");
+      setClientMessageId(null);
       await queryClient.invalidateQueries({
-        queryKey: ["whatsapp", "conversation", workspaceId, conversationId],
+        queryKey: ["whatsapp", "conversation", workspaceId, selectedId],
       });
       await queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations", workspaceId] });
       toast.success(t("orders.detail.messageSent"));
@@ -119,129 +106,48 @@ function ConversationThread({
     },
   });
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detailQuery.data?.messages.length]);
-
-  const conv = detailQuery.data?.conversation;
-  const messages = detailQuery.data?.messages ?? [];
-
-  function handleSend() {
-    if (!draft.trim() || sendMutation.isPending) return;
-    const id = clientMessageId ?? crypto.randomUUID();
-    if (!clientMessageId) setClientMessageId(id);
-    sendMutation.mutate({
-      data: { workspaceId, conversationId, clientMessageId: id, text: draft.trim() },
-    });
-  }
-
-  if (detailQuery.isPending) {
-    return (
-      <div className="flex h-full items-center justify-center rounded-[14px] border border-[#E6E8EC] bg-white">
-        <p className="text-[13px] text-[#667085]">{t("inbox.loadingQueue")}</p>
-      </div>
-    );
-  }
-
-  if (!conv) {
-    return (
-      <div className="flex h-full items-center justify-center rounded-[14px] border border-[#E6E8EC] bg-white">
-        <p className="text-[13px] text-[#667085]">{t("inbox.loadError")}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full min-h-[520px] flex-col rounded-[14px] border border-[#E6E8EC] bg-white">
-      <div className="flex items-center gap-3 border-b border-[#E6E8EC] px-4 py-3">
-        {onBack ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex size-8 items-center justify-center rounded-[8px] text-[#667085] hover:bg-[#F7F8FA] lg:hidden"
-            aria-label={t("inbox.whatsapp.back")}
-          >
-            <ArrowLeft className="size-4" strokeWidth={1.75} />
-          </button>
-        ) : null}
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold text-[#0A0C10]">{displayName(conv)}</p>
-          <p className="truncate text-[12px] text-[#667085]">
-            {conv.orderLabel
-              ? t("inbox.whatsapp.threadSubtitleOrder", { order: conv.orderLabel })
-              : conv.customerPhone}
-          </p>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {messages.map((message) => {
-          const outbound = message.direction === "outbound";
-          return (
-            <div
-              key={message.id}
-              className={cn("flex", outbound ? "justify-end" : "justify-start")}
-            >
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-[12px] px-3 py-2 text-[13px] leading-relaxed",
-                  outbound
-                    ? "bg-[#2563EB] text-white"
-                    : "border border-[#E6E8EC] bg-[#F7F8FA] text-[#0A0C10]",
-                )}
-              >
-                {message.body}
-              </div>
-            </div>
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
-
-      <div className="border-t border-[#E6E8EC] p-3">
-        <div className="flex items-end gap-2">
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={2}
-            disabled={sendMutation.isPending}
-            placeholder={t("inbox.whatsapp.replyPlaceholder")}
-            className="min-h-[44px] resize-none rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
-          />
-          <Button
-            type="button"
-            disabled={!draft.trim() || sendMutation.isPending}
-            onClick={handleSend}
-            className="h-10 shrink-0 rounded-[10px] bg-[#2563EB] px-3 text-white hover:bg-[#1D4ED8]"
-          >
-            <Send className="size-4" strokeWidth={1.75} />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function WhatsAppInboxPanel() {
-  const t = useT();
-  const { workspaceId } = useWorkspaceId();
-  const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const listQuery = useQuery({
-    queryKey: ["whatsapp", "conversations", workspaceId],
-    enabled: Boolean(workspaceId),
-    queryFn: () => queryWhatsAppConversations({ data: { workspaceId: workspaceId! } }),
+  const deleteMessageMutation = useMutation({
+    mutationFn: deleteWhatsAppInboxMessage,
+    onSuccess: async () => {
+      setPendingDeleteMessageId(null);
+      await queryClient.invalidateQueries({
+        queryKey: ["whatsapp", "conversation", workspaceId, selectedId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations", workspaceId] });
+      toast.success(t("inbox.whatsapp.deleteMessageSuccess"));
+    },
+    onError: () => {
+      toast.error(t("inbox.whatsapp.deleteMessageFailed"));
+    },
   });
 
-  const conversations = useMemo(
-    () => listQuery.data?.conversations ?? [],
-    [listQuery.data?.conversations],
-  );
-  const totalUnread = useMemo(
-    () => conversations.reduce((sum, item) => sum + item.unreadCount, 0),
-    [conversations],
-  );
+  const deleteContactsMutation = useMutation({
+    mutationFn: deleteWhatsAppInboxConversations,
+    onSuccess: async (result, variables) => {
+      const deletedIds = variables.data.conversationIds;
+      const deleted = result.deletedCount;
+      setPendingDeleteContactIds(null);
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+
+      if (selectedId && deletedIds.includes(selectedId)) {
+        setSelectedId(null);
+        setMobileView("list");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations", workspaceId] });
+      await queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversation", workspaceId] });
+
+      toast.success(
+        deleted > 1
+          ? t("inbox.whatsapp.deleteContactsSuccess", { count: deleted })
+          : t("inbox.whatsapp.deleteContactSuccess"),
+      );
+    },
+    onError: () => {
+      toast.error(t("inbox.whatsapp.deleteContactFailed"));
+    },
+  });
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -265,22 +171,12 @@ export function WhatsAppInboxPanel() {
       .channel(`whatsapp-inbox-${workspaceId}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "whatsapp_messages",
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
+        { event: "*", schema: "public", table: "whatsapp_messages", filter: `workspace_id=eq.${workspaceId}` },
         invalidate,
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "whatsapp_conversations",
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
+        { event: "*", schema: "public", table: "whatsapp_conversations", filter: `workspace_id=eq.${workspaceId}` },
         invalidate,
       )
       .subscribe();
@@ -292,81 +188,234 @@ export function WhatsAppInboxPanel() {
   }, [workspaceId, queryClient, selectedId]);
 
   useEffect(() => {
-    if (!selectedId && conversations[0]?.id) {
-      setSelectedId(conversations[0].id);
+    if (selectionMode) return;
+    if (!selectedId && visibleConversations[0]?.id) {
+      setSelectedId(visibleConversations[0].id);
     }
-  }, [conversations, selectedId]);
+  }, [visibleConversations, selectedId, selectionMode]);
+
+  function handleSelectConversation(id: string) {
+    if (selectionMode) return;
+    setSelectedId(id);
+    setMobileView("chat");
+  }
+
+  function handleSend() {
+    if (!draft.trim() || !selectedId || !workspaceId || sendMutation.isPending) return;
+    const id = clientMessageId ?? crypto.randomUUID();
+    if (!clientMessageId) setClientMessageId(id);
+    sendMutation.mutate({
+      data: { workspaceId, conversationId: selectedId, clientMessageId: id, text: draft.trim() },
+    });
+  }
+
+  function handleConfirmDeleteMessage() {
+    if (!pendingDeleteMessageId || !selectedId || !workspaceId || deleteMessageMutation.isPending) {
+      return;
+    }
+    deleteMessageMutation.mutate({
+      data: {
+        workspaceId,
+        conversationId: selectedId,
+        messageId: pendingDeleteMessageId,
+      },
+    });
+  }
+
+  function requestDeleteContacts(ids: string[]) {
+    if (ids.length === 0) return;
+    setPendingDeleteContactIds(ids);
+  }
+
+  function handleConfirmDeleteContacts() {
+    if (!pendingDeleteContactIds?.length || !workspaceId || deleteContactsMutation.isPending) return;
+    deleteContactsMutation.mutate({
+      data: { workspaceId, conversationIds: pendingDeleteContactIds },
+    });
+  }
+
+  function handleToggleSelectionMode() {
+    setSelectionMode(true);
+    setSelectedIds(new Set());
+  }
+
+  function handleCancelSelection() {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function handleToggleItemChecked(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleToggleSelectAll() {
+    const visibleIds = visibleConversations.map((item) => item.id);
+    const allSelected = visibleIds.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(visibleIds));
+  }
 
   if (!workspaceId) {
     return (
-      <p className="text-[13px] text-[#667085]">{t("connections.whatsappWorkspaceRequired")}</p>
+      <p className="px-4 py-8 text-[13px] text-[#667085]">{t("connections.whatsappWorkspaceRequired")}</p>
     );
   }
 
   if (listQuery.isPending) {
     return (
-      <div className="rounded-[14px] border border-[#E6E8EC] bg-white py-16 text-center">
-        <p className="text-[14px] font-medium text-[#0A0C10]">{t("inbox.loadingQueue")}</p>
+      <div className="flex min-h-[480px] items-center justify-center rounded-[14px] border border-[#E6E8EC] bg-white">
+        <p className="text-[14px] text-[#667085]">{t("inbox.loadingQueue")}</p>
       </div>
     );
   }
 
-  if (conversations.length === 0) {
+  if (listQuery.isError) {
     return (
-      <div className="rounded-[14px] border border-[#E6E8EC] bg-white py-16 text-center">
-        <p className="text-[14px] font-medium text-[#0A0C10]">{t("inbox.whatsapp.emptyTitle")}</p>
-        <p className="mt-1 text-[13px] text-[#667085]">{t("inbox.whatsapp.emptyHint")}</p>
+      <div className="flex min-h-[480px] flex-col items-center justify-center rounded-[14px] border border-[#E6E8EC] bg-white px-6 text-center">
+        <p className="text-[14px] font-medium text-[#0A0C10]">{t("inbox.loadError")}</p>
+        <p className="mt-1 text-[13px] text-[#667085]">{t("inbox.whatsapp.retryHint")}</p>
       </div>
     );
   }
+
+  if (allConversations.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-[14px] border border-[#E6E8EC] bg-white">
+        <InboxHeader search={search} onSearchChange={setSearch} />
+        <div className="flex min-h-[420px] flex-col items-center justify-center px-6 py-16 text-center">
+          <p className="text-[14px] font-medium text-[#0A0C10]">{t("inbox.whatsapp.emptyTitle")}</p>
+          <p className="mt-1 text-[13px] text-[#667085]">{t("inbox.whatsapp.emptyHint")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const activeConversation = detailQuery.data?.conversation ?? selectedListItem;
+  const pendingDeleteCount = pendingDeleteContactIds?.length ?? 0;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <div>
-          <h2 className="text-[15px] font-semibold tracking-tight text-[#0A0C10]">
-            {t("inbox.whatsapp.title")}
-          </h2>
-          <p className="mt-0.5 text-[13px] text-[#667085]">{t("inbox.whatsapp.subtitle")}</p>
-        </div>
-        {totalUnread > 0 ? (
-          <span className="inline-flex h-7 items-center rounded-full border border-[#2563EB]/20 bg-[#EFF6FF] px-3 text-[12px] font-semibold text-[#2563EB]">
-            {t("inbox.whatsapp.unreadBadge", { count: totalUnread })}
-          </span>
-        ) : null}
-      </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-[#E6E8EC] bg-white">
+      <InboxHeader search={search} onSearchChange={setSearch} />
+      <InboxFilters active={filter} counts={filterCounts} onChange={setFilter} />
 
-      <div className="grid min-h-[560px] grid-cols-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div
+      <div className="flex min-h-[min(720px,calc(100dvh-11rem))] flex-1">
+        <aside
           className={cn(
-            "space-y-2 rounded-[14px] border border-[#E6E8EC] bg-[#F7F8FA] p-2",
-            selectedId ? "hidden lg:block" : "block",
+            "w-full shrink-0 border-r border-[#E6E8EC] lg:w-[300px] xl:w-[320px]",
+            mobileView === "chat" && !selectionMode ? "hidden lg:flex lg:flex-col" : "flex flex-col",
           )}
         >
-          {conversations.map((item) => (
-            <ConversationListItem
-              key={item.id}
-              item={item}
-              active={item.id === selectedId}
-              onSelect={() => setSelectedId(item.id)}
-            />
-          ))}
-        </div>
+          <ConversationList
+            items={visibleConversations}
+            selectedId={selectedId}
+            listSearch={listSearch}
+            onListSearchChange={setListSearch}
+            onSelect={handleSelectConversation}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleSelectionMode={handleToggleSelectionMode}
+            onCancelSelection={handleCancelSelection}
+            onToggleItemChecked={handleToggleItemChecked}
+            onToggleSelectAll={handleToggleSelectAll}
+            onDeleteSelected={() => requestDeleteContacts([...selectedIds])}
+            deleting={deleteContactsMutation.isPending}
+          />
+        </aside>
 
-        <div className={cn("min-h-[520px]", selectedId ? "block" : "hidden lg:block")}>
-          {selectedId ? (
-            <ConversationThread
-              conversationId={selectedId}
-              workspaceId={workspaceId}
-              onBack={() => setSelectedId(null)}
+        <main
+          className={cn(
+            "min-w-0 flex-1 bg-[#FAFBFC]",
+            mobileView === "list" || selectionMode ? "hidden lg:flex lg:flex-col" : "flex flex-col",
+            !selectedId && "hidden lg:flex lg:flex-col",
+          )}
+        >
+          {selectedId && !selectionMode ? (
+            <ConversationChat
+              detail={detailQuery.data}
+              loading={detailQuery.isPending}
+              draft={draft}
+              sending={sendMutation.isPending}
+              onDraftChange={setDraft}
+              onSend={handleSend}
+              onBack={() => setMobileView("list")}
+              onOpenOrderPanel={() => setOrderPanelOpen(true)}
+              showOrderPanelButton
+              onDeleteMessage={setPendingDeleteMessageId}
+              deletingMessageId={deleteMessageMutation.isPending ? pendingDeleteMessageId : null}
+              onDeleteContact={() => selectedId && requestDeleteContacts([selectedId])}
+              deletingContact={deleteContactsMutation.isPending}
+              pendingDeleteMessageId={pendingDeleteMessageId}
+              onConfirmDeleteMessage={handleConfirmDeleteMessage}
+              onCancelDeleteMessage={() => setPendingDeleteMessageId(null)}
             />
           ) : (
-            <div className="flex h-full items-center justify-center rounded-[14px] border border-[#E6E8EC] bg-white">
-              <p className="text-[13px] text-[#667085]">{t("inbox.whatsapp.selectConversation")}</p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-[13px] text-[#667085]">
+                {selectionMode
+                  ? t("inbox.whatsapp.selectContactsHint")
+                  : t("inbox.whatsapp.selectConversation")}
+              </p>
             </div>
           )}
-        </div>
+        </main>
+
+        <aside className="hidden w-[240px] shrink-0 border-l border-[#E6E8EC] xl:block">
+          <OrderDetailsSidebar conversation={activeConversation} className="h-full overflow-y-auto" />
+        </aside>
       </div>
+
+      <Sheet open={orderPanelOpen} onOpenChange={setOrderPanelOpen}>
+        <SheetContent side="right" className="w-[300px] p-0 sm:max-w-[300px]">
+          <SheetHeader className="border-b border-[#E6E8EC] px-4 py-3 text-left">
+            <SheetTitle className="text-[14px] font-semibold">{t("inbox.whatsapp.sidebar.order")}</SheetTitle>
+          </SheetHeader>
+          <OrderDetailsSidebar conversation={activeConversation} />
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog
+        open={pendingDeleteCount > 0}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteContactIds(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-[14px] border-[#E6E8EC]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[15px] text-[#0A0C10]">
+              {pendingDeleteCount > 1
+                ? t("inbox.whatsapp.deleteContactsTitle")
+                : t("inbox.whatsapp.deleteContactTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[13px] text-[#667085]">
+              {pendingDeleteCount > 1
+                ? t("inbox.whatsapp.deleteContactsDescription", { count: pendingDeleteCount })
+                : t("inbox.whatsapp.deleteContactDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-[10px] border-[#E6E8EC]">
+              {t("inbox.whatsapp.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-[10px] bg-[#B42318] hover:bg-[#912018]"
+              onClick={(event) => {
+                event.preventDefault();
+                handleConfirmDeleteContacts();
+              }}
+            >
+              {t("inbox.whatsapp.deleteContactConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

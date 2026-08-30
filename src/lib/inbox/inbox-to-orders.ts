@@ -9,6 +9,7 @@ export function inboxItemToOperationalOrder(item: InboxItem): OperationalOrder {
     id: `demo-${item.id}`,
     order_id: Number.isFinite(orderId) && orderId > 0 ? orderId : 0,
     shopify_order_id: null,
+    confirmed_at: null,
     status_id: null,
     status_name: item.issueLabel,
     details: `${item.issueDetail}${item.product ? ` · ${item.product}` : ""}`,

@@ -296,11 +296,21 @@ export class SessionManager {
     workspaceId: string,
     connectionId: string,
     message: import("@whiskeysockets/baileys").WAMessage,
+    sock: import("@whiskeysockets/baileys").WASocket,
   ): Promise<void> {
     const { normalizeInboundMessage } = await import("./inbound/normalize-inbound.js");
     const { forwardInboundToElevate } = await import("./inbound/forward-inbound.js");
 
-    const event = normalizeInboundMessage({ workspaceId, connectionId, message });
+    const resolvePnForLid = sock.signalRepository?.lidMapping?.getPNForLID?.bind(
+      sock.signalRepository.lidMapping,
+    );
+
+    const event = await normalizeInboundMessage({
+      workspaceId,
+      connectionId,
+      message,
+      ...(resolvePnForLid ? { resolvePnForLid } : {}),
+    });
     if (!event) return;
 
     await forwardInboundToElevate(this.config, event);
@@ -457,7 +467,7 @@ export class SessionManager {
       sock.ev.on("messages.upsert", ({ messages, type }) => {
         if (type !== "notify") return;
         for (const message of messages) {
-          void this.handleInboundMessage(workspaceId, connectionId, message).catch((err) => {
+          void this.handleInboundMessage(workspaceId, connectionId, message, sock).catch((err) => {
             logger.error(
               { err: sanitizeForLog(err), connection_id: connectionId },
               "inbound message handler failed",

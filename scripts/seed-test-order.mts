@@ -29,7 +29,7 @@ function loadEnv(path: string) {
 loadEnv(join(root, ".env"));
 loadEnv(join(root, ".env.local"));
 
-const TEST_PHONE = process.env.TEST_CUSTOMER_PHONE?.trim() || "+351932821272";
+const TEST_PHONE = process.env.TEST_CUSTOMER_PHONE?.trim() || "+351931815886";
 const TEST_ORDER_ID = 9_991_042_082;
 
 async function main() {

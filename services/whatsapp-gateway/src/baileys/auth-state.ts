@@ -263,9 +263,9 @@ export async function createSupabaseAuthState(
   return { creds, keys, sessionId, saveCreds, flushPendingWrites };
 }
 
-/** Parse display phone from Baileys user id (e.g. 351912345678:12@s.whatsapp.net). */
+/** Parse display phone from Baileys PN user id (e.g. 351912345678:12@s.whatsapp.net). */
 export function phoneFromBaileysUserId(userId: string | undefined): string | null {
-  if (!userId) return null;
+  if (!userId?.endsWith("@s.whatsapp.net")) return null;
   const local = userId.split("@")[0]?.split(":")[0] ?? "";
   if (!/^\d{6,15}$/.test(local)) return null;
   return `+${local}`;

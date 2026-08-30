@@ -66,8 +66,15 @@ export function pickDefaultTemplate(order: OperationalOrder): MessageTemplateId 
     return "incident";
   }
   if (status.key === "cancelled") return "cancelled";
-  if (status.key === "waiting" || status.key === "messaged") return "follow_up";
+  if (
+    (status.key === "waiting" || status.key === "messaged") &&
+    !order.confirmed_at
+  ) {
+    return "confirmation";
+  }
+  if (status.key === "messaged") return "follow_up";
   if (status.key === "shipped" || order.tracking_code) return "tracking_update";
+  if (status.key === "confirmed") return order.tracking_code ? "tracking_update" : "follow_up";
   return "confirmation";
 }
 

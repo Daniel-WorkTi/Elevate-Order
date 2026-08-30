@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { WhatsAppConnectPanel } from "@/components/connections/whatsapp/whatsapp-connect-panel";
+import { WhatsAppAutoConfirmToggle } from "@/components/connections/whatsapp/whatsapp-auto-confirm-toggle";
+import { WhatsAppConfirmationKeywords } from "@/components/connections/whatsapp/whatsapp-confirmation-keywords";
 import { WhatsAppLogo } from "@/components/connections/whatsapp/whatsapp-logo";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { getWhatsAppConnectionStatus } from "@/lib/whatsapp/whatsapp.functions";
@@ -70,6 +72,8 @@ function WhatsAppConnectionPage() {
         </div>
 
         <WhatsAppConnectPanel workspaceId={workspaceId} workspaceReady={ready} />
+        <WhatsAppAutoConfirmToggle workspaceId={workspaceId} workspaceReady={ready} />
+        <WhatsAppConfirmationKeywords workspaceId={workspaceId} workspaceReady={ready} />
       </div>
     </AppShell>
   );

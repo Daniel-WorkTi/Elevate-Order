@@ -49,6 +49,9 @@ export type Database = {
           id: string;
           name: string;
           owner_user_id: string | null;
+          whatsapp_auto_confirm: boolean;
+          whatsapp_confirm_keywords: string[];
+          whatsapp_reject_keywords: string[];
           created_at: string;
           updated_at: string;
         };
@@ -56,6 +59,9 @@ export type Database = {
           id?: string;
           name?: string;
           owner_user_id?: string | null;
+          whatsapp_auto_confirm?: boolean;
+          whatsapp_confirm_keywords?: string[];
+          whatsapp_reject_keywords?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -63,6 +69,9 @@ export type Database = {
           id?: string;
           name?: string;
           owner_user_id?: string | null;
+          whatsapp_auto_confirm?: boolean;
+          whatsapp_confirm_keywords?: string[];
+          whatsapp_reject_keywords?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -206,16 +215,76 @@ export type Database = {
         };
         Relationships: [];
       };
+      order_confirmation_events: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          order_uuid: string | null;
+          order_id: number | null;
+          event_type: "confirmation_classified" | "order_confirmed" | "cod_operation_handled";
+          source: "whatsapp_auto" | "operator" | "system";
+          intent: "confirm" | "reject" | "needs_operator" | null;
+          reason: string | null;
+          conversation_id: string | null;
+          message_id: string | null;
+          actor_user_id: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          order_uuid?: string | null;
+          order_id?: number | null;
+          event_type: "confirmation_classified" | "order_confirmed" | "cod_operation_handled";
+          source: "whatsapp_auto" | "operator" | "system";
+          intent?: "confirm" | "reject" | "needs_operator" | null;
+          reason?: string | null;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          actor_user_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          order_uuid?: string | null;
+          order_id?: number | null;
+          event_type?: "confirmation_classified" | "order_confirmed";
+          source?: "whatsapp_auto" | "operator" | "system";
+          intent?: "confirm" | "reject" | "needs_operator" | null;
+          reason?: string | null;
+          conversation_id?: string | null;
+          message_id?: string | null;
+          actor_user_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       orders: {
         Row: {
           address: string | null;
           city: string | null;
+          confirmation_conversation_id: string | null;
+          confirmation_message_id: string | null;
+          confirmation_source: string | null;
+          cod_handled_at: string | null;
+          cod_handled_by_user_id: string | null;
+          cod_reply_at: string | null;
+          cod_reply_intent: "confirm" | "reject" | "needs_operator" | null;
+          cod_reply_text: string | null;
+          cod_request_sent_at: string | null;
+          confirmed_at: string | null;
+          confirmed_by_user_id: string | null;
           country: string | null;
           created_at: string;
           currency: string | null;
           customer_name: string | null;
           details: string | null;
           email: string | null;
+          external_confirmation_status: string;
           id: string;
           last_event_at: string | null;
           order_id: number;
@@ -237,12 +306,24 @@ export type Database = {
         Insert: {
           address?: string | null;
           city?: string | null;
+          confirmation_conversation_id?: string | null;
+          confirmation_message_id?: string | null;
+          confirmation_source?: string | null;
+          cod_handled_at?: string | null;
+          cod_handled_by_user_id?: string | null;
+          cod_reply_at?: string | null;
+          cod_reply_intent?: "confirm" | "reject" | "needs_operator" | null;
+          cod_reply_text?: string | null;
+          cod_request_sent_at?: string | null;
+          confirmed_at?: string | null;
+          confirmed_by_user_id?: string | null;
           country?: string | null;
           created_at?: string;
           currency?: string | null;
           customer_name?: string | null;
           details?: string | null;
           email?: string | null;
+          external_confirmation_status?: string;
           id?: string;
           last_event_at?: string | null;
           order_id: number;
@@ -264,12 +345,24 @@ export type Database = {
         Update: {
           address?: string | null;
           city?: string | null;
+          confirmation_conversation_id?: string | null;
+          confirmation_message_id?: string | null;
+          confirmation_source?: string | null;
+          cod_handled_at?: string | null;
+          cod_handled_by_user_id?: string | null;
+          cod_reply_at?: string | null;
+          cod_reply_intent?: "confirm" | "reject" | "needs_operator" | null;
+          cod_reply_text?: string | null;
+          cod_request_sent_at?: string | null;
+          confirmed_at?: string | null;
+          confirmed_by_user_id?: string | null;
           country?: string | null;
           created_at?: string;
           currency?: string | null;
           customer_name?: string | null;
           details?: string | null;
           email?: string | null;
+          external_confirmation_status?: string;
           id?: string;
           last_event_at?: string | null;
           order_id?: number;
@@ -703,6 +796,50 @@ export type Database = {
           p_order_id?: string | null;
         };
         Returns: string;
+      };
+      mark_cod_operation_handled: {
+        Args: {
+          p_workspace_id: string;
+          p_order_uuid: string;
+          p_actor_user_id: string;
+        };
+        Returns: {
+          applied: boolean;
+          already_handled: boolean;
+          event_id: string | null;
+        }[];
+      };
+      confirm_order_cod: {
+        Args: {
+          p_workspace_id: string;
+          p_order_uuid: string;
+          p_source: string;
+          p_conversation_id?: string | null;
+          p_message_id?: string | null;
+          p_actor_user_id?: string | null;
+          p_intent_reason?: string | null;
+        };
+        Returns: {
+          applied: boolean;
+          already_confirmed: boolean;
+          order_uuid: string;
+          confirmation_event_id: string | null;
+        }[];
+      };
+      record_confirmation_classification: {
+        Args: {
+          p_workspace_id: string;
+          p_message_id: string;
+          p_conversation_id: string;
+          p_intent: string;
+          p_reason?: string | null;
+          p_order_uuid?: string | null;
+          p_source?: string;
+        };
+        Returns: {
+          inserted: boolean;
+          event_id: string;
+        }[];
       };
     };
     Enums: {

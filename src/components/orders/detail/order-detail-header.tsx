@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, MessageSquare, Truck } from "lucide-react";
+import { ChevronLeft, CheckCircle2, MessageSquare, Truck } from "lucide-react";
 
 import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { Button } from "@/components/ui/button";
 import { formatOrderStamp } from "@/lib/i18n/date-locale";
 import { useI18n } from "@/lib/i18n/locale-context";
+import { isSupplySnapshotIneligibleForCodConfirmation } from "@/lib/orders/cod-confirmation-eligibility";
 import {
   formatPrimaryOrderId,
   getOrderSupply,
@@ -39,16 +40,27 @@ export function OrderDetailHeader({
   order,
   shopifyUrl,
   onSendMessage,
+  onConfirmOrder,
+  confirmingOrder = false,
 }: {
   order: OperationalOrder;
   shopifyUrl: string | null;
   onSendMessage: () => void;
+  onConfirmOrder?: () => void;
+  confirmingOrder?: boolean;
 }) {
   const { t, locale } = useI18n();
   const supply = getOrderSupply(order);
   const supplyLabel = supply ? SUPPLY_LABEL[supply] : order.source;
   const created = formatOrderStamp(order.created_at ?? order.last_event_at, locale);
   const trackingHref = safeTrackingHref(order.tracking_url);
+  const canConfirm =
+    Boolean(onConfirmOrder) &&
+    !order.confirmed_at &&
+    !isSupplySnapshotIneligibleForCodConfirmation({
+      status_name: order.status_name,
+      details: order.details,
+    });
 
   return (
     <header className="space-y-3">
@@ -119,6 +131,18 @@ export function OrderDetailHeader({
             <MessageSquare className="size-3.5 shrink-0" strokeWidth={1.5} />
             {t("orders.detail.sendMessage")}
           </Button>
+
+          {canConfirm ? (
+            <Button
+              type="button"
+              className={btnPrimary}
+              disabled={confirmingOrder}
+              onClick={onConfirmOrder}
+            >
+              <CheckCircle2 className="size-3.5 shrink-0" strokeWidth={1.5} />
+              {confirmingOrder ? t("orders.detail.confirmingOrder") : t("orders.detail.confirmOrder")}
+            </Button>
+          ) : null}
         </div>
       </div>
     </header>

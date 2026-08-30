@@ -176,39 +176,51 @@ Todavía no hemos recibido confirmación sobre el pedido {{order_id}}.
   {
     kind: "confirmation",
     name: "Order confirmation",
-    description: "Confirm a new or paid order",
-    purpose: "Confirm a new or paid order to the customer.",
+    description: "Request COD confirmation from the customer",
+    purpose: "Ask the customer to confirm or cancel a pending COD order via WhatsApp reply.",
     content: {
       pt: `Olá {{customer_name}} 👋
 
-Confirmamos o seu pedido {{order_id}}.
+Precisamos da sua confirmação para enviar o pedido {{order_id}}.
 
-Status: {{status_name}}
 Total: {{total}}
+Status: {{status_name}}
 
-{{tracking_section}}
+Para confirmar o envio, responda:
+SIM
 
-Obrigado.`,
+Para cancelar, responda:
+NÃO
+
+(Ou escreva "Sim, confirmo" / "Pode enviar".)`,
       en: `Hi {{customer_name}} 👋
 
-We confirmed your order {{order_id}}.
+We need your confirmation to ship order {{order_id}}.
 
-Status: {{status_name}}
 Total: {{total}}
+Status: {{status_name}}
 
-{{tracking_section}}
+To confirm shipment, reply:
+YES
 
-Thank you.`,
+To cancel, reply:
+NO
+
+(Or write "Yes, confirm" / "You can ship".)`,
       es: `Hola {{customer_name}} 👋
 
-Confirmamos su pedido {{order_id}}.
+Necesitamos su confirmación para enviar el pedido {{order_id}}.
 
-Estado: {{status_name}}
 Total: {{total}}
+Estado: {{status_name}}
 
-{{tracking_section}}
+Para confirmar el envío, responda:
+SI
 
-Gracias.`,
+Para cancelar, responda:
+NO
+
+(O escriba "Sí, confirmo" / "Puede enviar".)`,
     },
   },
   {

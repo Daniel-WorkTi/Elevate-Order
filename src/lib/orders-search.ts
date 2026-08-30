@@ -4,8 +4,11 @@ import { endOfDay, startOfDay, subDays } from "date-fns";
 import { PAGE_SIZES, type PageSize, type Supply } from "@/lib/order-domain";
 import type { OrdersQueryInput } from "@/lib/synced-orders.functions";
 
+export type CodReplyFilter = "all" | "dropi_pending" | "yes" | "no" | "awaiting";
+
 export const ordersSearchSchema = z.object({
   supply: z.enum(["dropi", "dropea", "shopify"]).catch("dropi"),
+  codReply: z.enum(["all", "dropi_pending", "yes", "no", "awaiting"]).catch("all"),
   q: z.string().optional(),
   status: z.string().optional(),
   country: z.string().optional(),
@@ -68,6 +71,7 @@ export function searchToQuery(search: OrdersSearch): OrdersQueryInput {
   if (range.to) query.to = range.to;
   if (search.shipping) query.shipping = search.shipping;
   if (search.tracking) query.hasTracking = search.tracking;
+  if (search.codReply && search.codReply !== "all") query.codReply = search.codReply;
 
   return query;
 }
@@ -81,13 +85,15 @@ export function hasActiveFilters(search: OrdersSearch): boolean {
     search.from ||
     search.to ||
     search.shipping ||
-    search.tracking,
+    search.tracking ||
+    (search.codReply && search.codReply !== "all"),
   );
 }
 
 export function clearFiltersSearch(search: OrdersSearch): OrdersSearch {
   return {
     supply: search.supply,
+    codReply: "all",
     page: 1,
     pageSize: search.pageSize,
     sort: search.sort,

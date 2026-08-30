@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { CarrierIdentity } from "@/components/carriers/carrier-identity";
+import { CodReplyBadge } from "@/components/orders/cod-reply-badge";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -118,6 +119,23 @@ export function useOrdersColumns(): ColumnDef<OperationalOrder>[] {
         accessorKey: "status_name",
         header: ({ column }) => <SortHeader label={t("orders.col.status")} column={column} />,
         cell: ({ row }) => <OrderStatusBadge order={row.original} />,
+      },
+      {
+        id: "cod_reply",
+        accessorKey: "cod_reply_intent",
+        enableSorting: false,
+        header: () => (
+          <span className="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">
+            {t("orders.col.codReply")}
+          </span>
+        ),
+        cell: ({ row }) => (
+          <CodReplyBadge
+            intent={row.original.cod_reply_intent}
+            replyText={row.original.cod_reply_text}
+            order={row.original}
+          />
+        ),
       },
       {
         id: "total",

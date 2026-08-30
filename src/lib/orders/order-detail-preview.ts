@@ -11,6 +11,7 @@ export function getOrderDetailPreview(): OperationalOrder {
     id: "preview-local",
     order_id: 13707091935609,
     shopify_order_id: 13707091935609,
+    confirmed_at: null,
     status_id: 1,
     status_name: "Confirmado",
     details: "Pedido de teste — pagamento na entrega (COD)",
