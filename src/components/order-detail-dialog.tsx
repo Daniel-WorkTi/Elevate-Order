@@ -1,6 +1,5 @@
 import { MessageCircle, Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -79,7 +78,6 @@ export function OrderDetailDialog({
               <Button
                 asChild
                 className="flex-1 rounded-xl bg-whatsapp text-white hover:bg-whatsapp/90"
-                onClick={() => toast.success(`Message opened for ${order.id}`)}
               >
                 <a
                   href={whatsappLink(order, message)}
@@ -93,7 +91,8 @@ export function OrderDetailDialog({
               <Button
                 variant="outline"
                 className="rounded-xl"
-                onClick={() => toast.success("Queued for automated sending")}
+                disabled
+                title="Automated queue send is not available on this legacy board. Use Orders detail WhatsApp send."
               >
                 <Send className="size-4" />
                 Queue send

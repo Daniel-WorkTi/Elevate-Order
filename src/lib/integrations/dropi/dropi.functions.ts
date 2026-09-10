@@ -90,21 +90,20 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
   })
   .handler(
   async ({ data, context }): Promise<DropiDashboardResult> => {
-    const authConfigured = webhookAuthConfigured();
     const serverConfigured = envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
-    const webhookRelativeUrl = buildWebhookRelativeUrl();
+    const legacyAuthConfigured = webhookAuthConfigured();
 
     const emptySummary = {
       status: deriveStatus({
-        authConfigured,
+        authConfigured: legacyAuthConfigured,
         serverConfigured,
         hasEvents: false,
         queryFailed: false,
       }),
       method: "webhook" as const,
       webhookPath: DROPI_WEBHOOK_PATH,
-      webhookRelativeUrl,
-      authConfigured,
+      webhookRelativeUrl: buildWebhookRelativeUrl(),
+      authConfigured: legacyAuthConfigured,
       serverConfigured,
       lastWebhookAt: null,
       lastSuccessfulEventAt: null,
@@ -113,9 +112,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
       failedEventsToday: null,
       errorMessage: !serverConfigured
         ? "Order sync is not ready on this server yet."
-        : !authConfigured
-          ? "Webhook authentication is not ready on this server yet."
-          : null,
+        : null,
     };
 
     if (!serverConfigured) {
@@ -138,6 +135,18 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const todayIso = startOfDay(new Date()).toISOString();
+
+      const { data: endpoint } = await supabaseAdmin
+        .from("workspace_webhook_endpoints")
+        .select("token")
+        .eq("workspace_id", workspaceId)
+        .eq("supply", "dropi")
+        .maybeSingle();
+
+      const authConfigured = Boolean(endpoint?.token) || legacyAuthConfigured;
+      const webhookRelativeUrl = endpoint?.token
+        ? `${DROPI_WEBHOOK_PATH}?token=${encodeURIComponent(String(endpoint.token))}`
+        : buildWebhookRelativeUrl();
 
       const [ordersCountRes, eventsRes, todayCountRes] = await Promise.all([
         supabaseAdmin
@@ -174,7 +183,20 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
         isMissingWorkspaceColumn(todayCountRes.error?.message)
       ) {
         return {
-          summary: emptySummary,
+          summary: {
+            ...emptySummary,
+            authConfigured,
+            webhookRelativeUrl,
+            status: deriveStatus({
+              authConfigured,
+              serverConfigured,
+              hasEvents: false,
+              queryFailed: false,
+            }),
+            errorMessage: !authConfigured
+              ? "Generate a workspace webhook URL, then paste it in Dropi."
+              : null,
+          },
           fields: [...DROPI_WEBHOOK_FIELDS],
           recentEvents: [],
           error: null,
@@ -190,6 +212,8 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
         return {
           summary: {
             ...emptySummary,
+            authConfigured,
+            webhookRelativeUrl,
             status: "error",
             errorMessage: "Unable to load Dropi synchronization data.",
           },
@@ -225,7 +249,9 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
           orderCount,
           eventsToday,
           failedEventsToday: null,
-          errorMessage: null,
+          errorMessage: !authConfigured
+            ? "Generate a workspace webhook URL, then paste it in Dropi."
+            : null,
         },
         fields: [...DROPI_WEBHOOK_FIELDS],
         recentEvents: dropiEvents,

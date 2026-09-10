@@ -55,6 +55,7 @@ async function readWebhookJson(request: Request): Promise<unknown> {
 
 type ExistingOrderRow = {
   order_id: number;
+  workspace_id: string | null;
   customer_name: string | null;
   phone: string | null;
   email: string | null;
@@ -69,7 +70,7 @@ type ExistingOrderRow = {
 
 export async function handlePublicOrdersWebhook(request: Request): Promise<Response> {
   const auth = await resolvePublicWebhookAuth(request);
-  if (!auth.ok) {
+  if (!auth.ok || !auth.workspaceId) {
     return json({ error: "Unauthorized" }, 401);
   }
   const workspaceId = auth.workspaceId;
@@ -98,7 +99,8 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
 
   const parsed = dropiWebhookPayloadSchema.safeParse(prepareDropiWebhookBody(raw));
   if (!parsed.success) {
-    return json({ error: "Invalid payload", issues: parsed.error.issues }, 422);
+    // Do not echo Zod issue paths to public webhook callers.
+    return json({ error: "Invalid payload" }, 422);
   }
 
   let events: NormalizedDropiEvent[];
@@ -117,7 +119,45 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-  const eventRows = events.map((e) => {
+  const candidateOrderIds = [...new Set(events.map((e) => e.order_id))];
+  const { data: existingRows, error: existingError } = await supabaseAdmin
+    .from("orders")
+    .select(
+      "order_id, workspace_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot",
+    )
+    .in("order_id", candidateOrderIds);
+
+  if (existingError) {
+    console.error("orders lookup failed", existingError);
+  }
+
+  const existingById = new Map<number, ExistingOrderRow>(
+    ((existingRows ?? []) as ExistingOrderRow[]).map((row) => [row.order_id, row]),
+  );
+
+  // Schema still has global UNIQUE(order_id). Refuse cross-workspace overwrite.
+  const blockedOrderIds = new Set<number>();
+  if (workspaceId) {
+    for (const [orderId, row] of existingById) {
+      if (row.workspace_id && row.workspace_id !== workspaceId) {
+        blockedOrderIds.add(orderId);
+        console.error(
+          "[webhook] order_id collision across workspaces — skipped",
+          JSON.stringify({ order_id: orderId }),
+        );
+      }
+    }
+  }
+
+  const acceptedEvents = events.filter((e) => !blockedOrderIds.has(e.order_id));
+  if (acceptedEvents.length === 0 && blockedOrderIds.size > 0) {
+    return json(
+      { error: "Order conflict", received: events.length, skipped: blockedOrderIds.size },
+      409,
+    );
+  }
+
+  const eventRows = acceptedEvents.map((e) => {
     const logistics = logisticsFromEvent(e);
     return {
       order_id: e.order_id,
@@ -146,38 +186,28 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
   }
 
   const latest = new Map<number, NormalizedDropiEvent>();
-  for (const row of events) {
+  for (const row of acceptedEvents) {
     const current = latest.get(row.order_id);
     if (!current || row.event_date > current.event_date) latest.set(row.order_id, row);
   }
 
-  const orderIds = [...latest.keys()];
-  const { data: existingRows, error: existingError } = await supabaseAdmin
-    .from("orders")
-    .select(
-      "order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot",
-    )
-    .in("order_id", orderIds);
-
-  if (existingError) {
-    console.error("orders lookup failed", existingError);
-  }
-
-  const existingById = new Map<number, ExistingOrderRow>(
-    ((existingRows ?? []) as ExistingOrderRow[]).map((row) => [row.order_id, row]),
-  );
-
   const shopifyLookupIds = [...latest.values()]
     .map((row) => row.shopify_order_id)
     .filter((id): id is number => typeof id === "number");
-  const { data: shopifyTwins } = shopifyLookupIds.length
-    ? await supabaseAdmin
+  let shopifyTwinQuery = shopifyLookupIds.length
+    ? supabaseAdmin
         .from("orders")
         .select(
           "shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot, shipping_company, tracking_code, tracking_url",
         )
         .in("shopify_order_id", shopifyLookupIds)
         .ilike("source", "%shopify%")
+    : null;
+  if (shopifyTwinQuery && workspaceId) {
+    shopifyTwinQuery = shopifyTwinQuery.eq("workspace_id", workspaceId);
+  }
+  const { data: shopifyTwins } = shopifyTwinQuery
+    ? await shopifyTwinQuery
     : { data: [] as never[] };
   const twinByShopifyId = new Map(
     (shopifyTwins ?? []).map((row) => [Number(row.shopify_order_id), row]),
