@@ -7,15 +7,28 @@ import { fetchConnection } from "../db/connections.js";
 import type { SessionManager } from "../session-manager.js";
 
 const CORS_ORIGINS = (
-  process.env["WHATSAPP_GATEWAY_CORS_ORIGINS"] ?? "https://localhost:8081,http://localhost:8081"
+  process.env["WHATSAPP_GATEWAY_CORS_ORIGINS"] ??
+  "https://elevate-orders.vercel.app,https://localhost:8081,http://localhost:8081"
 )
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (CORS_ORIGINS.includes(origin)) return true;
+  // Vercel preview deployments for this project
+  try {
+    const host = new URL(origin).hostname;
+    return host === "elevate-orders.vercel.app" || host.endsWith("-danielworkti.vercel.app");
+  } catch {
+    return false;
+  }
+}
+
 function applyCors(req: IncomingMessage, res: ServerResponse): boolean {
   const origin = req.headers.origin ?? "";
-  if (origin && CORS_ORIGINS.includes(origin)) {
+  if (isAllowedOrigin(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
