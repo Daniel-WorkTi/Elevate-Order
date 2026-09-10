@@ -112,9 +112,9 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
       eventsToday: null,
       failedEventsToday: null,
       errorMessage: !serverConfigured
-        ? "Server synchronization is not fully configured."
+        ? "Order sync is not ready on this server yet."
         : !authConfigured
-          ? "Webhook authentication is not configured."
+          ? "Webhook authentication is not ready on this server yet."
           : null,
     };
 
@@ -145,7 +145,8 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
           .select("order_id", { count: "exact", head: true })
           .eq("workspace_id", workspaceId)
           .ilike("source", "%dropi%")
-          .not("source", "ilike", "%dropea%"),
+          .not("source", "ilike", "%dropea%")
+          .not("source", "ilike", "%shopify%"),
         supabaseAdmin
           .from("order_events")
           .select(
@@ -154,6 +155,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
           .eq("workspace_id", workspaceId)
           .ilike("source", "%dropi%")
           .not("source", "ilike", "%dropea%")
+          .not("source", "ilike", "%shopify%")
           .order("event_date", { ascending: false })
           .limit(40),
         supabaseAdmin
@@ -162,6 +164,7 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
           .eq("workspace_id", workspaceId)
           .ilike("source", "%dropi%")
           .not("source", "ilike", "%dropea%")
+          .not("source", "ilike", "%shopify%")
           .gte("event_date", todayIso),
       ]);
 

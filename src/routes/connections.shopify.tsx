@@ -9,7 +9,7 @@ import { StoreConnectPanel } from "@/components/connections/store/store-connect-
 import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
-import { getShopifyDashboard, syncShopifyOrders } from "@/lib/integrations/shopify/shopify.functions";
+import { getShopifyDashboard } from "@/lib/integrations/shopify/shopify.functions";
 import {
   disconnectShopifyStore,
   getShopifyOauthStatus,
@@ -52,61 +52,21 @@ function StoreConnectionPage() {
   const { error: oauthError } = connectionsRoute.useSearch();
   const query = useQuery(shopifyDashboardQuery);
   const oauthQuery = useQuery(shopifyOauthQuery);
-  const {
-    linked,
-    storeName,
-    storeDomain,
-    accessTokenConfigured,
-    getAccessToken,
-    connect,
-    disconnect,
-  } = useStoreConnectionPreference();
   const { workspaceId } = useWorkspaceId();
+  const { linked, storeName, storeDomain, connect, disconnect, busy } =
+    useStoreConnectionPreference(workspaceId);
   const [syncing, setSyncing] = useState(false);
 
   const oauth = oauthQuery.data;
-  const oauthLinked = Boolean(oauth?.connected && oauth.shopDomain);
-  const fullyLinked = oauthLinked || (linked && accessTokenConfigured && Boolean(storeDomain));
+  const fullyLinked = Boolean(oauth?.connected && oauth.shopDomain) || linked;
 
   async function runSync() {
     setSyncing(true);
     try {
-      if (oauthLinked) {
-        const result = await syncConnectedShopifyStore({
-          data: workspaceId ? { workspaceId } : {},
-        });
-        await Promise.all([query.refetch(), oauthQuery.refetch()]);
-        if (!result.ok) {
-          toast.error(result.error ?? t("connections.shopifySyncFailed"));
-          return;
-        }
-        const imported =
-          result.imported === 1
-            ? t("connections.importedOrdersOne", { count: result.imported })
-            : t("connections.importedOrders", { count: result.imported });
-        toast.success(
-          imported +
-            (result.enriched > 0
-              ? t("connections.enrichedSupply", { count: result.enriched })
-              : ""),
-        );
-        return;
-      }
-
-      const token = getAccessToken();
-      if (!storeDomain || !token) {
-        toast.error(t("connections.connectStoreFirst"));
-        return;
-      }
-      const result = await syncShopifyOrders({
-        data: {
-          storeDomain,
-          accessToken: token,
-          limit: 50,
-          ...(workspaceId ? { workspaceId } : {}),
-        },
+      const result = await syncConnectedShopifyStore({
+        data: workspaceId ? { workspaceId } : {},
       });
-      await query.refetch();
+      await Promise.all([query.refetch(), oauthQuery.refetch()]);
       if (!result.ok) {
         toast.error(result.error ?? t("connections.shopifySyncFailed"));
         return;
@@ -117,7 +77,9 @@ function StoreConnectionPage() {
           : t("connections.importedOrders", { count: result.imported });
       toast.success(
         imported +
-          (result.enriched > 0 ? t("connections.enrichedSupply", { count: result.enriched }) : ""),
+          (result.enriched > 0
+            ? t("connections.enrichedSupply", { count: result.enriched })
+            : ""),
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("connections.shopifySyncFailed"));
@@ -166,17 +128,16 @@ function StoreConnectionPage() {
           oauthConfigured={Boolean(oauth?.oauthConfigured)}
           oauthShop={oauth?.shopDomain ?? null}
           oauthError={oauthError === "oauth"}
+          connecting={busy}
           onOauthInstall={(shop) => {
             const params = new URLSearchParams({ shop });
             if (workspaceId) params.set("workspaceId", workspaceId);
             (window.top ?? window).location.assign(`/auth/shopify?${params.toString()}`);
           }}
           onConnect={connect}
-          onDisconnect={() => {
-            disconnect();
-            if (oauthLinked) {
-              void disconnectShopifyStore().then(() => oauthQuery.refetch());
-            }
+          onDisconnect={async () => {
+            await disconnect();
+            await oauthQuery.refetch();
           }}
           {...(fullyLinked ? { onSync: () => void runSync() } : {})}
           syncing={syncing}

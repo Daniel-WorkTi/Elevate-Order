@@ -15,7 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DATE_PRESET_I18N_KEY, hasActiveFilters, type OrdersSearch } from "@/lib/orders-search";
+import {
+  clearFiltersSearch,
+  DATE_PRESET_I18N_KEY,
+  hasActiveFilters,
+  type OrdersSearch,
+} from "@/lib/orders-search";
 import { formatDayMonth } from "@/lib/i18n/date-locale";
 import { useI18n } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
@@ -308,15 +313,7 @@ export function OrdersToolbar({
         {hasActiveFilters(search) ? (
           <button
             type="button"
-            onClick={() =>
-              onChange({
-                supply: search.supply,
-                page: 1,
-                pageSize: search.pageSize,
-                sort: search.sort,
-                dir: search.dir,
-              })
-            }
+            onClick={() => onChange(clearFiltersSearch(search))}
             className="inline-flex h-10 items-center gap-1 px-2 text-[13px] font-medium text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" strokeWidth={1.5} />

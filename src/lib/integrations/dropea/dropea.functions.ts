@@ -54,7 +54,7 @@ export const getDropeaDashboard = createServerFn({ method: "GET" })
       eventsToday: null,
       errorMessage: serverConfigured
         ? null
-        : "Server synchronization is not fully configured.",
+        : "Order sync is not ready on this server yet.",
     };
 
     if (!serverConfigured) {

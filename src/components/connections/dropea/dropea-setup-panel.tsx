@@ -20,6 +20,7 @@ export function DropeaSetupPanel({
   onDisconnect,
   onSync,
   syncing = false,
+  connecting = false,
 }: {
   linked: boolean;
   apiTokenConfigured: boolean;
@@ -28,10 +29,11 @@ export function DropeaSetupPanel({
   webhookUrl: string;
   loadingUrl?: boolean;
   urlError?: string | null;
-  onConnect: (credentials: DropeaConnectCredentials) => boolean;
-  onDisconnect: () => void;
+  onConnect: (credentials: DropeaConnectCredentials) => boolean | Promise<boolean>;
+  onDisconnect: () => void | Promise<void>;
   onSync?: () => void;
   syncing?: boolean;
+  connecting?: boolean;
 }) {
   const t = useT();
   const [apiToken, setApiToken] = useState("");
@@ -40,6 +42,7 @@ export function DropeaSetupPanel({
   const [showHmac, setShowHmac] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const fullyLinked = linked && apiTokenConfigured && hmacSecretConfigured;
 
@@ -148,15 +151,23 @@ export function DropeaSetupPanel({
 
         <Button
           type="button"
-          disabled={!webhookUrl || Boolean(loadingUrl)}
+          disabled={!webhookUrl || Boolean(loadingUrl) || saving || connecting}
           onClick={() => {
-            const ok = onConnect({ apiToken, hmacSecret });
-            if (!ok) {
-              setError(t("connections.enterBothToConnect"));
-              return;
-            }
-            setApiToken("");
-            setHmacSecret("");
+            void (async () => {
+              setSaving(true);
+              try {
+                const ok = await onConnect({ apiToken, hmacSecret });
+                if (!ok) {
+                  setError(t("connections.enterBothToConnect"));
+                  return;
+                }
+                setApiToken("");
+                setHmacSecret("");
+                setError(null);
+              } finally {
+                setSaving(false);
+              }
+            })();
           }}
           className="h-10 rounded-[10px] bg-[#2563EB] text-[13px] shadow-none hover:bg-[#1D4ED8]"
         >

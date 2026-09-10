@@ -8,7 +8,10 @@ export type GatewayConfig = {
 };
 
 export function loadGatewayConfig(): GatewayConfig {
-  const port = Number(process.env["WHATSAPP_GATEWAY_PORT"] ?? 8787);
+  // Railway/Render inject PORT; local uses WHATSAPP_GATEWAY_PORT.
+  const port = Number(
+    process.env["PORT"] ?? process.env["WHATSAPP_GATEWAY_PORT"] ?? 8787,
+  );
   const supabaseUrl = (
     process.env["SUPABASE_URL"] ??
     process.env["VITE_SUPABASE_URL"] ??

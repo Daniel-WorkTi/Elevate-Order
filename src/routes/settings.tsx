@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
-import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
 import { useWhatsAppSettings, type WhatsAppUiPreferences } from "@/hooks/use-whatsapp-settings";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
@@ -29,8 +29,8 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const t = useT();
   const { settings, save } = useWhatsAppSettings();
-  const dropi = useDropiConnectionPreference();
-  const dropea = useDropeaConnectionPreference();
+  const { workspaceId } = useWorkspaceId();
+  const dropea = useDropeaConnectionPreference(workspaceId);
   const [draft, setDraft] = useState<WhatsAppUiPreferences>(settings);
 
   useEffect(() => {
@@ -85,17 +85,8 @@ function SettingsPage() {
             <Button type="submit" className="rounded-xl gradient-cta border-0">
               {t("settings.saveConfiguration")}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-xl"
-              onClick={() =>
-                toast.message(t("settings.testMessageUnavailable"), {
-                  description: t("settings.testMessageUnavailableDesc"),
-                })
-              }
-            >
-              {t("settings.sendTestMessage")}
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/connections/whatsapp">{t("settings.manageWhatsAppConnection")}</Link>
             </Button>
           </div>
         </section>
@@ -107,8 +98,12 @@ function SettingsPage() {
           </div>
 
           {[
-            { name: "Dropi", linked: dropi.linked, to: "/connections/dropi" as const },
-            { name: "Dropea", linked: dropea.linked, to: "/connections/dropea" as const },
+            { name: "Dropi", linked: false, to: "/connections/dropi" as const },
+            {
+              name: "Dropea",
+              linked: dropea.linked,
+              to: "/connections/dropea" as const,
+            },
           ].map((integration) => (
             <div
               key={integration.name}

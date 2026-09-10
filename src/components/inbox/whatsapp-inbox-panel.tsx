@@ -122,7 +122,8 @@ export function WhatsAppInboxPanel() {
   });
 
   const deleteContactsMutation = useMutation({
-    mutationFn: deleteWhatsAppInboxConversations,
+    mutationFn: (input: { data: { workspaceId: string; conversationIds: string[] } }) =>
+      deleteWhatsAppInboxConversations(input),
     onSuccess: async (result, variables) => {
       const deletedIds = variables.data.conversationIds;
       const deleted = result.deletedCount;

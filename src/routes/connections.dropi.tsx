@@ -7,7 +7,6 @@ import { ConnectionActivity } from "@/components/connections/workspace/connectio
 import { ConnectionHero } from "@/components/connections/workspace/connection-hero";
 import { DropiSetupPanel } from "@/components/connections/dropi/dropi-setup-panel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import {
   dropiStatusClass,
@@ -41,7 +40,6 @@ export const Route = createFileRoute("/connections/dropi")({
 
 function DropiConnectionPage() {
   const t = useT();
-  const { linked, connect, disconnect } = useDropiConnectionPreference();
   const { workspaceId } = useWorkspaceId();
   const query = useQuery(dropiDashboardQuery(workspaceId));
   const data = query.data;
@@ -66,13 +64,14 @@ function DropiConnectionPage() {
 
   const summary = useMemo(() => {
     if (!data?.summary) return null;
-    return applyOperatorDropiSummary(data.summary, linked);
-  }, [data?.summary, linked]);
+    return applyOperatorDropiSummary(data.summary);
+  }, [data?.summary]);
 
-  const events = linked ? (data?.recentEvents ?? []) : [];
+  const events = data?.recentEvents ?? [];
   const serverReady = Boolean(
     data?.summary.serverConfigured && data?.summary.authConfigured,
   );
+  const showActivity = summary?.status === "connected" || summary?.status === "configured";
 
   const activity = events.slice(0, 5).map((event) => ({
     id: event.id,
@@ -102,16 +101,12 @@ function DropiConnectionPage() {
             <DropiSetupPanel
               webhookUrl={webhookQuery.data?.webhookUrl ?? ""}
               loadingUrl={webhookQuery.isPending || !workspaceId}
-              urlError={
-                webhookQuery.isError ? t("connections.webhookUrlError") : null
-              }
+              urlError={webhookQuery.isError ? t("connections.webhookUrlError") : null}
               serverReady={serverReady}
-              linked={linked}
-              onConnect={connect}
-              onDisconnect={disconnect}
+              status={summary.status}
             />
 
-            {linked && activity.length > 0 ? (
+            {showActivity && activity.length > 0 ? (
               <ConnectionActivity
                 items={activity}
                 emptyLabel={t("connections.emptyDropiActivity")}

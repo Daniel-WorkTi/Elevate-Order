@@ -58,8 +58,8 @@ export function startGateway(port = DEFAULT_PORT): GatewayServer {
   const config = loadGatewayConfig();
   const gateway = createGatewayServer(config);
   registerGracefulShutdown(gateway.server, gateway.manager);
-  gateway.server.listen(port, () => {
-    console.info(`[whatsapp-gateway] listening on http://127.0.0.1:${port}`);
+  gateway.server.listen(port, "0.0.0.0", () => {
+    console.info(`[whatsapp-gateway] listening on 0.0.0.0:${port}`);
     console.info(`[whatsapp-gateway] phase 5 — inbound messaging`);
   });
   return gateway;

@@ -186,7 +186,7 @@ export function ConversationChat({
         <MessageTimeline
           timeline={detail.timeline}
           {...(onDeleteMessage ? { onDeleteMessage } : {})}
-          deletingMessageId={deletingMessageId}
+          {...(deletingMessageId !== undefined ? { deletingMessageId } : {})}
         />
       </div>
       <MessageComposer

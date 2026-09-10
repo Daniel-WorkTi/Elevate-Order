@@ -20,7 +20,7 @@ export function SupplyLogo({
   className?: string;
 }) {
   if (supply === "shopify") {
-    return <ShopifyLogo size={size} className={className} />;
+    return <ShopifyLogo size={size} {...(className ? { className } : {})} />;
   }
 
   return (

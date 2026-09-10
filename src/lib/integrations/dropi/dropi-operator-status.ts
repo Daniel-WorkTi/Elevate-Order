@@ -4,51 +4,23 @@ import type {
 } from "@/lib/integrations/dropi/dropi-types";
 
 /**
- * Operator-facing status.
- * Once the operator clicks Connect (linked), show Connected — same as Shopify.
- * Waiting for the first webhook is operational detail, not a separate badge.
+ * Operator-facing Dropi status from backend reality only.
+ * Never treat a browser localStorage flag as Connected.
  */
-export function resolveDropiOperatorStatus(input: {
-  linked: boolean;
-  summary: DropiConnectionSummary;
-}): DropiConnectionStatus {
-  const { linked, summary } = input;
-
+export function resolveDropiOperatorStatus(summary: DropiConnectionSummary): DropiConnectionStatus {
   if (!summary.serverConfigured || !summary.authConfigured) {
     return summary.status === "error" ? "error" : "not_configured";
   }
-
-  if (!linked) return "not_configured";
-
-  if (summary.status === "error" && summary.errorMessage) {
-    return "error";
+  if (summary.status === "error") return "error";
+  if ((summary.orderCount ?? 0) > 0 || summary.lastSuccessfulEventAt || summary.lastWebhookAt) {
+    return "connected";
   }
-
-  return "connected";
+  return "configured";
 }
 
-export function applyOperatorDropiSummary(
-  summary: DropiConnectionSummary,
-  linked: boolean,
-): DropiConnectionSummary {
-  const status = resolveDropiOperatorStatus({ linked, summary });
-
-  if (!linked) {
-    return {
-      ...summary,
-      status,
-      // Do not present shared/historical sync as this operator's connection yet.
-      lastWebhookAt: null,
-      lastSuccessfulEventAt: null,
-      orderCount: null,
-      eventsToday: null,
-      failedEventsToday: null,
-      errorMessage:
-        summary.serverConfigured && summary.authConfigured
-          ? null
-          : summary.errorMessage,
-    };
-  }
-
-  return { ...summary, status };
+export function applyOperatorDropiSummary(summary: DropiConnectionSummary): DropiConnectionSummary {
+  return {
+    ...summary,
+    status: resolveDropiOperatorStatus(summary),
+  };
 }

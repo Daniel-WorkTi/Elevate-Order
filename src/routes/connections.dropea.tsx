@@ -43,15 +43,15 @@ export const Route = createFileRoute("/connections/dropea")({
 function DropeaConnectionPage() {
   const t = useT();
   const queryClient = useQueryClient();
+  const { workspaceId } = useWorkspaceId();
   const {
     linked,
     apiTokenConfigured,
     hmacSecretConfigured,
     connect,
     disconnect,
-    getApiToken,
-  } = useDropeaConnectionPreference();
-  const { workspaceId } = useWorkspaceId();
+    busy,
+  } = useDropeaConnectionPreference(workspaceId);
   const query = useQuery(dropeaDashboardQuery(workspaceId));
   const data = query.data;
   const loading = query.isPending && !data;
@@ -120,20 +120,18 @@ function DropeaConnectionPage() {
               serverReady={serverReady}
               webhookUrl={webhookQuery.data?.webhookUrl ?? ""}
               loadingUrl={webhookQuery.isPending || !workspaceId}
-              urlError={
-                webhookQuery.isError ? t("connections.webhookUrlError") : null
-              }
+              urlError={webhookQuery.isError ? t("connections.webhookUrlError") : null}
+              connecting={busy}
               onConnect={connect}
               onDisconnect={disconnect}
               syncing={syncing}
               onSync={() => {
-                const token = getApiToken();
-                if (!token || !workspaceId) {
+                if (!workspaceId) {
                   toast.error(t("connections.enterBothToConnect"));
                   return;
                 }
                 setSyncing(true);
-                void syncDropeaOrders({ data: { workspaceId, apiToken: token } })
+                void syncDropeaOrders({ data: { workspaceId } })
                   .then((result) => {
                     if (!result.ok) {
                       toast.error(result.message ?? t("connections.syncFailed"));

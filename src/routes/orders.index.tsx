@@ -12,11 +12,9 @@ import { OrdersToolbar } from "@/components/orders/orders-toolbar";
 import { Button } from "@/components/ui/button";
 import { useCurrencyPreference } from "@/hooks/use-currency-preference";
 import { useEurRateTable } from "@/hooks/use-eur-rate-table";
-import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { supabase } from "@/integrations/supabase/client";
 import { syncConnectedShopifyStore } from "@/lib/integrations/shopify/oauth.functions";
-import { syncShopifyOrders } from "@/lib/integrations/shopify/shopify.functions";
 import { querySyncedOrders } from "@/lib/synced-orders.functions";
 import {
   searchToQuery,
@@ -120,7 +118,6 @@ function OrdersPage() {
   const query = useQuery(ordersListQuery(search, workspaceId));
   const { displayCurrency } = useCurrencyPreference();
   const fxTable = useEurRateTable();
-  const store = useStoreConnectionPreference();
   const [syncing, setSyncing] = useState(false);
   const supply = operationalSupply(search.supply);
 
@@ -181,24 +178,7 @@ function OrdersPage() {
         } else if (oauth.error && oauth.error !== "No Shopify store connected.") {
           toast.error(oauth.error);
         } else {
-          const token = store.getAccessToken();
-          if (store.storeDomain && token) {
-            const result = await syncShopifyOrders({
-              data: {
-                storeDomain: store.storeDomain,
-                accessToken: token,
-                limit: 50,
-                ...(workspaceId ? { workspaceId } : {}),
-              },
-            });
-            if (!result.ok) {
-              toast.error(result.error ?? t("connections.shopifySyncFailed"));
-            } else {
-              importedToast(t, result.imported, result.enriched);
-            }
-          } else {
-            toast.message(t("orders.refreshNeedsShopify"));
-          }
+          toast.message(t("orders.refreshNeedsShopify"));
         }
       }
       await query.refetch();

@@ -15,7 +15,6 @@ import {
   getShopifyOauthStatus,
   syncConnectedShopifyStore,
 } from "@/lib/integrations/shopify/oauth.functions";
-import { syncShopifyOrders } from "@/lib/integrations/shopify/shopify.functions";
 import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
 import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
@@ -106,7 +105,7 @@ function HeaderShopifyChip({
 }) {
   const t = useT();
   const { workspaceId } = useWorkspaceId();
-  const store = useStoreConnectionPreference();
+  const store = useStoreConnectionPreference(workspaceId);
   const oauthQuery = useQuery({
     queryKey: ["connections", "shopify", "oauth", "header"],
     queryFn: () => getShopifyOauthStatus(),
@@ -139,36 +138,10 @@ function HeaderShopifyChip({
   async function runSync() {
     setSyncing(true);
     try {
-      if (oauthLinked) {
-        const result = await syncConnectedShopifyStore({
-          data: workspaceId ? { workspaceId } : {},
-        });
-        await oauthQuery.refetch();
-        if (!result.ok) {
-          toast.error(result.error ?? t("connections.shopifySyncFailed"));
-          return;
-        }
-        toast.success(
-          result.imported === 1
-            ? t("connections.importedOrdersOne", { count: result.imported })
-            : t("connections.importedOrders", { count: result.imported }),
-        );
-        return;
-      }
-
-      const token = store.getAccessToken();
-      if (!store.storeDomain || !token) {
-        toast.error(t("connections.connectStoreFirst"));
-        return;
-      }
-      const result = await syncShopifyOrders({
-        data: {
-          storeDomain: store.storeDomain,
-          accessToken: token,
-          limit: 50,
-          ...(workspaceId ? { workspaceId } : {}),
-        },
+      const result = await syncConnectedShopifyStore({
+        data: workspaceId ? { workspaceId } : {},
       });
+      await oauthQuery.refetch();
       if (!result.ok) {
         toast.error(result.error ?? t("connections.shopifySyncFailed"));
         return;
@@ -185,13 +158,13 @@ function HeaderShopifyChip({
     }
   }
 
-  function submitToken() {
+  async function submitToken() {
     const host = normalizeShopifyDomain(shopInput);
     if (!host) {
       setError(t("connections.domainInvalid"));
       return;
     }
-    const ok = store.connect({
+    const ok = await store.connect({
       storeName: host,
       storeDomain: shopInput,
       accessToken,
@@ -204,6 +177,7 @@ function HeaderShopifyChip({
     setError(null);
     toast.success(t("shell.shopifyTokenConnected"));
     setOpen(false);
+    await oauthQuery.refetch();
   }
 
   function startOauth() {

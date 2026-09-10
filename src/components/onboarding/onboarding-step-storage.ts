@@ -12,7 +12,8 @@ export function readPersistedOnboardingStep(): OnboardingStepId | null {
   if (typeof window === "undefined") return null;
   try {
     const saved = window.sessionStorage.getItem(STORAGE_KEY);
-    return isOnboardingStep(saved ?? undefined) ? saved : null;
+    if (saved !== null && isOnboardingStep(saved)) return saved;
+    return null;
   } catch {
     return null;
   }

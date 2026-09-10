@@ -21,23 +21,26 @@ export function StoreConnectPanel({
   onOauthInstall,
   onSync,
   syncing = false,
+  connecting = false,
 }: {
   linked: boolean;
   storeName: string | null;
   storeDomain: string | null;
   accessTokenConfigured?: boolean;
-  onConnect: (input: StoreConnectInput) => boolean;
-  onDisconnect: () => void;
+  onConnect: (input: StoreConnectInput) => boolean | Promise<boolean>;
+  onDisconnect: () => void | Promise<void>;
   oauthConfigured?: boolean;
   oauthShop?: string | null;
   oauthError?: boolean;
   onOauthInstall?: (shop: string) => void;
   onSync?: () => void;
   syncing?: boolean;
+  connecting?: boolean;
 }) {
   const t = useT();
   const [shopInput, setShopInput] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [saving, setSaving] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,18 +88,27 @@ export function StoreConnectPanel({
     onOauthInstall!(host);
   }
 
-  function submitToken() {
+  async function submitToken() {
     const host = normalizeShopifyDomain(shopInput);
     if (!host) {
       setError(t("connections.domainInvalid"));
       return;
     }
-    const ok = onConnect({
-      storeName: host,
-      storeDomain: shopInput,
-      accessToken,
-    });
-    if (!ok) setError(t("connections.enterStoreFields"));
+    setSaving(true);
+    try {
+      const ok = await onConnect({
+        storeName: host,
+        storeDomain: shopInput,
+        accessToken,
+      });
+      if (!ok) setError(t("connections.enterStoreFields"));
+      else {
+        setAccessToken("");
+        setError(null);
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

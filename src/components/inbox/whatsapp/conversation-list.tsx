@@ -120,10 +120,12 @@ export function ConversationList({
                 key={item.id}
                 item={item}
                 active={item.id === selectedId}
-                selectionMode={selectionMode}
-                checked={selectedIds?.has(item.id)}
+                {...(selectionMode !== undefined ? { selectionMode } : {})}
+                {...(selectedIds ? { checked: selectedIds.has(item.id) } : {})}
                 onSelect={() => onSelect(item.id)}
-                onToggleChecked={() => onToggleItemChecked?.(item.id)}
+                {...(onToggleItemChecked
+                  ? { onToggleChecked: () => onToggleItemChecked(item.id) }
+                  : {})}
               />
             ))}
           </div>

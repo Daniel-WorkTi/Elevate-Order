@@ -28,7 +28,10 @@ function OnboardingPage() {
 
   return (
     <AppShell title={t("onboarding.title")} subtitle={t("onboarding.subtitle")}>
-      <OnboardingFlow userId={user?.id ?? null} initialStep={step} />
+      <OnboardingFlow
+        userId={user?.id ?? null}
+        {...(step ? { initialStep: step } : {})}
+      />
     </AppShell>
   );
 }

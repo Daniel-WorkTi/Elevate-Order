@@ -8,6 +8,36 @@ export type Database = {
   };
   public: {
     Tables: {
+      workspace_provider_credentials: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          provider: string;
+          api_token_ciphertext: string;
+          hmac_secret_ciphertext: string | null;
+          linked_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          provider: string;
+          api_token_ciphertext: string;
+          hmac_secret_ciphertext?: string | null;
+          linked_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workspace_id?: string;
+          provider?: string;
+          api_token_ciphertext?: string;
+          hmac_secret_ciphertext?: string | null;
+          linked_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       shopify_stores: {
         Row: {
           access_token: string;

@@ -70,7 +70,7 @@ export function ConversationListItem({
     >
       {selectionMode ? (
         <Checkbox
-          checked={checked}
+          checked={checked ?? false}
           onCheckedChange={() => onToggleChecked?.()}
           onClick={(event) => event.stopPropagation()}
           className="size-[18px] rounded-[4px] border-[#D0D5DD] data-[state=checked]:border-[#2563EB] data-[state=checked]:bg-[#2563EB]"

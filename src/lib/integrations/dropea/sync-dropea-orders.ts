@@ -15,7 +15,8 @@ import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-inp
 
 const syncInput = z.object({
   workspaceId: z.string().uuid(),
-  apiToken: z.string().min(8).max(512),
+  /** Optional one-shot token; prefer server-stored credentials. */
+  apiToken: z.string().min(8).max(512).optional(),
 });
 
 export type SyncDropeaResult = {
@@ -43,7 +44,7 @@ function extractOrderList(payload: unknown): unknown[] {
 
 /**
  * Pull orders from Dropea API (X-API-KEY) and upsert into the workspace queue.
- * Token is sent from the browser for this call — not stored on the server.
+ * Uses server-stored encrypted credentials (never read back to the browser).
  */
 export const syncDropeaOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -51,9 +52,21 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<SyncDropeaResult> => {
     const workspaceId = (await authorizeWorkspaceInput(context.userId, data.workspaceId)).id;
 
+    const { loadDropeaApiToken } = await import(
+      "@/lib/integrations/dropea/dropea-credentials.server"
+    );
+    const apiToken = data.apiToken?.trim() || (await loadDropeaApiToken(workspaceId));
+    if (!apiToken) {
+      return {
+        ok: false,
+        imported: 0,
+        message: "Connect Dropea with an API token before syncing.",
+      };
+    }
+
     let payload: unknown;
     try {
-      payload = await fetchDropeaOrders(data.apiToken);
+      payload = await fetchDropeaOrders(apiToken);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Dropea API unavailable";
       return { ok: false, imported: 0, message };

@@ -210,6 +210,85 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     return { ok: true, shop };
   });
 
+export const connectShopifyManualStore = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) =>
+    z
+      .object({
+        workspaceId: z.string().uuid(),
+        storeName: z.string().min(1).max(120),
+        storeDomain: z.string().min(3).max(120),
+        accessToken: z.string().min(8).max(512),
+      })
+      .parse(data),
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{ ok: true; shopDomain: string } | { ok: false; error: string }> => {
+      try {
+        const userId = await requireUserId();
+        const { authorizeWorkspaceInput } =
+          await import("@/lib/workspace/authorize-workspace-input");
+        const authorized = await authorizeWorkspaceInput(userId, data.workspaceId);
+        const shop = normalizeShopifyDomain(data.storeDomain);
+        if (!shop) {
+          return {
+            ok: false,
+            error:
+              "Use the Admin domain ending in .myshopify.com, not the public website.",
+          };
+        }
+        const token = data.accessToken.trim();
+        if (!token.startsWith("shpat_")) {
+          return {
+            ok: false,
+            error: "Paste the Admin API access token (starts with shpat_).",
+          };
+        }
+
+        // Validate token before persisting.
+        const shopRes = await fetch(
+          `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/shop.json`,
+          {
+            headers: {
+              "X-Shopify-Access-Token": token,
+              Accept: "application/json",
+            },
+          },
+        );
+        if (!shopRes.ok) {
+          return { ok: false, error: "Shopify rejected this token. Check install and scopes." };
+        }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { error } = await supabaseAdmin.from("shopify_stores").upsert(
+          {
+            user_id: userId,
+            shop_domain: shop,
+            access_token: token,
+            scope: null,
+            installed_at: new Date().toISOString(),
+            uninstalled_at: null,
+            workspace_id: authorized.id,
+          },
+          { onConflict: "user_id,shop_domain" },
+        );
+        if (error) {
+          console.error("[shopify] manual store persist failed", error.message);
+          return { ok: false, error: "Unable to save Shopify store on the server." };
+        }
+        return { ok: true, shopDomain: shop };
+      } catch (error) {
+        console.error("[shopify] manual connect failed", error);
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Unable to connect Shopify store.",
+        };
+      }
+    },
+  );
+
 export const disconnectShopifyStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<{ ok: true }> => {

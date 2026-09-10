@@ -1,3 +1,4 @@
+import { Agent } from "undici";
 import { createHmac } from "node:crypto";
 
 import type { GatewayConfig } from "../config.js";
@@ -19,6 +20,20 @@ function elevateInboundUrl(config: GatewayConfig): string | null {
 function signBody(secret: string, timestamp: string, rawBody: string): string {
   return `sha256=${createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex")}`;
 }
+
+function isLocalDevHost(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+/** Local Vite HTTPS uses a self-signed cert — relax verification only for that hop. */
+const localInsecureAgent = new Agent({
+  connect: { rejectUnauthorized: false },
+});
 
 export async function forwardInboundToElevate(
   config: GatewayConfig,
@@ -42,6 +57,7 @@ export async function forwardInboundToElevate(
       "X-Elevate-Signature": signature,
     },
     body: rawBody,
+    ...(isLocalDevHost(url) ? { dispatcher: localInsecureAgent } : {}),
   });
 
   if (!res.ok) {

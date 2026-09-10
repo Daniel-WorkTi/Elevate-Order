@@ -13,7 +13,7 @@ export default defineConfig({
     server: {
       port: 8081,
       strictPort: true,
-      https: true,
+      // HTTPS is provided by @vitejs/plugin-basic-ssl (boolean `https: true` is incompatible with Vite 8 ServerOptions).
     },
   },
   tanstackStart: {

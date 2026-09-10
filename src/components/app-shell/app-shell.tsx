@@ -85,8 +85,8 @@ export function AppShell({
   const isBelowLg = useIsBelowLg();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
-  const store = useStoreConnectionPreference();
   const { workspaceId } = useWorkspaceId();
+  const store = useStoreConnectionPreference(workspaceId);
   const oauthQuery = useQuery({
     queryKey: ["connections", "shopify", "oauth", "shell"],
     queryFn: () => getShopifyOauthStatus(),

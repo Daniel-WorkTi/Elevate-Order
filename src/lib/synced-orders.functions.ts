@@ -389,7 +389,11 @@ function applySupplyFilter<
 >(query: T, supply: Supply): T {
   if (supply === "dropea") return query.ilike("source", "%dropea%");
   if (supply === "shopify") return query.ilike("source", "%shopify%");
-  return query.or("source.ilike.%dropi%,source.ilike.%shopify%");
+  // Dropi operational queue — never mix Shopify or Dropea.
+  return query
+    .ilike("source", "%dropi%")
+    .not("source", "ilike", "%dropea%")
+    .not("source", "ilike", "%shopify%");
 }
 
 function applyDateFilter<

@@ -149,7 +149,7 @@ export const pt: TranslationDict = {
   "connections.shopifyScopesNote":
     "read_orders · read_customers · read_products — aprovados uma vez no Admin Shopify.",
   "connections.shopifyOauthMissing":
-    "A app Shopify ainda não está configurada neste servidor (SHOPIFY_API_KEY / SHOPIFY_API_SECRET). Use Outras formas com um token shpat_ entretanto.",
+    "A instalação da app Shopify ainda não está disponível neste servidor. Use Outras formas com um token Admin API, ou peça ao administrador para concluir a configuração Shopify.",
   "connections.shopifyFallbackToken": "Token de custom app (alternativa)",
   "connections.authorizedViaShopify": "Autorizado na Shopify — sem token para copiar",
   "connections.advancedTokenOption": "Opção avançada: token de app personalizada",
@@ -183,7 +183,8 @@ export const pt: TranslationDict = {
     "Estamos a tentar restaurar a sua ligação. Não é necessário digitalizar um novo código QR.",
   "connections.reconnecting": "A reconectar",
   "connections.whatsappQrPlaceholderTitle": "O código QR aparecerá aqui",
-  "connections.whatsappQrPlaceholderBody": "Disponível na próxima versão — digitalize com o telemóvel para ligar.",
+  "connections.whatsappQrPlaceholderBody":
+    "Digitalize com o telemóvel para ligar o WhatsApp a este workspace.",
   "connections.whatsappQrHint": "Mantenha o WhatsApp aberto no telemóvel durante a ligação.",
   "connections.whatsappWaitingForQr": "A gerar código QR…",
   "connections.whatsappWaitingConnection": "À espera da ligação…",
@@ -199,8 +200,12 @@ export const pt: TranslationDict = {
   "connections.whatsappHttpsRequired":
     "O login Meta exige HTTPS. Use https://localhost:8081 (npm run dev) ou teste em https://elevate-orders.vercel.app/connections/whatsapp.",
   "connections.whatsappNotConfigured":
-    "O gateway WhatsApp não está configurado neste servidor (WHATSAPP_GATEWAY_URL / GATEWAY_INTERNAL_SECRET).",
+    "O gateway WhatsApp ainda não está disponível neste servidor. Peça ao administrador para concluir a configuração e tente novamente.",
   "connections.whatsappWorkspaceRequired": "Selecione um workspace antes de ligar o WhatsApp.",
+  "connections.dropiServerNotReady":
+    "A sincronização de pedidos ainda não está pronta neste servidor. Peça ao administrador para concluir a configuração e depois cole o URL do webhook na Dropi.",
+  "connections.dropiReceivingEvents": "Os eventos Dropi estão a chegar a este workspace.",
+  "connections.webhookAuthNotReady": "A autenticação do webhook ainda não está pronta neste servidor.",
   "connections.whatsappConnectedTitle": "WhatsApp ligado",
   "connections.whatsappConnectedToast": "WhatsApp ligado a este workspace.",
   "connections.whatsappConnectFailed": "Não foi possível ligar o WhatsApp.",
@@ -1016,8 +1021,12 @@ export const pt: TranslationDict = {
   "onboarding.or": "ou",
   "onboarding.configureLater": "Vou configurar isto mais tarde",
   "onboarding.connect": "Ligar",
+  "onboarding.continueWith": "Continuar com {{name}}",
+  "onboarding.continueWithAria": "Continuar o onboarding com {{name}}",
   "onboarding.selected": "Selecionado",
   "onboarding.connectAria": "Selecionar {{name}} e continuar",
+  "onboarding.store.connectLaterHint":
+    "Escolher uma supply aqui só continua o onboarding. A ligação real faz-se em Connections.",
   "onboarding.back": "Voltar",
   "onboarding.continue": "Continuar",
   "onboarding.continueWithoutStore": "Continuar sem ligar",

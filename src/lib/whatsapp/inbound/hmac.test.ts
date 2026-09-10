@@ -5,7 +5,7 @@ import { signInboundPayload, verifyInboundRequest } from "./hmac.server.ts";
 
 describe("inbound hmac", () => {
   it("verifies valid signed payload", () => {
-    process.env.GATEWAY_INTERNAL_SECRET = "test-secret";
+    process.env["GATEWAY_INTERNAL_SECRET"] = "test-secret";
     const body = JSON.stringify({ hello: "world" });
     const timestamp = String(Date.now());
     const signature = signInboundPayload(timestamp, body);
@@ -20,7 +20,7 @@ describe("inbound hmac", () => {
   });
 
   it("rejects tampered signature", () => {
-    process.env.GATEWAY_INTERNAL_SECRET = "test-secret";
+    process.env["GATEWAY_INTERNAL_SECRET"] = "test-secret";
     const body = JSON.stringify({ hello: "world" });
     const timestamp = String(Date.now());
 

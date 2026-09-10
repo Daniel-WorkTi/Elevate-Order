@@ -220,9 +220,9 @@ export const getShopifyDashboard = createServerFn({ method: "GET" })
           serverConfigured: false,
           lastSyncAt: null,
           orderCount: null,
-          errorMessage: "Server synchronization is not fully configured.",
+          errorMessage: "Order sync is not ready on this server yet.",
         },
-        error: "Server synchronization is not fully configured.",
+        error: "Order sync is not ready on this server yet.",
       };
     }
 

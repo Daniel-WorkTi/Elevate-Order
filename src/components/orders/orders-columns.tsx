@@ -132,7 +132,9 @@ export function useOrdersColumns(): ColumnDef<OperationalOrder>[] {
         cell: ({ row }) => (
           <CodReplyBadge
             intent={row.original.cod_reply_intent}
-            replyText={row.original.cod_reply_text}
+            {...(row.original.cod_reply_text !== undefined
+              ? { replyText: row.original.cod_reply_text }
+              : {})}
             order={row.original}
           />
         ),

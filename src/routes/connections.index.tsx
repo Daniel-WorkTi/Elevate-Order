@@ -7,7 +7,6 @@ import { ConnectionRow } from "@/components/connections/workspace/connection-row
 import { WhatsAppLogo } from "@/components/connections/whatsapp/whatsapp-logo";
 import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { SupplyMark } from "@/components/supply-logo";
-import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
@@ -31,10 +30,9 @@ export const Route = createFileRoute("/connections/")({
 
 function ConnectionsPage() {
   const t = useT();
-  const store = useStoreConnectionPreference();
-  const dropi = useDropiConnectionPreference();
-  const dropea = useDropeaConnectionPreference();
   const { workspaceId } = useWorkspaceId();
+  const store = useStoreConnectionPreference(workspaceId);
+  const dropea = useDropeaConnectionPreference(workspaceId);
   const shopifyOauth = useQuery({
     queryKey: ["connections", "shopify", "oauth"],
     queryFn: () => getShopifyOauthStatus(),
@@ -56,10 +54,8 @@ function ConnectionsPage() {
   });
   const shopifyLinked = store.linked || Boolean(shopifyOauth.data?.connected);
   const dropiStatus = dropiDash.data?.summary
-    ? applyOperatorDropiSummary(dropiDash.data.summary, dropi.linked).status
-    : dropi.linked
-      ? "connected"
-      : "not_configured";
+    ? applyOperatorDropiSummary(dropiDash.data.summary).status
+    : "not_configured";
   const dropeaStatus = dropeaDash.data?.summary
     ? applyOperatorDropeaSummary(
         dropeaDash.data.summary,

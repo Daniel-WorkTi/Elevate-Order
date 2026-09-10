@@ -48,11 +48,12 @@ export function IntegrationCard({
       <p className="mt-2 flex-1 text-[14px] leading-relaxed text-muted-foreground">
         {t(`onboarding.integration.${integration.id}`)}
       </p>
+      <p className="mt-2 text-[12px] text-muted-foreground">{t("onboarding.store.connectLaterHint")}</p>
 
       <ConnectSpinButton
         className="mt-6"
-        label={selected ? t("onboarding.selected") : t("onboarding.connect")}
-        ariaLabel={t("onboarding.connectAria", { name: integration.name })}
+        label={selected ? t("onboarding.selected") : t("onboarding.continueWith", { name: integration.name })}
+        ariaLabel={t("onboarding.continueWithAria", { name: integration.name })}
         onClick={() => onSelect?.(integration.id)}
       />
     </article>
