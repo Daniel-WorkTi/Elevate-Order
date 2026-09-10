@@ -978,9 +978,9 @@ export const en: TranslationDict = {
   "settings.title": "Settings",
   "settings.subtitle": "Account and WhatsApp configuration.",
   "settings.saved": "Settings saved",
-  "settings.whatsappApi": "WhatsApp Business API",
+  "settings.whatsappApi": "WhatsApp",
   "settings.whatsappApiHint":
-    "Connection is managed in Connections via Meta Embedded Signup. Below are local message preferences only.",
+    "Connection is managed in Connections with a QR code. Below are local message preferences only.",
   "settings.whatsappManagedHint":
     "WhatsApp credentials are stored server-side per workspace. Connect or reconnect from Connections.",
   "settings.manageWhatsAppConnection": "Manage WhatsApp connection",
@@ -995,7 +995,7 @@ export const en: TranslationDict = {
   "settings.testMessageSent": "Test message sent",
   "settings.testMessageUnavailable": "API sending is not connected yet",
   "settings.testMessageUnavailableDesc":
-    "Use Open WhatsApp on the order. The WhatsApp Business API does not send from here.",
+    "Use Open WhatsApp on the order. Messages are not sent from Settings.",
   "settings.integrations": "Integrations",
   "settings.integrationsHint": "Connect Dropi and Dropea on the Connections page.",
   "settings.manageConnection": "Manage",
@@ -1192,7 +1192,7 @@ export const en: TranslationDict = {
   "meta.shopifyDescription": "Connect your Shopify store and sync complete orders into ELEVATE.",
   "meta.whatsappTitle": "WhatsApp — Connections — ELEVATE",
   "meta.whatsappDescription":
-    "Connect WhatsApp Business to this workspace with Meta Embedded Signup.",
+    "Connect WhatsApp to this workspace by scanning a QR code.",
   "meta.settingsTitle": "Settings — ELEVATE",
   "meta.onboardingTitle": "Onboarding — ELEVATE",
   "meta.onboardingDescription": "Connect your first store to import orders into ELEVATE Orders.",

@@ -981,9 +981,9 @@ export const pt: TranslationDict = {
   "settings.title": "Definições",
   "settings.subtitle": "Conta e configuração do WhatsApp.",
   "settings.saved": "Definições guardadas",
-  "settings.whatsappApi": "WhatsApp Business API",
+  "settings.whatsappApi": "WhatsApp",
   "settings.whatsappApiHint":
-    "A ligação é gerida em Conexões via Meta Embedded Signup. Abaixo ficam apenas preferências locais de mensagem.",
+    "A ligação é gerida em Conexões com um código QR. Abaixo ficam apenas preferências locais de mensagem.",
   "settings.whatsappManagedHint":
     "As credenciais WhatsApp ficam no servidor por workspace. Ligue ou religue em Conexões.",
   "settings.manageWhatsAppConnection": "Gerir ligação WhatsApp",
@@ -998,7 +998,7 @@ export const pt: TranslationDict = {
   "settings.testMessageSent": "Mensagem de teste enviada",
   "settings.testMessageUnavailable": "Envio pela API ainda não está ligado",
   "settings.testMessageUnavailableDesc":
-    "Use Abrir WhatsApp no pedido. A WhatsApp Business API não envia mensagens a partir daqui.",
+    "Use Abrir WhatsApp no pedido. As mensagens não são enviadas a partir das Definições.",
   "settings.integrations": "Integrações",
   "settings.integrationsHint": "Ligue Dropi e Dropea na página Conexões.",
   "settings.manageConnection": "Gerir",
@@ -1198,7 +1198,7 @@ export const pt: TranslationDict = {
   "meta.shopifyDescription": "Ligue a sua loja Shopify e sincronize pedidos completos no ELEVATE.",
   "meta.whatsappTitle": "WhatsApp — Conexões — ELEVATE",
   "meta.whatsappDescription":
-    "Ligue o WhatsApp Business a este workspace com Meta Embedded Signup.",
+    "Ligue o WhatsApp a este workspace ao digitalizar um código QR.",
   "meta.settingsTitle": "Definições — ELEVATE",
   "meta.onboardingTitle": "Onboarding — ELEVATE",
   "meta.onboardingDescription": "Ligue a sua primeira loja para importar pedidos para o ELEVATE Orders.",

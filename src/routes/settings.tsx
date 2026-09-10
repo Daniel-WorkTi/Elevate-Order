@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -11,6 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
 import { useWhatsAppSettings, type WhatsAppUiPreferences } from "@/hooks/use-whatsapp-settings";
+import { applyOperatorDropiSummary } from "@/lib/integrations/dropi/dropi-operator-status";
+import { getDropiDashboard } from "@/lib/integrations/dropi/dropi.functions";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
 
@@ -31,6 +34,16 @@ function SettingsPage() {
   const { settings, save } = useWhatsAppSettings();
   const { workspaceId } = useWorkspaceId();
   const dropea = useDropeaConnectionPreference(workspaceId);
+  const dropiQuery = useQuery({
+    queryKey: ["connections", "dropi", "dashboard", workspaceId, "settings"],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const dashboard = await getDropiDashboard({ data: { workspaceId } });
+      return applyOperatorDropiSummary(dashboard.summary);
+    },
+  });
+  const dropiLinked =
+    dropiQuery.data?.status === "connected" || dropiQuery.data?.status === "configured";
   const [draft, setDraft] = useState<WhatsAppUiPreferences>(settings);
 
   useEffect(() => {
@@ -98,7 +111,7 @@ function SettingsPage() {
           </div>
 
           {[
-            { name: "Dropi", linked: false, to: "/connections/dropi" as const },
+            { name: "Dropi", linked: dropiLinked, to: "/connections/dropi" as const },
             {
               name: "Dropea",
               linked: dropea.linked,

@@ -129,7 +129,7 @@ export function WhatsAppConnectButton({
       type="button"
       disabled={disabled || loading}
       onClick={onConnect}
-      className="h-10 rounded-[10px] bg-[#2563EB] px-4 text-[13px] font-medium text-white shadow-none hover:bg-[#1D4ED8] disabled:bg-[#2563EB]"
+      className="h-10 rounded-[10px] bg-whatsapp px-4 text-[13px] font-medium text-white shadow-none hover:bg-whatsapp/90 disabled:bg-whatsapp/60"
     >
       {loading ? t("connections.whatsappConnecting") : t("connections.whatsappConnect")}
     </Button>

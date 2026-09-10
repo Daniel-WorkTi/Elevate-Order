@@ -82,10 +82,7 @@ export function toWhatsAppUserError(error: unknown): WhatsAppUserError {
   }
 
   if (/fetch failed|ECONNREFUSED|ENOTFOUND|network/i.test(message)) {
-    return new WhatsAppUserError(
-      "gateway_unavailable",
-      "O gateway WhatsApp não está a correr. Inicie-o com npm run gateway:dev.",
-    );
+    return new WhatsAppUserError("gateway_unavailable", USER_MESSAGES.gateway_unavailable);
   }
 
   if (/gateway|WHATSAPP_GATEWAY|not_connected|gateway_send/i.test(message)) {

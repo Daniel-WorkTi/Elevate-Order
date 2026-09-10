@@ -10,7 +10,13 @@ import {
 import { sourceFromWebhookAuth } from "@/lib/integrations/dropi/source";
 import { resolvePublicWebhookAuth } from "@/lib/integrations/webhook-auth";
 
-function logisticsFromEvent(event: NormalizedDropiEvent) {
+function logisticsFromEvent(
+  event: NormalizedDropiEvent,
+  supply: "dropi" | "dropea" | null,
+) {
+  // Prefer auth supply stamp over payload source (avoids Dropi/Dropea normalizer mix).
+  if (supply === "dropea") return normalizeDropeaOrder(event.raw);
+  if (supply === "dropi") return normalizeDropiOrder(event.raw);
   const source = (event.source ?? "").toLowerCase();
   if (source.includes("dropea")) return normalizeDropeaOrder(event.raw);
   return normalizeDropiOrder(event.raw);
@@ -158,7 +164,7 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
   }
 
   const eventRows = acceptedEvents.map((e) => {
-    const logistics = logisticsFromEvent(e);
+    const logistics = logisticsFromEvent(e, auth.supply);
     return {
       order_id: e.order_id,
       event_date: e.event_date,
@@ -217,7 +223,7 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
   const orderRows = [...latest.values()].map((row) => {
     const existing = existingById.get(row.order_id);
     const twin = row.shopify_order_id ? twinByShopifyId.get(row.shopify_order_id) : undefined;
-    const logistics = logisticsFromEvent(row);
+    const logistics = logisticsFromEvent(row, auth.supply);
     return {
       order_id: row.order_id,
       shopify_order_id: row.shopify_order_id,
