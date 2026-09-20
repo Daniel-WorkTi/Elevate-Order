@@ -5,16 +5,17 @@ import { buildWhatsAppLink, normalizeWhatsAppPhone } from "./order-message.ts";
 import { safeTrackingHref } from "./order-domain.ts";
 
 describe("wa.me generation", () => {
-  it("normalizes phone to digits and encodes message text", () => {
+  it("normalizes phone to E.164 and encodes message text", () => {
     const phone = normalizeWhatsAppPhone("+351 931 815 886");
-    assert.equal(phone, "351931815886");
+    assert.equal(phone, "+351931815886");
     const link = buildWhatsAppLink(phone!, "Olá João — pedido #999\nhttps://track.example/abc?x=1");
     assert.ok(link.startsWith("https://wa.me/351931815886?text="));
     assert.ok(link.includes(encodeURIComponent("Olá João — pedido #999")));
     assert.ok(link.includes(encodeURIComponent("https://track.example/abc?x=1")));
   });
 
-  it("rejects short phones", () => {
+  it("rejects ambiguous local numbers without country code", () => {
+    assert.equal(normalizeWhatsAppPhone("912345678"), null);
     assert.equal(normalizeWhatsAppPhone("123"), null);
   });
 });

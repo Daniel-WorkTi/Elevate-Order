@@ -15,5 +15,7 @@ export function tryGetWhatsAppGatewayUrl(): string | null {
 }
 
 export function isWhatsAppGatewayConfigured(): boolean {
-  return tryGetWhatsAppGatewayUrl() !== null;
+  const url = tryGetWhatsAppGatewayUrl();
+  const secret = process.env["GATEWAY_INTERNAL_SECRET"]?.trim();
+  return url !== null && Boolean(secret);
 }

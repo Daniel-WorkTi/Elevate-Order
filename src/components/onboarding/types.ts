@@ -15,10 +15,31 @@ export type IntegrationOption = {
   status: IntegrationStatus;
 };
 
-export type OnboardingStepId = "store" | "orders" | "whatsapp" | "ready";
+/** Canonical onboarding steps (3). Legacy `store` / `orders` map to `configuration`. */
+export type OnboardingStepId = "configuration" | "whatsapp" | "ready";
+
+export type LegacyOnboardingStepId = "store" | "orders";
 
 export type OnboardingStep = {
   id: OnboardingStepId;
   label: string;
   number: number;
 };
+
+export const ONBOARDING_STEP_ORDER: readonly OnboardingStepId[] = [
+  "configuration",
+  "whatsapp",
+  "ready",
+] as const;
+
+/** Map old URLs (?step=store|orders) and aliases onto the 3-step model. */
+export function normalizeOnboardingStepId(
+  value: string | undefined | null,
+): OnboardingStepId | null {
+  if (!value) return null;
+  if (value === "store" || value === "orders" || value === "configuration") {
+    return "configuration";
+  }
+  if (value === "whatsapp" || value === "ready") return value;
+  return null;
+}

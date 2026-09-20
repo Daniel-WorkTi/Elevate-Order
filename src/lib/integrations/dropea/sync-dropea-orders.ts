@@ -11,6 +11,7 @@ import {
   coalesceStatic,
   type NormalizedDropiEvent,
 } from "@/lib/integrations/dropi/dropi-webhook-normalize";
+import { collectCrossWorkspaceOrderCollisions } from "@/lib/orders/cross-workspace-order-collision";
 import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
 
 const syncInput = z.object({
@@ -23,6 +24,7 @@ export type SyncDropeaResult = {
   ok: boolean;
   imported: number;
   message?: string;
+  skippedCollisions?: number;
 };
 
 function extractOrderList(payload: unknown): unknown[] {
@@ -106,7 +108,42 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const nowIso = new Date().toISOString();
 
-    const eventRows = events.map((e) => {
+    const candidateOrderIds = [...new Set(events.map((e) => e.order_id))];
+    const { data: existingRows } = await supabaseAdmin
+      .from("orders")
+      .select(
+        "order_id, workspace_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency",
+      )
+      .in("order_id", candidateOrderIds);
+
+    const blockedOrderIds = collectCrossWorkspaceOrderCollisions(
+      (existingRows ?? []).map((row) => ({
+        order_id: row.order_id as number,
+        workspace_id: (row.workspace_id as string | null) ?? null,
+      })),
+      workspaceId,
+    );
+
+    if (blockedOrderIds.size > 0) {
+      for (const orderId of blockedOrderIds) {
+        console.error(
+          "[dropea] order_id collision across workspaces — skipped",
+          JSON.stringify({ order_id: orderId }),
+        );
+      }
+    }
+
+    const acceptedEvents = events.filter((e) => !blockedOrderIds.has(e.order_id));
+    if (acceptedEvents.length === 0 && blockedOrderIds.size > 0) {
+      return {
+        ok: false,
+        imported: 0,
+        skippedCollisions: blockedOrderIds.size,
+        message: "Order conflict with another workspace",
+      };
+    }
+
+    const eventRows = acceptedEvents.map((e) => {
       const logistics = normalizeDropeaOrder(e.raw);
       return {
         order_id: e.order_id,
@@ -135,21 +172,15 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
     }
 
     const latest = new Map<number, NormalizedDropiEvent>();
-    for (const row of events) {
+    for (const row of acceptedEvents) {
       const current = latest.get(row.order_id);
       if (!current || row.event_date > current.event_date) latest.set(row.order_id, row);
     }
 
-    const orderIds = [...latest.keys()];
-    const { data: existingRows } = await supabaseAdmin
-      .from("orders")
-      .select(
-        "order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency",
-      )
-      .in("order_id", orderIds);
-
     const existingById = new Map(
-      (existingRows ?? []).map((row) => [row.order_id as number, row]),
+      (existingRows ?? [])
+        .filter((row) => !blockedOrderIds.has(row.order_id as number))
+        .map((row) => [row.order_id as number, row]),
     );
 
     const orderRows = [...latest.values()].map((row) => {
@@ -194,5 +225,9 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
       return { ok: false, imported: 0, message: "Failed to store orders" };
     }
 
-    return { ok: true, imported: orderRows.length };
+    return {
+      ok: true,
+      imported: orderRows.length,
+      ...(blockedOrderIds.size > 0 ? { skippedCollisions: blockedOrderIds.size } : {}),
+    };
   });

@@ -15,7 +15,7 @@ export type InboxQueueResult = {
 };
 
 const COLUMNS_FULL =
-  "id, order_id, shopify_order_id, confirmed_at, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, source, last_event_at, created_at";
+  "id, order_id, shopify_order_id, confirmed_at, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, source, last_event_at, last_whatsapp_contact_at, created_at";
 
 const COLUMNS_LEGACY =
   "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at, created_at";
@@ -49,6 +49,7 @@ function toOrder(row: Record<string, unknown>): OperationalOrder {
     address: (row["address"] as string | null) ?? null,
     source: String(row["source"] ?? ""),
     last_event_at: (row["last_event_at"] as string | null) ?? null,
+    last_whatsapp_contact_at: (row["last_whatsapp_contact_at"] as string | null) ?? null,
     created_at: (row["created_at"] as string | null) ?? null,
     product_summary: (row["product_summary"] as string | null) ?? null,
   };

@@ -10,7 +10,10 @@ type OnboardingStepperProps = {
   className?: string;
 };
 
-export function OnboardingStepper({ currentStep = "store", className }: OnboardingStepperProps) {
+export function OnboardingStepper({
+  currentStep = "configuration",
+  className,
+}: OnboardingStepperProps) {
   const t = useT();
   const currentIndex = ONBOARDING_STEPS.findIndex((s) => s.id === currentStep);
 

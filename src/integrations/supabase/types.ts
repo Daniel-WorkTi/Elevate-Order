@@ -317,6 +317,7 @@ export type Database = {
           external_confirmation_status: string;
           id: string;
           last_event_at: string | null;
+          last_whatsapp_contact_at: string | null;
           order_id: number;
           phone: string | null;
           postal_code: string | null;
@@ -356,6 +357,7 @@ export type Database = {
           external_confirmation_status?: string;
           id?: string;
           last_event_at?: string | null;
+          last_whatsapp_contact_at?: string | null;
           order_id: number;
           phone?: string | null;
           postal_code?: string | null;
@@ -395,6 +397,7 @@ export type Database = {
           external_confirmation_status?: string;
           id?: string;
           last_event_at?: string | null;
+          last_whatsapp_contact_at?: string | null;
           order_id?: number;
           phone?: string | null;
           postal_code?: string | null;

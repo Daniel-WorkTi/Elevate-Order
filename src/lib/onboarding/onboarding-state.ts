@@ -83,6 +83,9 @@ export function isOnboardingExemptPath(pathname: string): boolean {
   return (
     pathname === "/onboarding" ||
     pathname.startsWith("/connections/whatsapp") ||
+    pathname.startsWith("/connections/shopify") ||
+    pathname.startsWith("/connections/dropi") ||
+    pathname.startsWith("/connections/dropea") ||
     pathname.startsWith("/auth/") ||
     pathname === "/login" ||
     pathname.startsWith("/api/")

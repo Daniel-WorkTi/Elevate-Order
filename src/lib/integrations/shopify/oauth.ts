@@ -145,6 +145,8 @@ export type ShopifyOauthCookie = {
   shop: string;
   userId: string;
   workspaceId?: string;
+  /** Post-install redirect path (sanitized on write). */
+  returnTo?: string;
 };
 
 export function encodeOauthCookie(value: ShopifyOauthCookie): string {
@@ -165,6 +167,7 @@ export function decodeOauthCookie(raw: string | undefined): ShopifyOauthCookie |
         shop: parsed.shop,
         userId: parsed.userId,
         ...(typeof parsed.workspaceId === "string" ? { workspaceId: parsed.workspaceId } : {}),
+        ...(typeof parsed.returnTo === "string" ? { returnTo: parsed.returnTo } : {}),
       };
     }
     return null;

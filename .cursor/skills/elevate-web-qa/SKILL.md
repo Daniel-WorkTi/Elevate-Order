@@ -1,138 +1,123 @@
 ---
 name: elevate-web-qa
 description: >-
-  Testa todas as funções do sistema web ELEVATE Orders (rotas, board de pedidos,
-  WhatsApp, painéis financeiros, ads Meta, webhook/API, settings, pricing, help).
-  Use when the user asks to test the web app, QA, regression, smoke test, or
-  verificar funções do dashboard Elevate.
+  Testa as funções do sistema web ELEVATE Orders (Inbox, Orders, Templates,
+  Profits, Connections, onboarding, settings, webhooks). Use when the user asks
+  to test the web app, QA, regression, smoke test, or verificar funções Elevate.
 ---
 
 # ELEVATE Web QA Agent
 
-Agente de teste manual/sistemático do app em `http://localhost:8080` (ou URL que o usuário indicar).
+Teste manual/sistemático em `https://localhost:8081` (ou URL indicada).  
+Porta default do `npm run dev`: **8081**.
 
-## Antes de testar
+## Before testing
 
-1. Confirmar `npm run dev` rodando e home com HTTP 200.
-2. Ler [PROJECT_READER.md](../../../PROJECT_READER.md) para saber o que é mock vs real.
-3. Não inventar backend: se a UI só mostra toast/`localStorage`/dados hardcoded, reportar como **mock** (não como bug de rede).
-4. Nunca expor nem commitá-las: service role, tokens WA, secrets do `.env`.
+1. Confirm `npm run dev` is up (and `npm run gateway:dev` if testing WhatsApp).
+2. Read **PROJECT.md**, **DESIGN.md**, and **docs/CURRENT_STATE.md**.
+3. Do **not** use `docs/archive/**` or deleted `PROJECT_READER.md` as current truth.
+4. Never invent backend: if UI has no real source of truth, report **ghost feature** / mock — not a network bug.
+5. Never expose or commit secrets (service role, WA tokens, `.env` values).
 
-## Matriz de funções (executar nesta ordem)
+## Official nav (must match chrome)
 
-Copie e marque o progresso:
+1. Inbox `/`  
+2. Orders `/orders`  
+3. Templates `/templates`  
+4. Profits `/profits`  
+5. Connections `/connections`  
+
+Also exercise when relevant: `/onboarding`, `/settings` (user menu), `/login`, `/orders/$id`.
+
+**Do not** treat as active product QA: Pricing, Meta Ads, Analytics pages, fake global search, fake notification bell. Legacy redirects may still exist — confirm they redirect, don’t reintroduce pages.
+
+## Progress checklist
 
 ```
 QA Progress:
-- [ ] Shell: nav, theme, 404
-- [ ] Dashboard /
-- [ ] Orders /orders
-- [ ] Analytics /analytics
-- [ ] Ads /ads
-- [ ] Integração API /integracao-api
+- [ ] Shell: nav 5 items, theme, 404
+- [ ] Ghost feature scan
+- [ ] Inbox /
+- [ ] Orders /orders (+ detail)
+- [ ] Templates /templates
+- [ ] Profits /profits
+- [ ] Connections hub + Dropi / Dropea / Shopify / WhatsApp
+- [ ] Onboarding /onboarding
 - [ ] Settings /settings
-- [ ] Pricing /pricing
-- [ ] Help /help
-- [ ] Webhook POST (se env permitir)
+- [ ] Auth gate → /login
+- [ ] Supply isolation Dropi ≠ Dropea
+- [ ] Webhook / gateway smoke (if env allows)
 ```
 
 ### 1. Shell
 
-- Navegar por todos os links da sidebar (Operação / Integrações / Conta).
-- Alternar tema claro/escuro; recarregar e confirmar persistência (`elevate-theme`).
-- Busca global do header: **esperado** não filtrar nada (gap conhecido).
-- Abrir rota inexistente → 404 com link home.
+- Sidebar: only Inbox, Orders, Templates, Profits, Connections.
+- No Pricing / Ads / Analytics / Upgrade / fake search / fake bell.
+- Theme toggle persists.
+- Unknown route → 404 with home link.
 
-### 2. Dashboard `/`
+### 2. Ghost feature detection
 
-- Stats Confirmed / Messaged / Unanswered / Incidents batem com contagens do mock.
-- ProfitPanel: toggles Lucro bruto/líquido e EUR/BRL atualizam valores.
-- Link “Abrir Integração Ads” → `/ads`.
-- MoneyPanel: EUR/BRL; cards retido/recuperado; taxas Dropi/Dropea.
-- OrdersBoard embutido: abrir card Details e botão WhatsApp.
+Fail the build/report if UI shows:
 
-### 3. Orders `/orders`
+- Connected without backend/session/events proof  
+- Syncing without an in-flight sync  
+- Sent without provider ack / persisted result  
+- Fake analytics KPIs  
+- Fake automation progress  
+- Fake notifications  
 
-- Tabs All / Confirmed / Messaged / Unanswered / Incident com contadores.
-- Busca por order ID, cliente e CEP.
-- Select “Last 7/30/90 days”: **esperado** não filtrar (gap conhecido) — registrar.
-- Card: “Enviar mensagem” abre `wa.me` com texto coerente ao status/motivo.
-- Dialog: editar textarea, Open in WhatsApp, Queue send → toast.
+### 3. Inbox `/`
 
-### 4. Analytics `/analytics`
+- WhatsApp conversation UI loads (auth required).
+- Empty/loading/error states are honest.
+- No Meta Embedded Signup chrome.
 
-- 4 KPIs visíveis.
-- Charts carregam (ClientOnly/Suspense); sem crash SSR.
+### 4. Orders `/orders`
 
-### 5. Ads `/ads`
+- Supply tabs **[ Dropi ] [ Dropea ]** — queues never mixed.
+- Data from Supabase server functions (not mock board).
+- Open detail / drawer: tracking only if present; never invent URL.
+- COD / message actions reflect real eligibility.
 
-- Conectar/Desconectar Meta (estado local).
-- Persistir ID conta e gasto (`elevate-ad-account`, `elevate-ad-spend`).
-- Alterar gasto e voltar ao Dashboard: lucro líquido deve refletir o novo valor.
-- Tabela de campanhas renderiza; ROAS/CPA recalculam.
+### 5. Templates `/templates`
 
-### 6. Integração API `/integracao-api`
+- List/create/edit from real templates store.
+- Preview uses placeholders — no fake send.
 
-- URL do webhook e headers `apikey` visíveis.
-- Tabela: lista pedidos **ou** empty state **ou** mensagem de erro amigável.
-- Se faltar `SUPABASE_SERVICE_ROLE_KEY`, reportar como **bloqueio P0**, não falha de UI.
+### 6. Profits `/profits`
 
-### 7. Settings `/settings`
+- Aggregation may cross supplies **via filters**.
+- Numbers from real order data; skeleton while loading.
 
-- Submit → toast “Settings saved” (sem persistência real).
-- “Send test message” → toast.
-- Toggles Dropi/Dropea/auto-message interativos.
+### 7. Connections
 
-### 8. Pricing `/pricing`
+For each of Shopify, Dropi, Dropea, WhatsApp:
 
-- 3 planos; CTA → toast “{plan} plan selected”.
-- Plano Pro destacado.
+- Status badge matches backend source of truth.  
+- **Connected ≠ localStorage-only.**  
+- Errors explain impact + next action.  
+- WhatsApp: QR/session from gateway; disconnected/reconnecting must match session state.
 
-### 9. Help `/help`
+### 8. Onboarding `/onboarding`
 
-- Accordion FAQ abre/fecha.
-- Card Contact support aponta para WhatsApp externo.
+- Steps: Store → Order source → WhatsApp → Ready (target).
+- Continue/disabled states must not claim Connected without proof.
+- Same visual language as app (DESIGN.md).
 
-### 10. Webhook (opcional, só com service role)
+### 9. Settings `/settings`
 
-- `POST /api/public/webhooks/orders` sem `apikey` → 401.
-- Payload inválido → 422.
-- Payload válido → `{ ok: true }` e linha nova/atualizada em Integração API após ~30s.
-- Não documentar nem colar a service role na resposta ao usuário.
+- Prefs that are local must not pretend to be server sync.
+- Links to Connections for real integrations.
 
-## Formato do relatório
+### 10. External smoke (optional)
 
-```markdown
-# Relatório QA ELEVATE — YYYY-MM-DD
+- `POST /api/public/webhooks/orders` without auth → 401.  
+- Inbound without HMAC → reject.  
+- Gateway `GET /health` when testing WA.
 
-## Ambiente
-- URL:
-- Branch/commit:
-- Service role presente: sim/não
+## Report format
 
-## Resumo
-- Passou: N
-- Falhou: N
-- Gaps conhecidos (mock): N
-
-## Resultados
-| Área | Caso | Resultado | Notas |
-| --- | --- | --- | --- |
-| Orders | Busca CEP | PASS/FAIL/SKIP | |
-
-## Bugs novos
-1. Severidade · rota · passos · esperado · obtido
-
-## Gaps já conhecidos (não abrir como bug novo)
-- Board usa mock, não Supabase
-- Filtro de data sem efeito
-- Settings/Pricing/Ads connect sem backend
-- Auth UI ausente
-```
-
-## Regras
-
-- Preferir evidência (status HTTP, toast, valor na tela) a opinião.
-- Separar **FAIL** (quebrado) de **GAP** (propositalmente mock).
-- Após mudanças de código, reexecutar só a área afetada + smoke das rotas.
-- Responder ao usuário em português, curto, com a tabela de resultados.
+For each area: **PASS** | **FAIL** | **BLOCKED_EXTERNAL** | **GHOST_FEATURE**.  
+Cite route + what source of truth was checked.  
+No secrets in the report.

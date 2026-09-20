@@ -14,6 +14,7 @@ import { persistShopifyNormalizedOrders } from "@/lib/integrations/shopify/persi
 const shopInput = z.object({
   shop: z.string().min(3).max(120),
   workspaceId: z.string().uuid().optional(),
+  returnTo: z.string().max(200).optional(),
 });
 
 const WEBHOOK_TOPICS = [
@@ -111,6 +112,10 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
     const state = oauth.createOauthNonce();
     const origin = getPublicAppUrl();
     const redirectUri = `${origin}/auth/shopify/callback`;
+    const { sanitizeShopifyOauthReturnTo } = await import(
+      "@/lib/integrations/shopify/oauth-return-to"
+    );
+    const returnTo = sanitizeShopifyOauthReturnTo(data.returnTo);
     const url = oauth.shopifyAuthorizeUrl({
       shop,
       apiKey: config.apiKey,
@@ -126,6 +131,7 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
         state,
         shop,
         userId,
+        returnTo,
         ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
       }),
       {
@@ -152,8 +158,11 @@ const callbackSchema = z.object({
 
 export const completeShopifyInstall = createServerFn({ method: "POST" })
   .validator((data: unknown) => callbackSchema.parse(data))
-  .handler(async ({ data }): Promise<{ ok: true; shop: string }> => {
+  .handler(async ({ data }): Promise<{ ok: true; shop: string; returnTo: string }> => {
     const oauth = await import("@/lib/integrations/shopify/oauth");
+    const { sanitizeShopifyOauthReturnTo, DEFAULT_SHOPIFY_OAUTH_RETURN_TO } = await import(
+      "@/lib/integrations/shopify/oauth-return-to"
+    );
     const config = oauth.getShopifyAppConfig();
     if (!config) throw new Error("Shopify app is not configured on this server.");
 
@@ -170,6 +179,7 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     if (!cookie || cookie.state !== data.state || cookie.shop !== shop) {
       throw new Error("Invalid OAuth state");
     }
+    const returnTo = sanitizeShopifyOauthReturnTo(cookie.returnTo ?? DEFAULT_SHOPIFY_OAUTH_RETURN_TO);
 
     const token = await oauth.exchangeShopifyAccessToken({
       shop,
@@ -207,7 +217,7 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     }
 
     setCookie(oauth.SHOPIFY_OAUTH_STATE_COOKIE, "", { path: "/", maxAge: 0 });
-    return { ok: true, shop };
+    return { ok: true, shop, returnTo };
   });
 
 export const connectShopifyManualStore = createServerFn({ method: "POST" })

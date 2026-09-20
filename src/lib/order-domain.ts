@@ -35,6 +35,8 @@ export type OperationalOrder = {
   cod_reply_at?: string | null;
   cod_reply_text?: string | null;
   cod_request_sent_at?: string | null;
+  /** Elevate successfully sent WhatsApp for this order (contact truth). */
+  last_whatsapp_contact_at?: string | null;
   /** Operator marked manual Dropi action done (Phase 7). */
   cod_handled_at?: string | null;
   cod_handled_by_user_id?: string | null;
@@ -136,6 +138,7 @@ export function supplyMatchesSource(supply: Supply, source: string): boolean {
 export function getOrderStatus(
   order: Pick<OperationalOrder, "status_name" | "details"> & {
     confirmed_at?: string | null;
+    last_whatsapp_contact_at?: string | null;
   },
 ): {
   key: OrderStatusKey;
@@ -150,6 +153,23 @@ export function getOrderStatus(
 
   const haystack = `${order.status_name ?? ""} ${order.details ?? ""}`.trim();
   const match = STATUS_RULES.find((rule) => rule.pattern.test(haystack));
+
+  // Terminal / incident supply states win over Elevate contact.
+  if (match && (match.key === "cancelled" || match.key === "delivered" || match.key === "incident")) {
+    return {
+      key: match.key,
+      label: order.status_name?.trim() || STATUS_LABEL[match.key],
+    };
+  }
+
+  // Successful Elevate WhatsApp send → operational messaged (not supply regex alone).
+  if (order.last_whatsapp_contact_at) {
+    return {
+      key: "messaged",
+      label: order.status_name?.trim() || STATUS_LABEL.messaged,
+    };
+  }
+
   if (match) {
     return {
       key: match.key,

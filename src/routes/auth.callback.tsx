@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { exchangeAuthCode } from "@/lib/auth/session.functions";
 import { useT } from "@/lib/i18n/locale-context";
+import { getOnboardingGate } from "@/lib/onboarding/onboarding.functions";
 
 type CallbackSearch = {
   code?: string;
@@ -35,8 +36,11 @@ export const Route = createFileRoute("/auth/callback")({
       });
     }
 
-    // First landing after login: onboarding (root gate skips if already done).
-    throw redirect({ to: "/onboarding", replace: true });
+    const gate = await getOnboardingGate();
+    if (gate.needsOnboarding) {
+      throw redirect({ to: "/onboarding", replace: true });
+    }
+    throw redirect({ to: "/", replace: true });
   },
   component: AuthCallbackPending,
 });

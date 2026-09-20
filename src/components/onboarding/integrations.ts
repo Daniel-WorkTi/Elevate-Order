@@ -1,13 +1,16 @@
 import { DropeaMark, DropiMark, ShopifyMark } from "@/components/onboarding/brand-icons";
 import type { IntegrationOption, OnboardingStep } from "@/components/onboarding/types";
+import { ONBOARDING_STEP_ORDER } from "@/components/onboarding/types";
 
-export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
-  { id: "store", label: "Store", number: 1 },
-  { id: "orders", label: "Orders", number: 2 },
-  { id: "whatsapp", label: "WhatsApp", number: 3 },
-  { id: "ready", label: "Ready", number: 4 },
-] as const;
+export const ONBOARDING_STEPS: readonly OnboardingStep[] = ONBOARDING_STEP_ORDER.map(
+  (id, index) => ({
+    id,
+    label: id,
+    number: index + 1,
+  }),
+);
 
+/** Catalog metadata only — connection UI uses real Connections panels. */
 export const INTEGRATION_OPTIONS: readonly IntegrationOption[] = [
   {
     id: "shopify",

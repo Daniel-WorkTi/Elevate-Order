@@ -56,6 +56,28 @@ test("messaged orders enter as follow-up", () => {
   assert.equal(item?.priority, "followup");
 });
 
+test("last_whatsapp_contact_at marks messaged without supply status rename", () => {
+  const item = operationalOrderToInboxItem(
+    order({
+      status_name: "Waiting",
+      details: null,
+      last_whatsapp_contact_at: "2026-09-20T12:00:00.000Z",
+    }),
+  );
+  assert.equal(item?.priority, "followup");
+});
+
+test("incident still wins over last_whatsapp_contact_at", () => {
+  const item = operationalOrderToInboxItem(
+    order({
+      status_name: "Incident",
+      details: "Address issue",
+      last_whatsapp_contact_at: "2026-09-20T12:00:00.000Z",
+    }),
+  );
+  assert.equal(item?.priority, "critical");
+});
+
 test("delivered orders stay out of the inbox queue", () => {
   assert.equal(operationalOrderToInboxItem(order({ status_name: "Delivered", details: null })), null);
 });

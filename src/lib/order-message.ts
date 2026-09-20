@@ -16,6 +16,7 @@ import {
   type TemplateKind,
 } from "@/lib/templates";
 import { TEMPLATE_KIND_I18N } from "@/lib/templates/template-kind-i18n";
+import { normalizePhoneToE164 } from "@/lib/whatsapp/phone-e164";
 
 export type MessageTemplateId = TemplateKind;
 
@@ -118,14 +119,12 @@ export function resolveOrderMessage(
 }
 
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 8) return null;
-  return digits;
+  return normalizePhoneToE164(phone);
 }
 
 export function buildWhatsAppLink(phone: string, message: string): string {
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 export type MessageFieldChip = {

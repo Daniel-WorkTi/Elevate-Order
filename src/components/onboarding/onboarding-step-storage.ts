@@ -1,19 +1,21 @@
 import type { OnboardingStepId } from "@/components/onboarding/types";
+import {
+  normalizeOnboardingStepId,
+  ONBOARDING_STEP_ORDER,
+} from "@/components/onboarding/types";
 
 const STORAGE_KEY = "elevate-onboarding-step";
 
-const STEP_ORDER: readonly OnboardingStepId[] = ["store", "orders", "whatsapp", "ready"];
-
 export function isOnboardingStep(value: string | undefined): value is OnboardingStepId {
-  return STEP_ORDER.includes(value as OnboardingStepId);
+  const normalized = normalizeOnboardingStepId(value);
+  return normalized !== null && (ONBOARDING_STEP_ORDER as readonly string[]).includes(normalized);
 }
 
 export function readPersistedOnboardingStep(): OnboardingStepId | null {
   if (typeof window === "undefined") return null;
   try {
     const saved = window.sessionStorage.getItem(STORAGE_KEY);
-    if (saved !== null && isOnboardingStep(saved)) return saved;
-    return null;
+    return normalizeOnboardingStepId(saved ?? undefined);
   } catch {
     return null;
   }
@@ -29,8 +31,9 @@ export function persistOnboardingStep(step: OnboardingStepId) {
 }
 
 export function resolveOnboardingInitialStep(
-  urlStep: OnboardingStepId | undefined,
+  urlStep: string | undefined,
 ): OnboardingStepId {
-  if (urlStep && isOnboardingStep(urlStep)) return urlStep;
-  return readPersistedOnboardingStep() ?? "store";
+  const fromUrl = normalizeOnboardingStepId(urlStep);
+  if (fromUrl) return fromUrl;
+  return readPersistedOnboardingStep() ?? "configuration";
 }

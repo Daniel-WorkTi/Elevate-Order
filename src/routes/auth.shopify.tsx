@@ -2,11 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { startShopifyInstall } from "@/lib/integrations/shopify/oauth.functions";
+import {
+  sanitizeShopifyOauthReturnTo,
+  shopifyOauthErrorReturnTo,
+} from "@/lib/integrations/shopify/oauth-return-to";
 import { useT } from "@/lib/i18n/locale-context";
 
 type ShopifyStartSearch = {
   shop?: string;
   workspaceId?: string;
+  returnTo?: string;
 };
 
 export const Route = createFileRoute("/auth/shopify")({
@@ -14,6 +19,7 @@ export const Route = createFileRoute("/auth/shopify")({
     const result: ShopifyStartSearch = {};
     if (typeof search["shop"] === "string") result.shop = search["shop"];
     if (typeof search["workspaceId"] === "string") result.workspaceId = search["workspaceId"];
+    if (typeof search["returnTo"] === "string") result.returnTo = search["returnTo"];
     return result;
   },
   component: ShopifyAuthStart,
@@ -25,8 +31,9 @@ function ShopifyAuthStart() {
 
   useEffect(() => {
     const shop = search.shop;
+    const returnTo = sanitizeShopifyOauthReturnTo(search.returnTo);
     if (!shop) {
-      window.location.replace("/connections/shopify");
+      window.location.replace(returnTo);
       return;
     }
 
@@ -40,6 +47,7 @@ function ShopifyAuthStart() {
     void startShopifyInstall({
       data: {
         shop,
+        returnTo,
         ...(search.workspaceId ? { workspaceId: search.workspaceId } : {}),
       },
     })
@@ -49,14 +57,14 @@ function ShopifyAuthStart() {
       })
       .catch(() => {
         if (!cancelled) {
-          window.location.replace("/connections/shopify?error=oauth");
+          window.location.replace(shopifyOauthErrorReturnTo(returnTo));
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [search.shop, search.workspaceId]);
+  }, [search.shop, search.workspaceId, search.returnTo]);
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-[#F7F8FA]">

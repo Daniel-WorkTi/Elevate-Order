@@ -7,6 +7,7 @@ import {
   encryptIntegrationSecret,
   TokenCryptoError,
 } from "@/lib/integrations/credential-crypto.server";
+import { DropeaApiError, fetchDropeaOrders } from "@/lib/integrations/dropea/client";
 import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
 
 const saveInput = z.object({
@@ -78,7 +79,26 @@ export const saveDropeaCredentials = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ ok: true } | { ok: false; error: string }> => {
     try {
       const workspaceId = (await authorizeWorkspaceInput(context.userId, data.workspaceId)).id;
-      const apiCipher = encryptIntegrationSecret(data.apiToken.trim());
+      const apiToken = data.apiToken.trim();
+
+      try {
+        await fetchDropeaOrders(apiToken);
+      } catch (error) {
+        if (error instanceof DropeaApiError && (error.status === 401 || error.status === 403)) {
+          return { ok: false, error: "Dropea rejected this API key." };
+        }
+        const message =
+          error instanceof Error ? error.message : "Unable to verify Dropea API key.";
+        return {
+          ok: false,
+          error:
+            message.includes("unavailable") || message.includes("abort")
+              ? "Dropea API unavailable — credentials were not saved."
+              : "Unable to verify Dropea API key — credentials were not saved.",
+        };
+      }
+
+      const apiCipher = encryptIntegrationSecret(apiToken);
       const hmacCipher = encryptIntegrationSecret(data.hmacSecret.trim());
       const nowIso = new Date().toISOString();
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

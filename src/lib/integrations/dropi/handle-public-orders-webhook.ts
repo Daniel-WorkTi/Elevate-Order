@@ -9,6 +9,7 @@ import {
 } from "@/lib/integrations/dropi/dropi-webhook-normalize";
 import { sourceFromWebhookAuth } from "@/lib/integrations/dropi/source";
 import { resolvePublicWebhookAuth } from "@/lib/integrations/webhook-auth";
+import { collectCrossWorkspaceOrderCollisions } from "@/lib/orders/cross-workspace-order-collision";
 
 function logisticsFromEvent(
   event: NormalizedDropiEvent,
@@ -142,16 +143,21 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
   );
 
   // Schema still has global UNIQUE(order_id). Refuse cross-workspace overwrite.
-  const blockedOrderIds = new Set<number>();
-  if (workspaceId) {
-    for (const [orderId, row] of existingById) {
-      if (row.workspace_id && row.workspace_id !== workspaceId) {
-        blockedOrderIds.add(orderId);
-        console.error(
-          "[webhook] order_id collision across workspaces — skipped",
-          JSON.stringify({ order_id: orderId }),
-        );
-      }
+  const blockedOrderIds = workspaceId
+    ? collectCrossWorkspaceOrderCollisions(
+        ((existingRows ?? []) as ExistingOrderRow[]).map((row) => ({
+          order_id: row.order_id,
+          workspace_id: row.workspace_id,
+        })),
+        workspaceId,
+      )
+    : new Set<number>();
+  if (blockedOrderIds.size > 0) {
+    for (const orderId of blockedOrderIds) {
+      console.error(
+        "[webhook] order_id collision across workspaces — skipped",
+        JSON.stringify({ order_id: orderId }),
+      );
     }
   }
 

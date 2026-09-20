@@ -38,7 +38,7 @@ export type SyncedOrder = {
 };
 
 const ORDER_COLUMNS_FULL =
-  "id, order_id, shopify_order_id, confirmed_at, cod_reply_intent, cod_reply_at, cod_reply_text, cod_request_sent_at, cod_handled_at, cod_handled_by_user_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, created_at, workspace_id";
+  "id, order_id, shopify_order_id, confirmed_at, cod_reply_intent, cod_reply_at, cod_reply_text, cod_request_sent_at, cod_handled_at, cod_handled_by_user_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, last_whatsapp_contact_at, created_at, workspace_id";
 
 const ORDER_COLUMNS_LEGACY =
   "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at, created_at";
@@ -117,6 +117,7 @@ type OrdersRow = {
   workspace_id?: string | null;
   source: string;
   last_event_at: string | null;
+  last_whatsapp_contact_at?: string | null;
   created_at: string | null;
 };
 
@@ -158,6 +159,7 @@ function mapOrder(row: OrdersRow): OperationalOrder {
     address: coalesceText(row.address, extra.address),
     source: row.source,
     last_event_at: row.last_event_at,
+    last_whatsapp_contact_at: row.last_whatsapp_contact_at ?? null,
     created_at: row.created_at,
     product_summary: productSummary,
     line_items: resolveOrderLineItems({

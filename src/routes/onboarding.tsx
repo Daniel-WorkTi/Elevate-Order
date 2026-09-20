@@ -3,11 +3,16 @@ import { z } from "zod";
 
 import { AppShell } from "@/components/app-shell";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
+import { normalizeOnboardingStepId } from "@/components/onboarding/types";
 import { useT } from "@/lib/i18n/locale-context";
 import { metaT } from "@/lib/i18n/meta";
 
 const onboardingSearchSchema = z.object({
-  step: z.enum(["store", "orders", "whatsapp", "ready"]).optional(),
+  // Accept legacy store|orders → normalized in flow to configuration
+  step: z
+    .enum(["configuration", "whatsapp", "ready", "store", "orders"])
+    .optional(),
+  error: z.enum(["oauth"]).optional(),
 });
 
 export const Route = createFileRoute("/onboarding")({
@@ -24,13 +29,15 @@ export const Route = createFileRoute("/onboarding")({
 function OnboardingPage() {
   const t = useT();
   const { user } = useRouteContext({ from: "__root__" });
-  const { step } = Route.useSearch();
+  const { step, error } = Route.useSearch();
+  const normalized = normalizeOnboardingStepId(step) ?? undefined;
 
   return (
     <AppShell title={t("onboarding.title")} subtitle={t("onboarding.subtitle")}>
       <OnboardingFlow
         userId={user?.id ?? null}
-        {...(step ? { initialStep: step } : {})}
+        oauthError={error === "oauth"}
+        {...(normalized ? { initialStep: normalized } : {})}
       />
     </AppShell>
   );

@@ -176,6 +176,12 @@ export async function runSendWhatsAppTextMessage(
     if (input.orderId) {
       await supabaseAdmin
         .from("orders")
+        .update({ last_whatsapp_contact_at: now })
+        .eq("id", input.orderId)
+        .eq("workspace_id", input.workspaceId);
+
+      await supabaseAdmin
+        .from("orders")
         .update({ cod_request_sent_at: now })
         .eq("id", input.orderId)
         .eq("workspace_id", input.workspaceId)
