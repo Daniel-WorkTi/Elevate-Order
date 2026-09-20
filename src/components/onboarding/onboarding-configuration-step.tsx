@@ -1,14 +1,14 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 
 import { OnboardingNav } from "@/components/onboarding/onboarding-nav";
 import { OnboardingStepper } from "@/components/onboarding/onboarding-stepper";
 import { markOnboardingSkipped } from "@/components/onboarding/onboarding-skip-storage";
-import { ShopifyLogo } from "@/components/brands/shopify-logo";
 import { DropiSetupPanel } from "@/components/connections/dropi/dropi-setup-panel";
 import { DropeaSetupPanel } from "@/components/connections/dropea/dropea-setup-panel";
 import { StoreConnectPanel } from "@/components/connections/store/store-connect-panel";
+import { SupplyMark } from "@/components/supply-logo";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
@@ -19,29 +19,20 @@ import {
   mapDropeaConnectionState,
   mapShopifyConnectionState,
 } from "@/lib/connections/connection-domain";
-import {
-  dropeaStatusClass,
-  dropeaStatusLabelKey,
-} from "@/lib/integrations/dropea/dropea-format";
 import { getDropeaDashboard } from "@/lib/integrations/dropea/dropea.functions";
 import { applyOperatorDropeaSummary } from "@/lib/integrations/dropea/dropea-operator-status";
-import { syncDropeaOrders } from "@/lib/integrations/dropea/sync-dropea-orders";
-import {
-  dropiStatusClass,
-  dropiStatusDotClass,
-  dropiStatusLabelKey,
-} from "@/lib/integrations/dropi/dropi-format";
 import { getDropiDashboard } from "@/lib/integrations/dropi/dropi.functions";
 import { applyOperatorDropiSummary } from "@/lib/integrations/dropi/dropi-operator-status";
 import {
   disconnectShopifyStore,
   getShopifyOauthStatus,
-  syncConnectedShopifyStore,
 } from "@/lib/integrations/shopify/oauth.functions";
 import { getWorkspaceWebhookUrl } from "@/lib/integrations/workspace-webhook.functions";
 import { useT } from "@/lib/i18n/locale-context";
 import { ensureDefaultWorkspace } from "@/lib/workspace/workspace.functions";
 import { cn } from "@/lib/utils";
+
+type ProviderId = "shopify" | "dropi" | "dropea";
 
 type OnboardingConfigurationStepProps = {
   onContinue: () => void;
@@ -60,8 +51,8 @@ function publicBaseUrlPayload(): { publicBaseUrl?: string } {
 }
 
 /**
- * Step 1 — real Connections panels for Shopify, Dropi Pro, and Dropea.
- * Multiple providers may be connected; none are radio selections.
+ * Step 1 — choose one order source (3-up cards), then configure that provider only.
+ * Backend connection rules unchanged; one valid source unlocks Continue → WhatsApp.
  */
 export function OnboardingConfigurationStep({
   onContinue,
@@ -71,8 +62,13 @@ export function OnboardingConfigurationStep({
   const queryClient = useQueryClient();
   const { workspaceId, ready, refresh } = useWorkspaceId();
   const [bootstrapping, setBootstrapping] = useState(false);
-  const [syncingShopify, setSyncingShopify] = useState(false);
-  const [syncingDropea, setSyncingDropea] = useState(false);
+  const [activeProvider, setActiveProvider] = useState<ProviderId | null>(
+    oauthError ? "shopify" : null,
+  );
+
+  useEffect(() => {
+    if (oauthError) setActiveProvider("shopify");
+  }, [oauthError]);
 
   useEffect(() => {
     if (!ready || workspaceId) return;
@@ -122,19 +118,10 @@ export function OnboardingConfigurationStep({
 
   const dropiWebhook = useQuery({
     queryKey: ["workspace-webhook", "dropi", workspaceId],
-    enabled: Boolean(workspaceId),
+    enabled: Boolean(workspaceId) && activeProvider === "dropi",
     queryFn: () =>
       getWorkspaceWebhookUrl({
         data: { workspaceId: workspaceId!, supply: "dropi", ...publicBaseUrlPayload() },
-      }),
-  });
-
-  const dropeaWebhook = useQuery({
-    queryKey: ["workspace-webhook", "dropea", workspaceId],
-    enabled: Boolean(workspaceId),
-    queryFn: () =>
-      getWorkspaceWebhookUrl({
-        data: { workspaceId: workspaceId!, supply: "dropea", ...publicBaseUrlPayload() },
       }),
   });
 
@@ -143,7 +130,7 @@ export function OnboardingConfigurationStep({
   const shopifyState = mapShopifyConnectionState({
     connected: fullyLinked,
     connecting: busy || bootstrapping,
-    syncing: syncingShopify,
+    syncing: false,
     error: oauthError,
   });
   const shopifyConnected = isConnectedState(shopifyState);
@@ -167,12 +154,11 @@ export function OnboardingConfigurationStep({
     ? mapDropiConnectionState(dropiSummary.status)
     : "not_connected";
   const dropeaState = dropeaSummary
-    ? mapDropeaConnectionState(dropeaSummary.status, { syncing: syncingDropea })
+    ? mapDropeaConnectionState(dropeaSummary.status)
     : "not_connected";
 
   const dropiConnected = isConnectedState(dropiState);
   const dropeaConnected = isConnectedState(dropeaState);
-  const dropiWaiting = dropiState === "awaiting_external_action";
   const anyConnected = shopifyConnected || dropiConnected || dropeaConnected;
 
   const dropiServerReady = Boolean(
@@ -187,99 +173,154 @@ export function OnboardingConfigurationStep({
       !dropiSummary &&
       !oauth);
 
-  async function runShopifySync() {
-    setSyncingShopify(true);
-    try {
-      const result = await syncConnectedShopifyStore({
-        data: workspaceId ? { workspaceId } : {},
-      });
-      await oauthQuery.refetch();
-      if (!result.ok) {
-        toast.error(result.error ?? t("connections.shopifySyncFailed"));
-        return;
-      }
-      toast.success(
-        result.imported === 1
-          ? t("connections.importedOrdersOne", { count: result.imported })
-          : t("connections.importedOrders", { count: result.imported }),
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("connections.shopifySyncFailed"));
-    } finally {
-      setSyncingShopify(false);
-    }
-  }
-
   function skip() {
     markOnboardingSkipped("configuration");
     onContinue();
   }
 
+  const providers: Array<{
+    id: ProviderId;
+    supply: "shopify" | "dropi" | "dropea";
+    name: string;
+    description: string;
+    connected: boolean;
+  }> = [
+    {
+      id: "shopify",
+      supply: "shopify",
+      name: "Shopify",
+      description: t("onboarding.configuration.card.shopify"),
+      connected: shopifyConnected,
+    },
+    {
+      id: "dropi",
+      supply: "dropi",
+      name: "Dropi Pro",
+      description: t("onboarding.configuration.card.dropi"),
+      connected: dropiConnected,
+    },
+    {
+      id: "dropea",
+      supply: "dropea",
+      name: "Dropea",
+      description: t("onboarding.configuration.card.dropea"),
+      connected: dropeaConnected,
+    },
+  ];
+
   return (
-    <div className="mx-auto w-full max-w-[880px]">
+    <div className="mx-auto w-full max-w-[1000px]">
       <OnboardingStepper currentStep="configuration" className="mb-6" />
 
-      <header className="mb-5">
-        <h2 className="text-[24px] font-semibold tracking-tight text-foreground md:text-[28px]">
-          {t("onboarding.configuration.headline")}
-        </h2>
-        <p className="mt-2 text-[14px] text-muted-foreground">
-          {t("onboarding.configuration.body")}
-        </p>
-      </header>
+      {activeProvider === null ? (
+        <>
+          <header className="mb-8 text-center">
+            <h2 className="text-[24px] font-semibold tracking-tight text-foreground md:text-[28px]">
+              {t("onboarding.configuration.headline")}
+            </h2>
+            <p className="mt-2 text-[16px] font-medium text-foreground">
+              {t("onboarding.configuration.question")}
+            </p>
+            <p className="mt-1.5 text-[14px] text-muted-foreground">
+              {t("onboarding.configuration.chooserHint")}
+            </p>
+          </header>
 
-      {loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-36 w-full rounded-[14px]" />
-          <Skeleton className="h-36 w-full rounded-[14px]" />
-          <Skeleton className="h-36 w-full rounded-[14px]" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Shopify — same StoreConnectPanel as Connections */}
-          <section className="rounded-[14px] border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="grid size-9 place-items-center overflow-hidden rounded-[10px] border border-border bg-white">
-                  <ShopifyLogo size={28} />
-                </span>
-                <div>
-                  <p className="text-[15px] font-semibold text-foreground">Shopify</p>
-                  <p className="text-[13px] text-muted-foreground">
-                    {t("onboarding.configuration.shopifyHint")}
-                  </p>
-                </div>
-              </div>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold",
-                  shopifyConnected
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : oauthError
-                      ? "border-red-200 bg-red-50 text-red-800"
-                      : "border-border bg-[#F7F8FA] text-muted-foreground",
-                )}
-              >
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    shopifyConnected
-                      ? "bg-emerald-500"
-                      : oauthError
-                        ? "bg-red-500"
-                        : "bg-[#98A2B3]",
-                  )}
-                  aria-hidden
-                />
-                {shopifyConnected
-                  ? t("connections.connected")
-                  : oauthError
-                    ? t("connections.error")
-                    : t("connections.notConnected")}
-              </span>
+          {loading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-52 w-full rounded-[14px]" />
+              <Skeleton className="h-52 w-full rounded-[14px]" />
+              <Skeleton className="h-52 w-full rounded-[14px]" />
             </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {providers.map((provider) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => setActiveProvider(provider.id)}
+                  className={cn(
+                    "flex h-full min-h-[220px] flex-col items-center rounded-[14px] border border-border bg-card p-6 text-center shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-150",
+                    "hover:border-[color:var(--elevate-blue)]/40 hover:shadow-[0_1px_2px_rgb(10_12_16/0.06)]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40",
+                  )}
+                >
+                  <SupplyMark supply={provider.supply} size={48} className="rounded-[12px]" />
+                  <p className="mt-4 text-[16px] font-semibold tracking-tight text-foreground">
+                    {provider.name}
+                  </p>
+                  <p className="mt-2 flex-1 text-[13px] leading-relaxed text-muted-foreground">
+                    {provider.description}
+                  </p>
+                  {provider.connected ? (
+                    <span className="mt-4 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-800">
+                      {t("connections.connected")}
+                    </span>
+                  ) : (
+                    <span className="mt-4 inline-flex h-10 items-center justify-center rounded-[10px] bg-[color:var(--elevate-blue)] px-5 text-[14px] font-medium text-white">
+                      {t("onboarding.connect")}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
 
+          <p className="mt-6 text-center text-[13px] text-muted-foreground">
+            {t("onboarding.configuration.addLater")}
+          </p>
+
+          {anyConnected ? (
+            <OnboardingNav
+              onContinue={onContinue}
+              continueLabel={t("onboarding.configuration.continueWhatsApp")}
+              backLabel={t("onboarding.back")}
+            />
+          ) : (
+            <div className="mt-8 text-center">
+              <button
+                type="button"
+                onClick={skip}
+                className="text-[14px] text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40"
+              >
+                {t("onboarding.configureLater")}
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="mx-auto w-full max-w-[680px]">
+          <div className="mb-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setActiveProvider(null)}
+              className="h-9 rounded-[10px] px-2 text-[14px] text-muted-foreground hover:text-foreground"
+            >
+              ← {t("onboarding.back")}
+            </Button>
+          </div>
+
+          <header className="mb-5">
+            <h2 className="text-[22px] font-semibold tracking-tight text-foreground md:text-[24px]">
+              {activeProvider === "shopify"
+                ? t("onboarding.setup.shopify.title")
+                : activeProvider === "dropi"
+                  ? t("onboarding.setup.dropi.title")
+                  : t("onboarding.setup.dropea.title")}
+            </h2>
+            <p className="mt-1.5 text-[14px] text-muted-foreground">
+              {activeProvider === "shopify"
+                ? t("onboarding.setup.shopify.body")
+                : activeProvider === "dropi"
+                  ? t("onboarding.setup.dropi.body")
+                  : t("onboarding.setup.dropea.body")}
+            </p>
+          </header>
+
+          {activeProvider === "shopify" ? (
             <StoreConnectPanel
+              variant="onboarding"
               linked={fullyLinked}
               storeName={storeName ?? oauth?.shopDomain ?? null}
               storeDomain={oauth?.shopDomain ?? storeDomain}
@@ -302,122 +343,69 @@ export function OnboardingConfigurationStep({
                 await queryClient.invalidateQueries({ queryKey: ["connections", "shopify"] });
                 await oauthQuery.refetch();
               }}
-              {...(fullyLinked ? { onSync: () => void runShopifySync() } : {})}
-              syncing={syncingShopify}
             />
-          </section>
+          ) : null}
 
-          {/* Dropi — same DropiSetupPanel as Connections */}
-          <section className="rounded-[14px] border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[15px] font-semibold text-foreground">Dropi Pro</p>
-                <p className="text-[13px] text-muted-foreground">
-                  {t("onboarding.configuration.dropiHint")}
-                </p>
-              </div>
-              {dropiSummary ? (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold",
-                    dropiStatusClass(dropiSummary.status),
-                  )}
-                >
-                  <span
-                    className={cn("size-1.5 rounded-full", dropiStatusDotClass(dropiSummary.status))}
-                  />
-                  {t(dropiStatusLabelKey(dropiSummary.status))}
-                </span>
-              ) : null}
-            </div>
-            {dropiWaiting ? (
-              <p className="mb-3 text-[13px] text-amber-800">
-                {t("onboarding.configuration.waitingFirstEvent")}
-              </p>
-            ) : null}
+          {activeProvider === "dropi" ? (
             <DropiSetupPanel
+              variant="onboarding"
               webhookUrl={dropiWebhook.data?.webhookUrl ?? ""}
               loadingUrl={dropiWebhook.isPending || !workspaceId}
               urlError={dropiWebhook.isError ? t("connections.webhookUrlError") : null}
               serverReady={dropiServerReady}
               status={dropiSummary?.status ?? "not_configured"}
             />
-          </section>
+          ) : null}
 
-          {/* Dropea — same DropeaSetupPanel as Connections */}
-          <section className="rounded-[14px] border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[15px] font-semibold text-foreground">Dropea</p>
-                <p className="text-[13px] text-muted-foreground">
-                  {t("onboarding.configuration.dropeaHint")}
-                </p>
-              </div>
-              {dropeaSummary ? (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold",
-                    dropeaStatusClass(dropeaSummary.status),
-                  )}
-                >
-                  {t(dropeaStatusLabelKey(dropeaSummary.status))}
-                </span>
-              ) : null}
-            </div>
+          {activeProvider === "dropea" ? (
             <DropeaSetupPanel
+              variant="onboarding"
               linked={dropeaLinked}
               apiTokenConfigured={apiTokenConfigured}
               hmacSecretConfigured={hmacSecretConfigured}
               serverReady={dropeaServerReady}
-              webhookUrl={dropeaWebhook.data?.webhookUrl ?? ""}
-              loadingUrl={dropeaWebhook.isPending || !workspaceId}
-              urlError={dropeaWebhook.isError ? t("connections.webhookUrlError") : null}
-              connecting={dropeaBusy}
+              webhookUrl=""
+              loadingUrl={false}
               onConnect={connectDropea}
               onDisconnect={disconnectDropea}
-              syncing={syncingDropea}
-              onSync={() => {
-                if (!workspaceId) {
-                  toast.error(t("connections.enterBothToConnect"));
-                  return;
-                }
-                setSyncingDropea(true);
-                void syncDropeaOrders({ data: { workspaceId } })
-                  .then((result) => {
-                    if (!result.ok) {
-                      toast.error(result.message ?? t("connections.syncFailed"));
-                      return;
-                    }
-                    toast.success(
-                      t("connections.syncDropeaSuccess", { count: result.imported }),
-                    );
-                    void queryClient.invalidateQueries({ queryKey: ["connections", "dropea"] });
-                  })
-                  .catch(() => toast.error(t("connections.syncFailed")))
-                  .finally(() => setSyncingDropea(false));
-              }}
+              connecting={dropeaBusy}
             />
-          </section>
+          ) : null}
+
+          {((activeProvider === "shopify" && shopifyConnected) ||
+            (activeProvider === "dropi" && dropiConnected) ||
+            (activeProvider === "dropea" && dropeaConnected)) && (
+            <div className="mt-6 space-y-3">
+              <Button
+                type="button"
+                onClick={onContinue}
+                className="h-11 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[14px] text-white shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
+              >
+                {t("onboarding.configuration.continueWhatsApp")}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setActiveProvider(null)}
+                className="mx-auto block text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t("onboarding.configuration.addAnother")}
+              </button>
+            </div>
+          )}
+
+          {!shopifyConnected && !dropiConnected && !dropeaConnected ? (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={skip}
+                className="text-[14px] text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40"
+              >
+                {t("onboarding.configureLater")}
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
-
-      <OnboardingNav
-        onContinue={onContinue}
-        continueLabel={t("onboarding.continue")}
-        backLabel={t("onboarding.back")}
-      />
-
-      {!anyConnected ? (
-        <div className="mt-3 text-center">
-          <button
-            type="button"
-            onClick={skip}
-            className="text-[14px] text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40"
-          >
-            {t("onboarding.configureLater")}
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

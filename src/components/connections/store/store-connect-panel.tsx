@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { ChevronDown, Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConnectionHowTo } from "@/components/connections/workspace/connection-howto";
 import type { StoreConnectInput } from "@/hooks/use-store-connection-preference";
-import { normalizeShopifyDomain } from "@/lib/integrations/shopify/shopify-normalize";
+import {
+  isLikelyCustomStoreDomain,
+  normalizeShopifyDomain,
+} from "@/lib/integrations/shopify/shopify-normalize";
 import { useT } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
+
+export type ConnectionPanelVariant = "connections" | "onboarding";
 
 export function StoreConnectPanel({
   linked,
@@ -22,6 +27,7 @@ export function StoreConnectPanel({
   onSync,
   syncing = false,
   connecting = false,
+  variant = "connections",
 }: {
   linked: boolean;
   storeName: string | null;
@@ -36,16 +42,32 @@ export function StoreConnectPanel({
   onSync?: () => void;
   syncing?: boolean;
   connecting?: boolean;
+  variant?: ConnectionPanelVariant;
 }) {
   const t = useT();
+  const onboarding = variant === "onboarding";
   const [shopInput, setShopInput] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [domainHint, setDomainHint] = useState(false);
 
   if (linked) {
+    if (onboarding) {
+      return (
+        <section className="rounded-[14px] border border-border bg-card px-5 py-6 text-center shadow-[var(--shadow-card)]">
+          <p className="text-[15px] font-semibold text-emerald-800">
+            ✓ {t("onboarding.setup.shopify.connected")}
+          </p>
+          <p className="mt-2 font-mono text-[13px] text-foreground">
+            {oauthShop ?? storeDomain ?? storeName}
+          </p>
+        </section>
+      );
+    }
+
     return (
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-[#E6E8EC] bg-white px-4 py-4">
         <p className="min-w-0 font-mono text-[13px] text-[#0A0C10]">
@@ -79,19 +101,31 @@ export function StoreConnectPanel({
 
   const showOauth = Boolean(oauthConfigured && onOauthInstall);
 
+  function resolveShopError(raw: string): string {
+    if (isLikelyCustomStoreDomain(raw)) {
+      setDomainHint(true);
+      return t("onboarding.setup.shopify.useMyshopify");
+    }
+    setDomainHint(false);
+    return onboarding
+      ? t("onboarding.setup.shopify.domainInvalid")
+      : t("connections.domainInvalid");
+  }
+
   function startOauth() {
     const host = normalizeShopifyDomain(shopInput);
     if (!host) {
-      setError(t("connections.domainInvalid"));
+      setError(resolveShopError(shopInput));
       return;
     }
+    setDomainHint(false);
     onOauthInstall!(host);
   }
 
   async function submitToken() {
     const host = normalizeShopifyDomain(shopInput);
     if (!host) {
-      setError(t("connections.domainInvalid"));
+      setError(resolveShopError(shopInput));
       return;
     }
     setSaving(true);
@@ -105,10 +139,136 @@ export function StoreConnectPanel({
       else {
         setAccessToken("");
         setError(null);
+        setDomainHint(false);
       }
     } finally {
       setSaving(false);
     }
+  }
+
+  if (onboarding) {
+    return (
+      <section className="space-y-4 rounded-[14px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        {oauthError ? (
+          <p className="text-[13px] font-medium text-red-600">{t("connections.shopifyOauthError")}</p>
+        ) : null}
+
+        {showOauth ? (
+          <>
+            <div>
+              <label
+                htmlFor="onboarding-shopify-shop"
+                className="text-[13px] font-semibold text-foreground"
+              >
+                {t("onboarding.setup.shopify.yourStore")}
+              </label>
+              <Input
+                id="onboarding-shopify-shop"
+                value={shopInput}
+                onChange={(event) => {
+                  setShopInput(event.target.value);
+                  setError(null);
+                  setDomainHint(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") startOauth();
+                }}
+                placeholder="nome-da-loja.myshopify.com"
+                className="mt-2 h-11 rounded-[10px] border-border font-mono text-[13px] shadow-none"
+              />
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                {t("onboarding.setup.shopify.dontKnow")}
+              </p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                {t("onboarding.setup.shopify.findMyshopify")}
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              onClick={startOauth}
+              disabled={connecting}
+              className="h-11 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[14px] shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
+            >
+              <Link2 className="size-3.5" strokeWidth={1.75} />
+              {t("onboarding.setup.shopify.continueCta")}
+            </Button>
+          </>
+        ) : (
+          <p className="text-[13px] text-muted-foreground">{t("connections.shopifyOauthMissing")}</p>
+        )}
+
+        {error ? <p className="text-[13px] font-medium text-red-600">{error}</p> : null}
+        {domainHint ? (
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            {t("onboarding.setup.shopify.findMyshopify")}
+          </p>
+        ) : null}
+
+        <div className="border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setTokenOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-2 text-left"
+            aria-expanded={tokenOpen}
+          >
+            <span className="text-[12px] font-medium text-muted-foreground">
+              {t("onboarding.setup.shopify.advanced")}
+            </span>
+            <ChevronDown
+              className={cn(
+                "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                tokenOpen && "rotate-180",
+              )}
+              strokeWidth={1.75}
+              aria-hidden
+            />
+          </button>
+          {tokenOpen ? (
+            <div className="mt-3 space-y-2.5">
+              <p className="text-[12px] text-muted-foreground">
+                {t("connections.shopifyFallbackTokenHint")}
+              </p>
+              <div className="relative">
+                <Input
+                  type={showToken ? "text" : "password"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={accessToken}
+                  onChange={(event) => {
+                    setAccessToken(event.target.value);
+                    setError(null);
+                  }}
+                  placeholder="shpat_…"
+                  className="h-10 rounded-[10px] border-border pr-10 font-mono text-[13px] shadow-none"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground"
+                  onClick={() => setShowToken((value) => !value)}
+                  aria-label={showToken ? t("connections.hideToken") : t("connections.showToken")}
+                >
+                  {showToken ? (
+                    <EyeOff className="size-4" strokeWidth={1.5} />
+                  ) : (
+                    <Eye className="size-4" strokeWidth={1.5} />
+                  )}
+                </button>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={submitToken}
+                disabled={saving}
+                className="h-10 rounded-[10px] border-border text-[13px] shadow-none"
+              >
+                {t("connections.connectStoreCta")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    );
   }
 
   return (

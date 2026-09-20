@@ -26,6 +26,15 @@ export function normalizeShopifyDomain(value: string): string | null {
   return null;
 }
 
+/** True when input looks like a custom storefront domain (not myshopify Admin host). */
+export function isLikelyCustomStoreDomain(value: string): boolean {
+  if (normalizeShopifyDomain(value)) return false;
+  const trimmed = value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const host = (trimmed.split("/")[0] ?? "").replace(/^www\./, "");
+  if (!host || !host.includes(".")) return false;
+  return !host.endsWith(".myshopify.com");
+}
+
 export function shopifyDomainError(value: string): string | null {
   if (!value.trim()) return "Enter the shop domain (example.myshopify.com).";
   if (normalizeShopifyDomain(value)) return null;

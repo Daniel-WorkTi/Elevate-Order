@@ -1,7 +1,29 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { normalizeShopifyRestOrder } from "@/lib/integrations/shopify/shopify-normalize";
+import {
+  isLikelyCustomStoreDomain,
+  normalizeShopifyDomain,
+  normalizeShopifyRestOrder,
+} from "@/lib/integrations/shopify/shopify-normalize";
+
+test("normalizeShopifyDomain accepts myshopify hosts and store slugs", () => {
+  assert.equal(normalizeShopifyDomain("nome-da-loja.myshopify.com"), "nome-da-loja.myshopify.com");
+  assert.equal(normalizeShopifyDomain("https://Nome.myshopify.com/"), "nome.myshopify.com");
+  assert.equal(normalizeShopifyDomain("nome"), "nome.myshopify.com");
+});
+
+test("normalizeShopifyDomain rejects custom storefront domains", () => {
+  assert.equal(normalizeShopifyDomain("minhaloja.com"), null);
+  assert.equal(normalizeShopifyDomain("www.minhaloja.com"), null);
+});
+
+test("isLikelyCustomStoreDomain detects public domains for friendly onboarding copy", () => {
+  assert.equal(isLikelyCustomStoreDomain("minhaloja.com"), true);
+  assert.equal(isLikelyCustomStoreDomain("www.minhaloja.com"), true);
+  assert.equal(isLikelyCustomStoreDomain("loja.myshopify.com"), false);
+  assert.equal(isLikelyCustomStoreDomain("loja"), false);
+});
 
 test("uses billing address and shipping line when shipping address is missing", () => {
   const order = normalizeShopifyRestOrder({

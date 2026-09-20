@@ -1045,6 +1045,48 @@ export const pt: TranslationDict = {
   "onboarding.integration.name.dropi": "Dropi Pro",
   "onboarding.integration.name.dropea": "Dropea",
   "onboarding.configuration.headline": "Configure a sua operação",
+  "onboarding.configuration.question": "De onde chegam os seus pedidos?",
+  "onboarding.configuration.chooserHint":
+    "Escolha uma opção para começar. Pode adicionar outras integrações depois.",
+  "onboarding.configuration.addLater": "Pode adicionar outras integrações depois em Ligações.",
+  "onboarding.configuration.continueWhatsApp": "Continuar para WhatsApp",
+  "onboarding.configuration.card.shopify": "Conecte a sua loja Shopify.",
+  "onboarding.configuration.card.dropi": "Conecte a sua operação Dropi Pro.",
+  "onboarding.configuration.card.dropea": "Conecte a sua operação Dropea.",
+  "onboarding.configuration.setup.shopify":
+    "Autorize a Shopify. Connected só após a instalação confirmada.",
+  "onboarding.configuration.setup.dropi":
+    "Cole o webhook na Dropi. Connected só após o primeiro evento real.",
+  "onboarding.configuration.setup.dropea":
+    "Guarde a API key no servidor. Connected após validação e sync.",
+  "onboarding.configuration.waitingFirstEvent": "À espera do primeiro evento",
+  "onboarding.configuration.addAnother": "Adicionar outra integração",
+  "onboarding.setup.shopify.title": "Conectar Shopify",
+  "onboarding.setup.shopify.body": "Conecte sua loja Shopify ao ELEVATE.",
+  "onboarding.setup.shopify.yourStore": "Sua loja",
+  "onboarding.setup.shopify.dontKnow": "Não sabe o endereço original da sua loja?",
+  "onboarding.setup.shopify.findMyshopify":
+    "Na Shopify, vá em Configurações → Domínios e procure o endereço terminado em myshopify.com.",
+  "onboarding.setup.shopify.useMyshopify": "Use o domínio original da Shopify.",
+  "onboarding.setup.shopify.domainInvalid": "Use um domínio no formato nome-da-loja.myshopify.com.",
+  "onboarding.setup.shopify.continueCta": "Continuar com Shopify",
+  "onboarding.setup.shopify.advanced": "Configuração avançada",
+  "onboarding.setup.shopify.connected": "Shopify conectado",
+  "onboarding.setup.dropi.title": "Conectar Dropi Pro",
+  "onboarding.setup.dropi.body":
+    "Receba automaticamente os pedidos e atualizações da sua operação Dropi.",
+  "onboarding.setup.dropi.step1Lead": "Na Dropi, vá em:",
+  "onboarding.setup.dropi.step1Path": "Configurações → API → Webhooks",
+  "onboarding.setup.dropi.step2": "Copie o link abaixo e cole no campo de webhook da Dropi.",
+  "onboarding.setup.dropi.step3": "Na Dropi, clique em Salvar.",
+  "onboarding.setup.dropi.waiting": "● Aguardando primeira atualização da Dropi...",
+  "onboarding.setup.dropi.connected": "Dropi Pro conectado",
+  "onboarding.setup.dropea.title": "Conectar Dropea",
+  "onboarding.setup.dropea.body": "Conecte sua operação Dropea ao ELEVATE.",
+  "onboarding.setup.dropea.connecting": "Conectando...",
+  "onboarding.setup.dropea.connectFailed":
+    "Não conseguimos conectar com esses dados. Confira e tente novamente.",
+  "onboarding.setup.dropea.connected": "Dropea conectado",
   "onboarding.configuration.body":
     "Ligue as plataformas que utiliza para receber e acompanhar os seus pedidos.",
   "onboarding.configuration.shopifyHint": "Plataforma da loja — OAuth Shopify real.",
@@ -1052,7 +1094,6 @@ export const pt: TranslationDict = {
     "Cole o webhook na Dropi. Connected só após o primeiro evento real.",
   "onboarding.configuration.dropeaHint":
     "Guarde a API key no servidor. Connected após validação e sync.",
-  "onboarding.configuration.waitingFirstEvent": "À espera do primeiro evento",
   "onboarding.whatsapp.headline": "Ligue o WhatsApp",
   "onboarding.whatsapp.body":
     "Ligue o número que a equipa usa com clientes. O QR vem do gateway real.",

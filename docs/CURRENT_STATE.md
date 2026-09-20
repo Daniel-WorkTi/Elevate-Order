@@ -1,6 +1,6 @@
 # ELEVATE — Current State
 
-**Updated:** 2026-09-20 (Phase 3 — production readiness + E2E path validation)  
+**Updated:** 2026-09-20 (Onboarding provider setup — presentation variant)  
 **Canon:** [PROJECT.md](../PROJECT.md) · [DESIGN.md](../DESIGN.md) · this file  
 **External ops:** [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md)  
 **Agents:** [AGENTS.md](../AGENTS.md)
@@ -15,7 +15,7 @@
 - WhatsApp: **`whatsapp_web`** + Railway gateway
 - Onboarding ↔ Connections share connection-domain truth (skipped ≠ connected)
 - Onboarding steps: **Configuração → WhatsApp → Pronto** (no informational Pedidos step)
-- Configuration step embeds the same Shopify / Dropi / Dropea panels as Connections
+- Configuration: **3-up provider chooser** → single-provider setup with `variant="onboarding"` on shared panels (Connections keeps full UI)
 
 ---
 
@@ -23,9 +23,18 @@
 
 | Step | Content |
 | --- | --- |
-| **Configuração** | Real `StoreConnectPanel` + `DropiSetupPanel` + `DropeaSetupPanel` (same as Connections). Multi-connect, not radio. |
+| **Configuração** | Chooser (Shopify \| Dropi Pro \| Dropea). Selecting one hides chooser and shows compact setup (`StoreConnectPanel` / `DropiSetupPanel` / `DropeaSetupPanel` with `variant="onboarding"`). Same OAuth/webhook/credential backends as Connections. One valid source → Continue to WhatsApp. |
 | **WhatsApp** | Real `WhatsAppConnectPanel` / gateway QR |
 | **Pronto** | Backend connection summaries; Enter ELEVATE |
+
+### Onboarding vs Connections (presentation only)
+
+| Surface | UI |
+| --- | --- |
+| **Onboarding Shopify** | Domain + Continuar com Shopify (real OAuth); myshopify help; advanced token collapsed |
+| **Onboarding Dropi** | 3 steps (Configurações → API → Webhooks); real webhook URL + copy; waiting until first event |
+| **Onboarding Dropea** | Token API + HMAC only; friendly errors; no webhook docs |
+| **Connections** | Full management (howto, sync, disconnect, webhook for Dropea, etc.) |
 
 Legacy `?step=store|orders` → `configuration`. Skip = not configured, never Connected.
 
@@ -117,11 +126,11 @@ Values omitted. Deployed envs: **MANUAL VERIFICATION REQUIRED** (not inspected f
 
 ---
 
-## Validation (Phase 3 + onboarding correction)
+## Validation (Phase 3 + onboarding setup simplify)
 
 | Check | Result |
 | --- | --- |
-| `npm test` | **PASS** (196/196) |
+| `npm test` | **PASS** (206/206) |
 | `npm run typecheck` | **PASS** |
 | `npm run build` | **PASS** |
 | `npm run lint` | Pre-existing CRLF prettier noise — not mixed into this phase |

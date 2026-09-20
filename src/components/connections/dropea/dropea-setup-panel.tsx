@@ -4,6 +4,7 @@ import { Check, Copy, Eye, EyeOff, Link2, RefreshCw, Unplug } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConnectionHowTo } from "@/components/connections/workspace/connection-howto";
+import type { ConnectionPanelVariant } from "@/components/connections/store/store-connect-panel";
 import type { DropeaConnectCredentials } from "@/hooks/use-dropea-connection-preference";
 import { useT } from "@/lib/i18n/locale-context";
 
@@ -21,6 +22,7 @@ export function DropeaSetupPanel({
   onSync,
   syncing = false,
   connecting = false,
+  variant = "connections",
 }: {
   linked: boolean;
   apiTokenConfigured: boolean;
@@ -34,8 +36,10 @@ export function DropeaSetupPanel({
   onSync?: () => void;
   syncing?: boolean;
   connecting?: boolean;
+  variant?: ConnectionPanelVariant;
 }) {
   const t = useT();
+  const onboarding = variant === "onboarding";
   const [apiToken, setApiToken] = useState("");
   const [hmacSecret, setHmacSecret] = useState("");
   const [showToken, setShowToken] = useState(false);
@@ -83,6 +87,16 @@ export function DropeaSetupPanel({
   );
 
   if (fullyLinked) {
+    if (onboarding) {
+      return (
+        <section className="rounded-[14px] border border-border bg-card px-5 py-6 text-center shadow-[var(--shadow-card)]">
+          <p className="text-[15px] font-semibold text-emerald-800">
+            ✓ {t("onboarding.setup.dropea.connected")}
+          </p>
+        </section>
+      );
+    }
+
     return (
       <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white p-4">
         {webhookBlock}
@@ -112,6 +126,68 @@ export function DropeaSetupPanel({
             {t("connections.disconnect")}
           </Button>
         </div>
+      </section>
+    );
+  }
+
+  if (onboarding) {
+    return (
+      <section className="space-y-4 rounded-[14px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        <SecretField
+          id="onboarding-dropea-api-token"
+          label={t("connections.apiToken")}
+          placeholder={t("connections.pasteApiTokenShort")}
+          value={apiToken}
+          show={showToken}
+          onShowChange={setShowToken}
+          onChange={(value) => {
+            setApiToken(value);
+            setError(null);
+          }}
+        />
+
+        <SecretField
+          id="onboarding-dropea-hmac-secret"
+          label={t("connections.hmacSecret")}
+          placeholder={t("connections.pasteHmacShort")}
+          value={hmacSecret}
+          show={showHmac}
+          onShowChange={setShowHmac}
+          onChange={(value) => {
+            setHmacSecret(value);
+            setError(null);
+          }}
+        />
+
+        <Button
+          type="button"
+          disabled={saving || connecting || !apiToken.trim() || !hmacSecret.trim()}
+          onClick={() => {
+            void (async () => {
+              setSaving(true);
+              try {
+                const ok = await onConnect({ apiToken, hmacSecret });
+                if (!ok) {
+                  setError(t("onboarding.setup.dropea.connectFailed"));
+                  return;
+                }
+                setApiToken("");
+                setHmacSecret("");
+                setError(null);
+              } finally {
+                setSaving(false);
+              }
+            })();
+          }}
+          className="h-11 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[14px] shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
+        >
+          <Link2 className="size-3.5" strokeWidth={1.75} />
+          {saving || connecting
+            ? t("onboarding.setup.dropea.connecting")
+            : t("connections.connectDropea")}
+        </Button>
+
+        {error ? <p className="text-[13px] font-medium text-red-600">{error}</p> : null}
       </section>
     );
   }
