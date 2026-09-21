@@ -11,10 +11,6 @@ import type {
 import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
 import { isMissingWorkspaceColumn } from "@/lib/workspace/parse-workspace-id";
 import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
-import {
-  buildWebhookRelativeUrl,
-  webhookAuthConfigured,
-} from "@/lib/integrations/webhook-auth";
 
 function envPresent(name: string) {
   const value = process.env[name]?.trim();
@@ -91,19 +87,18 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
   .handler(
   async ({ data, context }): Promise<DropiDashboardResult> => {
     const serverConfigured = envPresent("SUPABASE_SERVICE_ROLE_KEY") && envPresent("SUPABASE_URL");
-    const legacyAuthConfigured = webhookAuthConfigured();
 
     const emptySummary = {
       status: deriveStatus({
-        authConfigured: legacyAuthConfigured,
+        authConfigured: false,
         serverConfigured,
         hasEvents: false,
         queryFailed: false,
       }),
       method: "webhook" as const,
       webhookPath: DROPI_WEBHOOK_PATH,
-      webhookRelativeUrl: buildWebhookRelativeUrl(),
-      authConfigured: legacyAuthConfigured,
+      webhookRelativeUrl: DROPI_WEBHOOK_PATH,
+      authConfigured: false,
       serverConfigured,
       lastWebhookAt: null,
       lastSuccessfulEventAt: null,
@@ -143,10 +138,10 @@ export const getDropiDashboard = createServerFn({ method: "GET" })
         .eq("supply", "dropi")
         .maybeSingle();
 
-      const authConfigured = Boolean(endpoint?.token) || legacyAuthConfigured;
+      const authConfigured = Boolean(endpoint?.token);
       const webhookRelativeUrl = endpoint?.token
         ? `${DROPI_WEBHOOK_PATH}?token=${encodeURIComponent(String(endpoint.token))}`
-        : buildWebhookRelativeUrl();
+        : DROPI_WEBHOOK_PATH;
 
       const [ordersCountRes, eventsRes, todayCountRes] = await Promise.all([
         supabaseAdmin

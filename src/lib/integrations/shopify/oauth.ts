@@ -149,28 +149,72 @@ export type ShopifyOauthCookie = {
   returnTo?: string;
 };
 
-export function encodeOauthCookie(value: ShopifyOauthCookie): string {
-  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+const OAUTH_COOKIE_SIG_VERSION = "v1";
+
+function oauthCookieSigningSecret(): string | null {
+  return getShopifyAppConfig()?.apiSecret ?? null;
 }
 
+function signOauthPayload(payloadB64: string, secret: string): string {
+  return createHmac("sha256", secret).update(`${OAUTH_COOKIE_SIG_VERSION}.${payloadB64}`).digest("base64url");
+}
+
+/** Encode OAuth state cookie; HMAC-signed when Shopify secret is available. */
+export function encodeOauthCookie(value: ShopifyOauthCookie): string {
+  const payloadB64 = Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  const secret = oauthCookieSigningSecret();
+  if (!secret) return payloadB64;
+  return `${OAUTH_COOKIE_SIG_VERSION}.${payloadB64}.${signOauthPayload(payloadB64, secret)}`;
+}
+
+function parseOauthCookiePayload(parsed: Partial<ShopifyOauthCookie>): ShopifyOauthCookie | null {
+  if (
+    typeof parsed.state === "string" &&
+    typeof parsed.shop === "string" &&
+    typeof parsed.userId === "string"
+  ) {
+    return {
+      state: parsed.state,
+      shop: parsed.shop,
+      userId: parsed.userId,
+      ...(typeof parsed.workspaceId === "string" ? { workspaceId: parsed.workspaceId } : {}),
+      ...(typeof parsed.returnTo === "string" ? { returnTo: parsed.returnTo } : {}),
+    };
+  }
+  return null;
+}
+
+/**
+ * Decode OAuth state cookie.
+ * Prefers HMAC-signed format; accepts legacy unsigned base64url only when secret is unset
+ * (local/dev without Shopify config). When secret is set, unsigned cookies are rejected.
+ */
 export function decodeOauthCookie(raw: string | undefined): ShopifyOauthCookie | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as Partial<ShopifyOauthCookie>;
-    if (
-      typeof parsed.state === "string" &&
-      typeof parsed.shop === "string" &&
-      typeof parsed.userId === "string"
-    ) {
-      return {
-        state: parsed.state,
-        shop: parsed.shop,
-        userId: parsed.userId,
-        ...(typeof parsed.workspaceId === "string" ? { workspaceId: parsed.workspaceId } : {}),
-        ...(typeof parsed.returnTo === "string" ? { returnTo: parsed.returnTo } : {}),
-      };
+    const secret = oauthCookieSigningSecret();
+    const parts = raw.split(".");
+    if (parts.length === 3 && parts[0] === OAUTH_COOKIE_SIG_VERSION) {
+      const [, payloadB64, sig] = parts;
+      if (!payloadB64 || !sig) return null;
+      if (secret) {
+        const expected = signOauthPayload(payloadB64, secret);
+        const a = Buffer.from(sig, "utf8");
+        const b = Buffer.from(expected, "utf8");
+        if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+      }
+      const parsed = JSON.parse(
+        Buffer.from(payloadB64, "base64url").toString("utf8"),
+      ) as Partial<ShopifyOauthCookie>;
+      return parseOauthCookiePayload(parsed);
     }
-    return null;
+
+    // Legacy unsigned cookie — only allowed when no signing secret is configured.
+    if (secret) return null;
+    const parsed = JSON.parse(
+      Buffer.from(raw, "base64url").toString("utf8"),
+    ) as Partial<ShopifyOauthCookie>;
+    return parseOauthCookiePayload(parsed);
   } catch {
     return null;
   }

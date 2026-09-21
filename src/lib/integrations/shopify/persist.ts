@@ -1,5 +1,6 @@
 import { SHOPIFY_SOURCE, type ShopifyNormalizedOrder } from "@/lib/integrations/shopify/shopify-normalize";
 import { coalesceStatic } from "@/lib/integrations/dropi/dropi-webhook-normalize";
+import { eventStatusIdForUpsert } from "@/lib/orders/event-status-id";
 import { parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 
 export type ShopifyPersistResult = {
@@ -8,15 +9,19 @@ export type ShopifyPersistResult = {
   warning: string | null;
 };
 
-function toOrderRow(
-  order: ShopifyNormalizedOrder,
-  nowIso: string,
-  workspaceId: string | null,
-) {
+function requireWorkspaceId(workspaceId: string | null | undefined): string {
+  const id = parseWorkspaceId(workspaceId ?? "");
+  if (!id) {
+    throw new Error("Shopify persist requires a resolved workspace_id.");
+  }
+  return id;
+}
+
+function toOrderRow(order: ShopifyNormalizedOrder, nowIso: string, workspaceId: string) {
   return {
     order_id: order.order_id,
     shopify_order_id: order.shopify_order_id,
-    ...(workspaceId ? { workspace_id: workspaceId } : {}),
+    workspace_id: workspaceId,
     status_id: null,
     status_name: order.status_name,
     details: order.details,
@@ -40,6 +45,10 @@ function toOrderRow(
   };
 }
 
+/**
+ * Persist Shopify orders into exactly one workspace.
+ * Never lookup/update by external IDs without workspace_id (service_role rule).
+ */
 export async function persistShopifyNormalizedOrders(
   normalized: ShopifyNormalizedOrder[],
   workspaceId?: string | null,
@@ -48,35 +57,41 @@ export async function persistShopifyNormalizedOrders(
     return { imported: 0, enriched: 0, warning: null };
   }
 
+  const scopedWorkspaceId = requireWorkspaceId(workspaceId);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const nowIso = new Date().toISOString();
-  const scopedWorkspaceId = parseWorkspaceId(workspaceId ?? "") ?? null;
   const shopifyIds = normalized.map((order) => order.shopify_order_id);
 
-  const { data: existingRows } = await supabaseAdmin
+  // Supply rows in THIS workspace that already carry the Shopify id (enrich path).
+  const { data: existingSupplyRows } = await supabaseAdmin
     .from("orders")
     .select("order_id, shopify_order_id, source")
-    .in("shopify_order_id", shopifyIds);
+    .eq("workspace_id", scopedWorkspaceId)
+    .in("shopify_order_id", shopifyIds)
+    .not("source", "ilike", "%shopify%");
 
   const supplyShopifyIds = new Set(
-    (existingRows ?? [])
-      .filter((row) => !String(row.source ?? "").toLowerCase().includes("shopify"))
-      .map((row) => Number(row.shopify_order_id)),
+    (existingSupplyRows ?? []).map((row) => Number(row.shopify_order_id)),
   );
 
-  const fresh = normalized.filter((order) => !supplyShopifyIds.has(order.shopify_order_id));
-  const orderRows = fresh.map((order) => toOrderRow(order, nowIso, scopedWorkspaceId));
+  // Upsert Shopify-source rows for this workspace only.
+  const shopifySourceOrders = normalized.filter(
+    (order) => !supplyShopifyIds.has(order.shopify_order_id),
+  );
+  const orderRows = shopifySourceOrders.map((order) =>
+    toOrderRow(order, nowIso, scopedWorkspaceId),
+  );
 
   if (orderRows.length > 0) {
     const { error: upsertError } = await supabaseAdmin
       .from("orders")
-      .upsert(orderRows, { onConflict: "order_id" });
+      .upsert(orderRows, { onConflict: "workspace_id,order_id" });
 
     if (upsertError) {
-      if (/workspace_id/i.test(upsertError.message ?? "")) {
+      if (/workspace_id|orders_workspace_order/i.test(upsertError.message ?? "")) {
         console.error("Shopify upsert failed", upsertError);
         throw new Error(
-          "workspace_id column missing — run migration 20260823180000_shopify_stores_workspace.sql",
+          "workspace-scoped order uniqueness missing — run migration 20260920190000_orders_workspace_scoped_identity.sql",
         );
       }
       if (/product_summary|customer_name|snapshot|column/i.test(upsertError.message ?? "")) {
@@ -90,11 +105,13 @@ export async function persistShopifyNormalizedOrders(
     }
   }
 
+  // Enrich Dropi/Dropea rows in the SAME workspace only.
   const { data: linkedRows } = await supabaseAdmin
     .from("orders")
     .select(
       "order_id, shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, source, snapshot",
     )
+    .eq("workspace_id", scopedWorkspaceId)
     .in("shopify_order_id", shopifyIds)
     .not("source", "ilike", "%shopify%");
 
@@ -128,25 +145,17 @@ export async function persistShopifyNormalizedOrders(
         ...(!supplyHasLineItems && shopifyHasLineItems
           ? { snapshot: match.snapshot as import("@/integrations/supabase/types").Json }
           : {}),
-        ...(scopedWorkspaceId ? { workspace_id: scopedWorkspaceId } : {}),
         updated_at: nowIso,
       })
+      .eq("workspace_id", scopedWorkspaceId)
       .eq("order_id", row.order_id);
     if (!error) enriched += 1;
-  }
-
-  if (scopedWorkspaceId) {
-    await supabaseAdmin
-      .from("orders")
-      .update({ workspace_id: scopedWorkspaceId, updated_at: nowIso })
-      .in("shopify_order_id", shopifyIds)
-      .is("workspace_id", null);
   }
 
   const eventRows = normalized.map((order) => ({
     order_id: order.order_id,
     event_date: order.last_event_at,
-    status_id: null,
+    status_id: eventStatusIdForUpsert(null),
     status_name: order.status_name,
     details: order.details,
     tracking_code: order.tracking_code,
@@ -155,14 +164,20 @@ export async function persistShopifyNormalizedOrders(
     shipping_company: order.shipping_company,
     total: order.total,
     source: SHOPIFY_SOURCE,
-    ...(scopedWorkspaceId ? { workspace_id: scopedWorkspaceId } : {}),
+    workspace_id: scopedWorkspaceId,
     raw: order.snapshot as import("@/integrations/supabase/types").Json,
   }));
 
-  const { error: eventsError } = await supabaseAdmin
-    .from("order_events")
-    .upsert(eventRows, { onConflict: "order_id,event_date,status_id", ignoreDuplicates: true });
-  if (eventsError) console.error("Shopify order_events upsert failed", eventsError);
+  const { error: eventsError } = await supabaseAdmin.from("order_events").upsert(eventRows, {
+    onConflict: "workspace_id,order_id,event_date,status_id",
+    ignoreDuplicates: true,
+  });
+    if (eventsError) console.error("Shopify order_events upsert failed", {
+      workspace_id: scopedWorkspaceId,
+      provider: "shopify",
+      operation: "order_events_upsert",
+      message: eventsError.message,
+    });
 
   return { imported: orderRows.length, enriched, warning: null };
 }

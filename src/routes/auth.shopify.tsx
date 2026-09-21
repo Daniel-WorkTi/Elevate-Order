@@ -31,9 +31,10 @@ function ShopifyAuthStart() {
 
   useEffect(() => {
     const shop = search.shop;
+    const workspaceId = search.workspaceId;
     const returnTo = sanitizeShopifyOauthReturnTo(search.returnTo);
-    if (!shop) {
-      window.location.replace(returnTo);
+    if (!shop || !workspaceId) {
+      window.location.replace(shopifyOauthErrorReturnTo(returnTo));
       return;
     }
 
@@ -48,7 +49,7 @@ function ShopifyAuthStart() {
       data: {
         shop,
         returnTo,
-        ...(search.workspaceId ? { workspaceId: search.workspaceId } : {}),
+        workspaceId,
       },
     })
       .then(({ url }) => {

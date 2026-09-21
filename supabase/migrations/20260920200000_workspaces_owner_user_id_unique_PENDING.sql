@@ -1,0 +1,15 @@
+-- ============================================================
+-- PENDING — DO NOT APPLY until duplicate-owner reconciliation.
+--
+-- Target: one owned workspace per owner_user_id for NEW rows.
+-- Blocked by production owners with multiple owned workspaces:
+--   2b42f74f-… (5), 8706e5c4-… (3) — see docs/audit/duplicate-owner-forensics.json
+--
+-- After empties are safely retired and each owner has exactly one
+-- KEEP_PRIMARY, apply this UNIQUE partial index, then VALIDATE
+-- future-ownership CHECKs separately if desired.
+-- ============================================================
+
+-- CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS workspaces_owner_user_id_uidx
+--   ON public.workspaces (owner_user_id)
+--   WHERE owner_user_id IS NOT NULL;

@@ -9,13 +9,12 @@ import {
 } from "@/lib/integrations/dropi/dropi-webhook-normalize";
 import { sourceFromWebhookAuth } from "@/lib/integrations/dropi/source";
 import { resolvePublicWebhookAuth } from "@/lib/integrations/webhook-auth";
-import { collectCrossWorkspaceOrderCollisions } from "@/lib/orders/cross-workspace-order-collision";
+import { eventStatusIdForUpsert } from "@/lib/orders/event-status-id";
 
 function logisticsFromEvent(
   event: NormalizedDropiEvent,
   supply: "dropi" | "dropea" | null,
 ) {
-  // Prefer auth supply stamp over payload source (avoids Dropi/Dropea normalizer mix).
   if (supply === "dropea") return normalizeDropeaOrder(event.raw);
   if (supply === "dropi") return normalizeDropiOrder(event.raw);
   const source = (event.source ?? "").toLowerCase();
@@ -78,16 +77,19 @@ type ExistingOrderRow = {
 export async function handlePublicOrdersWebhook(request: Request): Promise<Response> {
   const auth = await resolvePublicWebhookAuth(request);
   if (!auth.ok || !auth.workspaceId) {
+    console.warn("[webhook] orders rejected", {
+      provider: "dropi",
+      operation: "auth",
+      reason: "unauthorized_or_unknown_token",
+    });
     return json({ error: "Unauthorized" }, 401);
   }
   const workspaceId = auth.workspaceId;
-  console.info(
-    "[webhook] orders accepted",
-    JSON.stringify({
-      supply: auth.supply,
-      workspace: workspaceId ? "set" : "none",
-    }),
-  );
+  console.info("[webhook] orders accepted", {
+    provider: auth.supply ?? "dropi",
+    operation: "ingest",
+    workspace_id: workspaceId,
+  });
 
   let raw: unknown;
   try {
@@ -96,7 +98,6 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
     return json({ error: "Invalid JSON body" }, 400);
   }
 
-  // Empty body — treat as reachability probe after auth (Dropi URL checkers).
   if (
     raw == null ||
     (typeof raw === "object" && !Array.isArray(raw) && Object.keys(raw as object).length === 0)
@@ -106,7 +107,6 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
 
   const parsed = dropiWebhookPayloadSchema.safeParse(prepareDropiWebhookBody(raw));
   if (!parsed.success) {
-    // Do not echo Zod issue paths to public webhook callers.
     return json({ error: "Invalid payload" }, 422);
   }
 
@@ -127,54 +127,34 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const candidateOrderIds = [...new Set(events.map((e) => e.order_id))];
+  // Workspace-scoped lookup only — same external order_id may exist in other tenants.
   const { data: existingRows, error: existingError } = await supabaseAdmin
     .from("orders")
     .select(
       "order_id, workspace_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot",
     )
+    .eq("workspace_id", workspaceId)
     .in("order_id", candidateOrderIds);
 
   if (existingError) {
-    console.error("orders lookup failed", existingError);
+    console.error("orders lookup failed", {
+      workspace_id: workspaceId,
+      provider: auth.supply ?? "dropi",
+      operation: "orders_lookup",
+      message: existingError.message,
+    });
   }
 
   const existingById = new Map<number, ExistingOrderRow>(
     ((existingRows ?? []) as ExistingOrderRow[]).map((row) => [row.order_id, row]),
   );
 
-  // Schema still has global UNIQUE(order_id). Refuse cross-workspace overwrite.
-  const blockedOrderIds = workspaceId
-    ? collectCrossWorkspaceOrderCollisions(
-        ((existingRows ?? []) as ExistingOrderRow[]).map((row) => ({
-          order_id: row.order_id,
-          workspace_id: row.workspace_id,
-        })),
-        workspaceId,
-      )
-    : new Set<number>();
-  if (blockedOrderIds.size > 0) {
-    for (const orderId of blockedOrderIds) {
-      console.error(
-        "[webhook] order_id collision across workspaces — skipped",
-        JSON.stringify({ order_id: orderId }),
-      );
-    }
-  }
-
-  const acceptedEvents = events.filter((e) => !blockedOrderIds.has(e.order_id));
-  if (acceptedEvents.length === 0 && blockedOrderIds.size > 0) {
-    return json(
-      { error: "Order conflict", received: events.length, skipped: blockedOrderIds.size },
-      409,
-    );
-  }
-
-  const eventRows = acceptedEvents.map((e) => {
+  const eventRows = events.map((e) => {
     const logistics = logisticsFromEvent(e, auth.supply);
     return {
       order_id: e.order_id,
       event_date: e.event_date,
-      status_id: e.status_id,
+      status_id: eventStatusIdForUpsert(e.status_id),
       status_name: e.status_name,
       details: e.details,
       tracking_code: logistics.trackingCode ?? e.tracking_code,
@@ -188,17 +168,23 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
     };
   });
 
-  const { error: eventsError } = await supabaseAdmin
-    .from("order_events")
-    .upsert(eventRows, { onConflict: "order_id,event_date,status_id", ignoreDuplicates: true });
+  const { error: eventsError } = await supabaseAdmin.from("order_events").upsert(eventRows, {
+    onConflict: "workspace_id,order_id,event_date,status_id",
+    ignoreDuplicates: true,
+  });
 
   if (eventsError) {
-    console.error("order_events upsert failed", eventsError);
+    console.error("order_events upsert failed", {
+      workspace_id: workspaceId,
+      provider: auth.supply ?? "dropi",
+      operation: "order_events_upsert",
+      message: eventsError.message,
+    });
     return json({ error: "Failed to store events" }, 500);
   }
 
   const latest = new Map<number, NormalizedDropiEvent>();
-  for (const row of acceptedEvents) {
+  for (const row of events) {
     const current = latest.get(row.order_id);
     if (!current || row.event_date > current.event_date) latest.set(row.order_id, row);
   }
@@ -206,21 +192,17 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
   const shopifyLookupIds = [...latest.values()]
     .map((row) => row.shopify_order_id)
     .filter((id): id is number => typeof id === "number");
-  let shopifyTwinQuery = shopifyLookupIds.length
-    ? supabaseAdmin
-        .from("orders")
-        .select(
-          "shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot, shipping_company, tracking_code, tracking_url",
-        )
-        .in("shopify_order_id", shopifyLookupIds)
-        .ilike("source", "%shopify%")
-    : null;
-  if (shopifyTwinQuery && workspaceId) {
-    shopifyTwinQuery = shopifyTwinQuery.eq("workspace_id", workspaceId);
-  }
-  const { data: shopifyTwins } = shopifyTwinQuery
-    ? await shopifyTwinQuery
-    : { data: [] as never[] };
+  const { data: shopifyTwins } =
+    shopifyLookupIds.length > 0
+      ? await supabaseAdmin
+          .from("orders")
+          .select(
+            "shopify_order_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency, snapshot, shipping_company, tracking_code, tracking_url",
+          )
+          .eq("workspace_id", workspaceId)
+          .in("shopify_order_id", shopifyLookupIds)
+          .ilike("source", "%shopify%")
+      : { data: [] as never[] };
   const twinByShopifyId = new Map(
     (shopifyTwins ?? []).map((row) => [Number(row.shopify_order_id), row]),
   );
@@ -271,10 +253,15 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
 
   const { error: ordersError } = await supabaseAdmin
     .from("orders")
-    .upsert(orderRows, { onConflict: "order_id" });
+    .upsert(orderRows, { onConflict: "workspace_id,order_id" });
 
   if (ordersError) {
-    console.error("orders upsert failed", ordersError);
+    console.error("orders upsert failed", {
+      workspace_id: workspaceId,
+      provider: auth.supply ?? "dropi",
+      operation: "orders_upsert",
+      message: ordersError.message,
+    });
     if (/product_summary|customer_name|snapshot|column/i.test(ordersError.message ?? "")) {
       const logisticsOnly = orderRows.map(
         ({
@@ -293,7 +280,7 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
       );
       const { error: fallbackError } = await supabaseAdmin
         .from("orders")
-        .upsert(logisticsOnly, { onConflict: "order_id" });
+        .upsert(logisticsOnly, { onConflict: "workspace_id,order_id" });
       if (fallbackError) {
         console.error("orders logistics upsert failed", fallbackError);
         return json({ error: "Failed to store orders" }, 500);
@@ -312,13 +299,12 @@ export async function handlePublicOrdersWebhook(request: Request): Promise<Respo
     .map((row) => row.shopify_order_id)
     .filter((id): id is number => typeof id === "number");
   if (shopifyIds.length > 0) {
-    let dupes = supabaseAdmin
+    await supabaseAdmin
       .from("orders")
       .delete()
+      .eq("workspace_id", workspaceId)
       .in("shopify_order_id", shopifyIds)
       .ilike("source", "%shopify%");
-    if (workspaceId) dupes = dupes.eq("workspace_id", workspaceId);
-    await dupes;
   }
 
   return json({ ok: true, received: eventRows.length, orders: orderRows.length });

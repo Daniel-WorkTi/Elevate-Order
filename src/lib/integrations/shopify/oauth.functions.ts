@@ -13,7 +13,7 @@ import { persistShopifyNormalizedOrders } from "@/lib/integrations/shopify/persi
 
 const shopInput = z.object({
   shop: z.string().min(3).max(120),
-  workspaceId: z.string().uuid().optional(),
+  workspaceId: z.string().uuid(),
   returnTo: z.string().max(200).optional(),
 });
 
@@ -42,7 +42,10 @@ async function requireUserId(): Promise<string> {
 
 export const getShopifyOauthStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<ShopifyOauthStatus> => {
+  .validator((data: unknown) =>
+    z.object({ workspaceId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<ShopifyOauthStatus> => {
     const oauthConfigured = (
       await import("@/lib/integrations/shopify/oauth")
     ).shopifyOauthConfigured();
@@ -56,33 +59,36 @@ export const getShopifyOauthStatus = createServerFn({ method: "GET" })
 
     try {
       const userId = await requireUserId();
+      const { authorizeWorkspaceInput } =
+        await import("@/lib/workspace/authorize-workspace-input");
+      const authorized = await authorizeWorkspaceInput(userId, data.workspaceId);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data, error } = await supabaseAdmin
+
+      const { data: store, error } = await supabaseAdmin
         .from("shopify_stores")
         .select("shop_domain, last_sync_at, uninstalled_at, workspace_id")
         .eq("user_id", userId)
+        .eq("workspace_id", authorized.id)
         .is("uninstalled_at", null)
         .order("installed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (error || !data?.shop_domain) return empty;
+      if (error || !store?.shop_domain) return empty;
 
       let orderCount: number | null = null;
-      if (data.workspace_id) {
-        const countRes = await supabaseAdmin
-          .from("orders")
-          .select("order_id", { count: "exact", head: true })
-          .eq("workspace_id", data.workspace_id)
-          .ilike("source", "%shopify%");
-        orderCount = countRes.count ?? 0;
-      }
+      const countRes = await supabaseAdmin
+        .from("orders")
+        .select("order_id", { count: "exact", head: true })
+        .eq("workspace_id", authorized.id)
+        .ilike("source", "%shopify%");
+      orderCount = countRes.count ?? 0;
 
       return {
         oauthConfigured,
         connected: true,
-        shopDomain: data.shop_domain,
-        lastSyncAt: data.last_sync_at,
+        shopDomain: store.shop_domain,
+        lastSyncAt: store.last_sync_at,
         orderCount,
       };
     } catch (error) {
@@ -105,10 +111,8 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
     if (!shop) throw new Error("Use a .myshopify.com Admin domain.");
 
     const userId = await requireUserId();
-    if (data.workspaceId) {
-      const { authorizeWorkspaceInput } = await import("@/lib/workspace/authorize-workspace-input");
-      await authorizeWorkspaceInput(userId, data.workspaceId);
-    }
+    const { authorizeWorkspaceInput } = await import("@/lib/workspace/authorize-workspace-input");
+    const authorized = await authorizeWorkspaceInput(userId, data.workspaceId);
     const state = oauth.createOauthNonce();
     const origin = getPublicAppUrl();
     const redirectUri = `${origin}/auth/shopify/callback`;
@@ -132,7 +136,7 @@ export const startShopifyInstall = createServerFn({ method: "POST" })
         shop,
         userId,
         returnTo,
-        ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
+        workspaceId: authorized.id,
       }),
       {
         httpOnly: true,
@@ -179,6 +183,25 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     if (!cookie || cookie.state !== data.state || cookie.shop !== shop) {
       throw new Error("Invalid OAuth state");
     }
+
+    // Bind install to the authenticated session when present (prevents cookie user spoofing).
+    try {
+      const sessionUserId = await requireUserId();
+      if (sessionUserId !== cookie.userId) {
+        console.error("[shopify] oauth cookie user mismatch", {
+          cookieUserId: cookie.userId,
+          sessionUserId,
+        });
+        throw new Error("Invalid OAuth session");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "Invalid OAuth session") throw error;
+      // OAuth callback may complete without a cookie session in some browsers; state+HMAC still required.
+      console.error("[shopify] oauth session check skipped", {
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    }
+
     const returnTo = sanitizeShopifyOauthReturnTo(cookie.returnTo ?? DEFAULT_SHOPIFY_OAUTH_RETURN_TO);
 
     const token = await oauth.exchangeShopifyAccessToken({
@@ -189,6 +212,9 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!cookie.workspaceId) {
+      throw new Error("Shopify OAuth requires a workspace. Restart connect from Connections or Onboarding.");
+    }
     const { error } = await supabaseAdmin.from("shopify_stores").upsert(
       {
         user_id: cookie.userId,
@@ -197,7 +223,7 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
         scope: token.scope,
         installed_at: new Date().toISOString(),
         uninstalled_at: null,
-        ...(cookie.workspaceId ? { workspace_id: cookie.workspaceId } : {}),
+        workspace_id: cookie.workspaceId,
       },
       { onConflict: "user_id,shop_domain" },
     );
@@ -208,12 +234,10 @@ export const completeShopifyInstall = createServerFn({ method: "POST" })
     }
 
     await registerShopifyWebhooks(shop, token.accessToken);
-    if (cookie.workspaceId) {
-      try {
-        await pullAndPersistShopifyOrders(shop, token.accessToken, 50, cookie.workspaceId);
-      } catch (error) {
-        console.error("[shopify] initial sync after install failed", error);
-      }
+    try {
+      await pullAndPersistShopifyOrders(shop, token.accessToken, 50, cookie.workspaceId);
+    } catch (error) {
+      console.error("[shopify] initial sync after install failed", error);
     }
 
     setCookie(oauth.SHOPIFY_OAUTH_STATE_COOKIE, "", { path: "/", maxAge: 0 });
@@ -301,22 +325,35 @@ export const connectShopifyManualStore = createServerFn({ method: "POST" })
 
 export const disconnectShopifyStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<{ ok: true }> => {
+  .validator((data: unknown) =>
+    z.object({ workspaceId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean; error: string | null }> => {
     const userId = await requireUserId();
+    const { authorizeWorkspaceInput } =
+      await import("@/lib/workspace/authorize-workspace-input");
+    const authorized = await authorizeWorkspaceInput(userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const nowIso = new Date().toISOString();
-    await supabaseAdmin
+
+    const { error } = await supabaseAdmin
       .from("shopify_stores")
       .update({ access_token: "", uninstalled_at: nowIso })
       .eq("user_id", userId)
+      .eq("workspace_id", authorized.id)
       .is("uninstalled_at", null);
-    return { ok: true };
+
+    if (error) {
+      console.error("[shopify] disconnect failed", error.message);
+      return { ok: false, error: "Unable to disconnect Shopify store." };
+    }
+    return { ok: true, error: null };
   });
 
 export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) =>
-    z.object({ workspaceId: z.string().uuid().optional() }).parse(data ?? {}),
+    z.object({ workspaceId: z.string().uuid() }).parse(data),
   )
   .handler(
     async ({
@@ -331,11 +368,14 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
         const userId = await requireUserId();
         const { authorizeWorkspaceInput } =
           await import("@/lib/workspace/authorize-workspace-input");
+        const authorized = await authorizeWorkspaceInput(userId, data.workspaceId);
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
         const { data: store, error } = await supabaseAdmin
           .from("shopify_stores")
           .select("shop_domain, access_token, workspace_id")
           .eq("user_id", userId)
+          .eq("workspace_id", authorized.id)
           .is("uninstalled_at", null)
           .order("installed_at", { ascending: false })
           .limit(1)
@@ -343,25 +383,6 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
 
         if (error || !store?.access_token || !store.shop_domain) {
           return { ok: false, imported: 0, enriched: 0, error: "No Shopify store connected." };
-        }
-
-        const workspaceId = data.workspaceId ?? store.workspace_id;
-        if (!workspaceId) {
-          return {
-            ok: false,
-            imported: 0,
-            enriched: 0,
-            error: "Shopify store has no workspace. Reconnect after Phase 0 migration.",
-          };
-        }
-
-        const authorized = await authorizeWorkspaceInput(userId, workspaceId);
-        if (data.workspaceId) {
-          await supabaseAdmin
-            .from("shopify_stores")
-            .update({ workspace_id: authorized.id })
-            .eq("user_id", userId)
-            .eq("shop_domain", store.shop_domain);
         }
 
         const result = await pullAndPersistShopifyOrders(
@@ -374,7 +395,8 @@ export const syncConnectedShopifyStore = createServerFn({ method: "POST" })
           .from("shopify_stores")
           .update({ last_sync_at: new Date().toISOString() })
           .eq("user_id", userId)
-          .eq("shop_domain", store.shop_domain);
+          .eq("shop_domain", store.shop_domain)
+          .eq("workspace_id", authorized.id);
 
         return {
           ok: true,

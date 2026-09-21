@@ -7,7 +7,7 @@ export type ResolvedWebhookAuth = {
 };
 
 /** Extract per-workspace webhook token from query or path. */
-function webhookTokenFromRequest(request: Request): string {
+export function webhookTokenFromRequest(request: Request): string {
   const url = new URL(request.url);
   const queryToken = url.searchParams.get("token")?.trim() ?? "";
   if (queryToken) return queryToken;
@@ -15,6 +15,21 @@ function webhookTokenFromRequest(request: Request): string {
   const pathToken = match?.[1] ? decodeURIComponent(match[1]).trim() : "";
   if (pathToken && pathToken !== "orders") return pathToken;
   return "";
+}
+
+/**
+ * Map a DB endpoint row to auth. Missing/unknown token → reject (no writes).
+ * Token A always resolves only to workspace A.
+ */
+export function authFromWebhookEndpointRow(
+  row: { workspace_id: unknown; supply: unknown } | null | undefined,
+): ResolvedWebhookAuth {
+  if (!row?.workspace_id) {
+    return { ok: false, workspaceId: null, supply: null };
+  }
+  const supply =
+    row.supply === "dropea" || row.supply === "dropi" ? row.supply : "dropi";
+  return { ok: true, workspaceId: String(row.workspace_id), supply };
 }
 
 /**
@@ -36,11 +51,7 @@ export async function resolvePublicWebhookAuth(request: Request): Promise<Resolv
       .eq("token", queryToken)
       .maybeSingle();
 
-    if (data?.workspace_id) {
-      const supply =
-        data.supply === "dropea" || data.supply === "dropi" ? data.supply : "dropi";
-      return { ok: true, workspaceId: String(data.workspace_id), supply };
-    }
+    return authFromWebhookEndpointRow(data);
   } catch (error) {
     console.error("workspace webhook token lookup failed", error);
   }
@@ -59,11 +70,9 @@ export function isPublicWebhookAuthorized(request: Request): boolean {
   return false;
 }
 
-/** Legacy global path builder (prefer getWorkspaceWebhookUrl). */
+/** Legacy path builder — never embeds global ELEVATE_WEBHOOK_TOKEN (no secret leak). */
 export function buildWebhookRelativeUrl(path = DROPI_WEBHOOK_PATH): string {
-  const token = process.env["ELEVATE_WEBHOOK_TOKEN"]?.trim();
-  if (!token) return path;
-  return `${path}?token=${encodeURIComponent(token)}`;
+  return path;
 }
 
 /** True when a global ingest token exists (legacy). Prefer per-workspace endpoints. */

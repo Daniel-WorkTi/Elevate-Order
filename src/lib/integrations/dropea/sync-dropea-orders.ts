@@ -11,8 +11,8 @@ import {
   coalesceStatic,
   type NormalizedDropiEvent,
 } from "@/lib/integrations/dropi/dropi-webhook-normalize";
-import { collectCrossWorkspaceOrderCollisions } from "@/lib/orders/cross-workspace-order-collision";
 import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-input";
+import { eventStatusIdForUpsert } from "@/lib/orders/event-status-id";
 
 const syncInput = z.object({
   workspaceId: z.string().uuid(),
@@ -24,7 +24,6 @@ export type SyncDropeaResult = {
   ok: boolean;
   imported: number;
   message?: string;
-  skippedCollisions?: number;
 };
 
 function extractOrderList(payload: unknown): unknown[] {
@@ -114,41 +113,15 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
       .select(
         "order_id, workspace_id, customer_name, phone, email, city, postal_code, address, country, product_summary, currency",
       )
+      .eq("workspace_id", workspaceId)
       .in("order_id", candidateOrderIds);
 
-    const blockedOrderIds = collectCrossWorkspaceOrderCollisions(
-      (existingRows ?? []).map((row) => ({
-        order_id: row.order_id as number,
-        workspace_id: (row.workspace_id as string | null) ?? null,
-      })),
-      workspaceId,
-    );
-
-    if (blockedOrderIds.size > 0) {
-      for (const orderId of blockedOrderIds) {
-        console.error(
-          "[dropea] order_id collision across workspaces — skipped",
-          JSON.stringify({ order_id: orderId }),
-        );
-      }
-    }
-
-    const acceptedEvents = events.filter((e) => !blockedOrderIds.has(e.order_id));
-    if (acceptedEvents.length === 0 && blockedOrderIds.size > 0) {
-      return {
-        ok: false,
-        imported: 0,
-        skippedCollisions: blockedOrderIds.size,
-        message: "Order conflict with another workspace",
-      };
-    }
-
-    const eventRows = acceptedEvents.map((e) => {
+    const eventRows = events.map((e) => {
       const logistics = normalizeDropeaOrder(e.raw);
       return {
         order_id: e.order_id,
         event_date: e.event_date,
-        status_id: e.status_id,
+        status_id: eventStatusIdForUpsert(e.status_id),
         status_name: e.status_name,
         details: e.details,
         tracking_code: logistics.trackingCode ?? e.tracking_code,
@@ -162,25 +135,29 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
       };
     });
 
-    const { error: eventsError } = await supabaseAdmin
-      .from("order_events")
-      .upsert(eventRows, { onConflict: "order_id,event_date,status_id", ignoreDuplicates: true });
+    const { error: eventsError } = await supabaseAdmin.from("order_events").upsert(eventRows, {
+      onConflict: "workspace_id,order_id,event_date,status_id",
+      ignoreDuplicates: true,
+    });
 
     if (eventsError) {
-      console.error("[dropea] order_events upsert failed", eventsError);
+      console.error("[dropea] order_events upsert failed", {
+        workspace_id: workspaceId,
+        provider: "dropea",
+        operation: "order_events_upsert",
+        message: eventsError.message,
+      });
       return { ok: false, imported: 0, message: "Failed to store events" };
     }
 
     const latest = new Map<number, NormalizedDropiEvent>();
-    for (const row of acceptedEvents) {
+    for (const row of events) {
       const current = latest.get(row.order_id);
       if (!current || row.event_date > current.event_date) latest.set(row.order_id, row);
     }
 
     const existingById = new Map(
-      (existingRows ?? [])
-        .filter((row) => !blockedOrderIds.has(row.order_id as number))
-        .map((row) => [row.order_id as number, row]),
+      (existingRows ?? []).map((row) => [row.order_id as number, row]),
     );
 
     const orderRows = [...latest.values()].map((row) => {
@@ -218,16 +195,20 @@ export const syncDropeaOrders = createServerFn({ method: "POST" })
 
     const { error: ordersError } = await supabaseAdmin
       .from("orders")
-      .upsert(orderRows, { onConflict: "order_id" });
+      .upsert(orderRows, { onConflict: "workspace_id,order_id" });
 
     if (ordersError) {
-      console.error("[dropea] orders upsert failed", ordersError);
+      console.error("[dropea] orders upsert failed", {
+        workspace_id: workspaceId,
+        provider: "dropea",
+        operation: "orders_upsert",
+        message: ordersError.message,
+      });
       return { ok: false, imported: 0, message: "Failed to store orders" };
     }
 
     return {
       ok: true,
       imported: orderRows.length,
-      ...(blockedOrderIds.size > 0 ? { skippedCollisions: blockedOrderIds.size } : {}),
     };
   });

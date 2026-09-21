@@ -207,7 +207,10 @@ export const testShopifyConnection = createServerFn({ method: "POST" })
 
 export const getShopifyDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<ShopifyDashboardResult> => {
+  .validator((data: unknown) =>
+    z.object({ workspaceId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }): Promise<ShopifyDashboardResult> => {
     const serverConfigured =
       Boolean(process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim()) &&
       Boolean(process.env["SUPABASE_URL"]?.trim());
@@ -227,34 +230,20 @@ export const getShopifyDashboard = createServerFn({ method: "GET" })
     }
 
     try {
-      const { listOwnedWorkspaces } = await import("@/lib/workspace/workspace.functions");
-      const owned = await listOwnedWorkspaces(context.userId);
-      if (owned.length === 0) {
-        return {
-          summary: {
-            status: "configured",
-            method: "api",
-            serverConfigured: true,
-            lastSyncAt: null,
-            orderCount: 0,
-            errorMessage: null,
-          },
-          error: null,
-        };
-      }
-
-      const workspaceIds = owned.map((w) => w.id);
+      const { authorizeWorkspaceInput } =
+        await import("@/lib/workspace/authorize-workspace-input");
+      const authorized = await authorizeWorkspaceInput(context.userId, data.workspaceId);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const [countRes, latestRes] = await Promise.all([
         supabaseAdmin
           .from("orders")
           .select("order_id", { count: "exact", head: true })
-          .in("workspace_id", workspaceIds)
+          .eq("workspace_id", authorized.id)
           .ilike("source", "%shopify%"),
         supabaseAdmin
           .from("orders")
           .select("last_event_at")
-          .in("workspace_id", workspaceIds)
+          .eq("workspace_id", authorized.id)
           .ilike("source", "%shopify%")
           .order("last_event_at", { ascending: false })
           .limit(1),

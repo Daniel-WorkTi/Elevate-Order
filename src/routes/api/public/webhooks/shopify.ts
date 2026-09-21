@@ -62,6 +62,10 @@ export const Route = createFileRoute("/api/public/webhooks/shopify")({
           console.error("[shopify] webhook for unknown shop");
           return json({ error: "Unknown shop" }, 404);
         }
+        if (!store.workspaceId) {
+          console.error("[shopify] webhook for shop without workspace");
+          return json({ error: "Shop not linked to a workspace" }, 409);
+        }
 
         let payload: unknown;
         try {
