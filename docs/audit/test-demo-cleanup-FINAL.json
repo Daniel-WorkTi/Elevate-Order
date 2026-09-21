@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-09-20T17:51:00.000Z",
+  "cleanupExecuted": true,
+  "preDeleteApprovedWorkspaces": 11,
+  "deletedWorkspaces": [
+    "b1218c09-6457-4975-a57e-3a1b38730cc2",
+    "d31e3ce6-4ccc-4405-96c7-ca73de0e1eb1",
+    "ce13684a-5616-4389-9ac4-8512932515f1",
+    "0e05a50c-a0af-4028-b0a9-73b50f31ad91",
+    "079b4bfb-253d-46d7-a88d-c1b796a2e8ea",
+    "3f90f6e4-19e9-4d02-a315-bc4a4a76621f",
+    "dee31139-5979-4baa-8cb9-68f6efef30c1",
+    "cdc31359-40a0-4e3b-9b40-28bbd2d83379",
+    "2fe91493-a603-45ee-aafd-d83568666b17",
+    "c3bba29a-445f-4ca0-8efe-5361ab9d967a",
+    "a00d8b76-4c76-4484-9a71-6a3db27f1f5d"
+  ],
+  "preflightTotals": {
+    "orders": 49,
+    "order_events": 0,
+    "order_confirmation_events": 0,
+    "shopify_stores": 0,
+    "workspace_webhook_endpoints": 0,
+    "workspace_provider_credentials": 0,
+    "whatsapp_connections": 9,
+    "whatsapp_sessions": 0,
+    "whatsapp_session_keys": 0,
+    "whatsapp_conversations": 20,
+    "whatsapp_messages": 26,
+    "whatsapp_connection_secrets": 2,
+    "message_templates": 0
+  },
+  "authUsersDeleted": 0,
+  "authDeleteCandidates": [
+    "542474f5-7a49-46a4-a22b-85cf9a38faff",
+    "d540bc13-fb07-44e6-a5bc-c52855d5a73e",
+    "537fbb38-0132-4ac4-87da-cc2604e51dbe",
+    "72fffac8-2bfa-47e8-87d8-52815bfcc62d"
+  ],
+  "crossWorkspaceReferencesFound": false,
+  "nullWorkspaceOrdersBefore": 49,
+  "nullWorkspaceOrdersAfter": 49,
+  "protectedPreserved": [
+    "0cfdb02c-02d4-4fb7-959c-22e1e7a3266b",
+    "18bd9cd4-2da1-4a88-9b9d-5da7645800ce",
+    "1d979bae-a97e-4202-b8ab-adcd6571f827",
+    "1eb823ac-fd62-4a2e-9cbc-9dc614366697"
+  ],
+  "shopifyRealPreserved": {
+    "id": "9659740f-3669-4bdf-9e96-65013453f79c",
+    "workspace_id": "1eb823ac-fd62-4a2e-9cbc-9dc614366697",
+    "shop_domain": "csezc6-rd.myshopify.com"
+  },
+  "workspacesBefore": 30,
+  "workspacesAfter": 19,
+  "notes": "Executed in multiple resumes after FK-order fixes; final verification: 0 approved remaining, protected intact, null orders unchanged."
+}

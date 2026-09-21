@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-09-20T18:40:00.000Z",
+  "verified_at": "2026-09-20T18:40:00.000Z",
+  "legacy_preserved": true,
+  "null_orders": { "count": 49, "status": "PRESERVED" },
+  "ownerless_workspaces": {
+    "status": "PRESERVED",
+    "ids": [
+      "0cfdb02c-02d4-4fb7-959c-22e1e7a3266b",
+      "18bd9cd4-2da1-4a88-9b9d-5da7645800ce",
+      "1d979bae-a97e-4202-b8ab-adcd6571f827"
+    ]
+  },
+  "future_ownership_migration": {
+    "file": "supabase/migrations/20260920193000_future_ownership_check_not_valid.sql",
+    "applied_to_prod": true,
+    "verified_by": "probe INSERT rejected with 23514 on orders/order_events/shopify_stores/workspaces"
+  },
+  "enforcement": {
+    "new_orders_null_workspace": false,
+    "new_events_null_workspace": false,
+    "new_shopify_store_null_workspace": false,
+    "new_customer_workspace_null_owner": false
+  },
+  "launch_readiness": "READY"
+}

@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-09-20T18:01:17.344Z",
+  "anchors": {
+    "MULTITENANT_MIGRATION_AT": "2026-08-27T00:00:00.000Z",
+    "P0_IDENTITY_AT": "2026-09-20T00:00:00.000Z"
+  },
+  "nullOrders": {
+    "count": 49,
+    "created_at_min": "2026-08-16T11:40:06.488895+00:00",
+    "created_at_max": "2026-08-16T11:40:06.488895+00:00",
+    "beforeMt": 49,
+    "between": 0,
+    "afterP0": 0,
+    "classification": "PRESERVE_LEGACY"
+  },
+  "ownerlessWorkspaces": [
+    "0cfdb02c-02d4-4fb7-959c-22e1e7a3266b",
+    "18bd9cd4-2da1-4a88-9b9d-5da7645800ce",
+    "1d979bae-a97e-4202-b8ab-adcd6571f827"
+  ],
+  "mappings": [
+    {
+      "workspace_id": "0cfdb02c-02d4-4fb7-959c-22e1e7a3266b",
+      "user_id": null,
+      "confidence": "UNKNOWN",
+      "evidence": "owner_user_id NULL; no unique shopify user binding; do not infer"
+    },
+    {
+      "workspace_id": "18bd9cd4-2da1-4a88-9b9d-5da7645800ce",
+      "user_id": null,
+      "confidence": "UNKNOWN",
+      "evidence": "owner_user_id NULL; no unique shopify user binding; do not infer"
+    },
+    {
+      "workspace_id": "1d979bae-a97e-4202-b8ab-adcd6571f827",
+      "user_id": null,
+      "confidence": "UNKNOWN",
+      "evidence": "owner_user_id NULL; no unique shopify user binding; do not infer"
+    }
+  ]
+}
