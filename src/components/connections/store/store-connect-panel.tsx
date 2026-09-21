@@ -57,11 +57,11 @@ export function StoreConnectPanel({
   if (linked) {
     if (onboarding) {
       return (
-        <section className="rounded-[14px] border border-border bg-card px-5 py-6 text-center shadow-[var(--shadow-card)]">
-          <p className="text-[15px] font-semibold text-emerald-800">
+        <section className="rounded-[16px] border border-[#E6E8EC] bg-white px-7 py-8 text-center shadow-[var(--shadow-card)]">
+          <p className="text-[16px] font-semibold text-emerald-800">
             ✓ {t("onboarding.setup.shopify.connected")}
           </p>
-          <p className="mt-2 font-mono text-[13px] text-foreground">
+          <p className="mt-2.5 font-mono text-[14px] text-foreground">
             {oauthShop ?? storeDomain ?? storeName}
           </p>
         </section>
@@ -148,9 +148,9 @@ export function StoreConnectPanel({
 
   if (onboarding) {
     return (
-      <section className="space-y-4 rounded-[14px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <section className="space-y-6 rounded-[16px] border border-[#E6E8EC] bg-white p-7 shadow-[var(--shadow-card)] sm:p-8">
         {oauthError ? (
-          <p className="text-[13px] font-medium text-red-600">{t("connections.shopifyOauthError")}</p>
+          <p className="text-[14px] font-medium text-red-600">{t("connections.shopifyOauthError")}</p>
         ) : null}
 
         {showOauth ? (
@@ -158,7 +158,7 @@ export function StoreConnectPanel({
             <div>
               <label
                 htmlFor="onboarding-shopify-shop"
-                className="text-[13px] font-semibold text-foreground"
+                className="text-[14px] font-semibold text-foreground"
               >
                 {t("onboarding.setup.shopify.yourStore")}
               </label>
@@ -174,50 +174,53 @@ export function StoreConnectPanel({
                   if (event.key === "Enter") startOauth();
                 }}
                 placeholder="nome-da-loja.myshopify.com"
-                className="mt-2 h-11 rounded-[10px] border-border font-mono text-[13px] shadow-none"
+                className="mt-2.5 h-12 rounded-[10px] border-border font-mono text-[14px] shadow-none"
               />
-              <p className="mt-2 text-[12px] text-muted-foreground">
-                {t("onboarding.setup.shopify.dontKnow")}
-              </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                {t("onboarding.setup.shopify.findMyshopify")}
-              </p>
             </div>
 
             <Button
               type="button"
               onClick={startOauth}
               disabled={connecting}
-              className="h-11 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[14px] shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
+              className="h-12 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[15px] shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
             >
-              <Link2 className="size-3.5" strokeWidth={1.75} />
+              <Link2 className="size-4" strokeWidth={1.75} />
               {t("onboarding.setup.shopify.continueCta")}
             </Button>
+
+            <div className="rounded-[12px] border border-border bg-[#F7F8FA] px-4 py-3.5">
+              <p className="text-[13px] font-medium text-foreground">
+                {t("onboarding.setup.shopify.dontKnow")}
+              </p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                {t("onboarding.setup.shopify.findMyshopify")}
+              </p>
+            </div>
           </>
         ) : (
-          <p className="text-[13px] text-muted-foreground">{t("connections.shopifyOauthMissing")}</p>
+          <p className="text-[14px] text-muted-foreground">{t("connections.shopifyOauthMissing")}</p>
         )}
 
-        {error ? <p className="text-[13px] font-medium text-red-600">{error}</p> : null}
+        {error ? <p className="text-[14px] font-medium text-red-600">{error}</p> : null}
         {domainHint ? (
-          <p className="text-[12px] leading-relaxed text-muted-foreground">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
             {t("onboarding.setup.shopify.findMyshopify")}
           </p>
         ) : null}
 
-        <div className="border-t border-border pt-3">
+        <div className="border-t border-border pt-4">
           <button
             type="button"
             onClick={() => setTokenOpen((open) => !open)}
             className="flex w-full items-center justify-between gap-2 text-left"
             aria-expanded={tokenOpen}
           >
-            <span className="text-[12px] font-medium text-muted-foreground">
+            <span className="text-[13px] font-medium text-muted-foreground">
               {t("onboarding.setup.shopify.advanced")}
             </span>
             <ChevronDown
               className={cn(
-                "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                "size-4 shrink-0 text-muted-foreground transition-transform",
                 tokenOpen && "rotate-180",
               )}
               strokeWidth={1.75}
@@ -226,7 +229,7 @@ export function StoreConnectPanel({
           </button>
           {tokenOpen ? (
             <div className="mt-3 space-y-2.5">
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {t("connections.shopifyFallbackTokenHint")}
               </p>
               <div className="relative">
@@ -240,7 +243,7 @@ export function StoreConnectPanel({
                     setError(null);
                   }}
                   placeholder="shpat_…"
-                  className="h-10 rounded-[10px] border-border pr-10 font-mono text-[13px] shadow-none"
+                  className="h-11 rounded-[10px] border-border pr-10 font-mono text-[13px] shadow-none"
                 />
                 <button
                   type="button"
@@ -260,7 +263,7 @@ export function StoreConnectPanel({
                 variant="outline"
                 onClick={submitToken}
                 disabled={saving}
-                className="h-10 rounded-[10px] border-border text-[13px] shadow-none"
+                className="h-11 rounded-[10px] border-border text-[14px] shadow-none"
               >
                 {t("connections.connectStoreCta")}
               </Button>

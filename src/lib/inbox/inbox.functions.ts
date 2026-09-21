@@ -14,11 +14,18 @@ export type InboxQueueResult = {
   error: string | null;
 };
 
-const COLUMNS_FULL =
+const COLUMNS_CORE =
+  "id, order_id, shopify_order_id, confirmed_at, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, source, last_event_at, created_at";
+
+const COLUMNS_WITH_CONTACT =
   "id, order_id, shopify_order_id, confirmed_at, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, source, last_event_at, last_whatsapp_contact_at, created_at";
 
 const COLUMNS_LEGACY =
   "id, order_id, shopify_order_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, source, last_event_at, created_at";
+
+function isMissingContactColumn(message: string | undefined) {
+  return /last_whatsapp_contact_at/i.test(message ?? "") && /column|schema cache|does not exist/i.test(message ?? "");
+}
 
 function asNumber(value: number | string | null): number | null {
   if (value === null) return null;
@@ -69,7 +76,7 @@ export const queryInboxQueue = createServerFn({ method: "GET" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const full = await supabaseAdmin
         .from("orders")
-        .select(COLUMNS_FULL)
+        .select(COLUMNS_WITH_CONTACT)
         .eq("workspace_id", workspaceId)
         .order("last_event_at", { ascending: false, nullsFirst: false })
         .limit(800);
@@ -78,7 +85,22 @@ export const queryInboxQueue = createServerFn({ method: "GET" })
       let error = full.error;
 
       if (error && isMissingWorkspaceColumn(error.message)) {
-        return { dropi: [], dropea: [], error: null };
+        return {
+          dropi: [],
+          dropea: [],
+          error: "Orders are missing workspace scope. Apply workspace identity migrations.",
+        };
+      }
+
+      if (error && isMissingContactColumn(error.message)) {
+        const core = await supabaseAdmin
+          .from("orders")
+          .select(COLUMNS_CORE)
+          .eq("workspace_id", workspaceId)
+          .order("last_event_at", { ascending: false, nullsFirst: false })
+          .limit(800);
+        rows = core.data as Record<string, unknown>[] | null;
+        error = core.error;
       }
 
       if (error && /column|schema cache|does not exist/i.test(error.message ?? "")) {

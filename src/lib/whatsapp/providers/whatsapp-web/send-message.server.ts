@@ -45,14 +45,6 @@ export async function runSendWhatsAppTextMessage(
     throw new WhatsAppUserError("validation_failed", "A mensagem é demasiado longa.");
   }
 
-  const recipientE164 = normalizePhoneToE164(input.recipientPhone);
-  if (!recipientE164) {
-    throw new WhatsAppUserError(
-      "validation_failed",
-      "Número de telefone inválido. Use formato internacional (ex.: +351912345678).",
-    );
-  }
-
   const connection = await getWhatsAppWebConnectionStatus(input.workspaceId);
   if (!connection.configured || connection.status !== "connected" || !connection.connectionId) {
     throw new WhatsAppUserError(
@@ -61,17 +53,20 @@ export async function runSendWhatsAppTextMessage(
     );
   }
 
-  const recipientIsConnectedAccount = samePhoneE164(
-    recipientE164,
-    connection.displayPhoneNumber,
-  );
-
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  let recipientE164 = normalizePhoneToE164(input.recipientPhone);
+  if (!recipientE164) {
+    throw new WhatsAppUserError(
+      "validation_failed",
+      "Número de telefone inválido. Use formato internacional (ex.: +351912345678).",
+    );
+  }
 
   if (input.orderId) {
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, workspace_id")
+      .select("id, workspace_id, phone")
       .eq("id", input.orderId)
       .eq("workspace_id", input.workspaceId)
       .maybeSingle();
@@ -79,7 +74,22 @@ export async function runSendWhatsAppTextMessage(
     if (orderError || !order) {
       throw new WhatsAppUserError("validation_failed", "Pedido não encontrado neste workspace.");
     }
+
+    // Order-bound sends: recipient comes from the order row (never trust client/conversation alone).
+    const orderPhone = normalizePhoneToE164(order.phone);
+    if (!orderPhone) {
+      throw new WhatsAppUserError(
+        "validation_failed",
+        "Este pedido não tem telefone válido para contacto.",
+      );
+    }
+    recipientE164 = orderPhone;
   }
+
+  const recipientIsConnectedAccount = samePhoneE164(
+    recipientE164,
+    connection.displayPhoneNumber,
+  );
 
   const { data: enqueueRows, error: enqueueError } = await supabaseAdmin.rpc(
     "enqueue_whatsapp_outbound_message",
@@ -174,11 +184,26 @@ export async function runSendWhatsAppTextMessage(
     }
 
     if (input.orderId) {
-      await supabaseAdmin
+      const { error: contactError } = await supabaseAdmin
         .from("orders")
         .update({ last_whatsapp_contact_at: now })
         .eq("id", input.orderId)
         .eq("workspace_id", input.workspaceId);
+
+      if (contactError) {
+        if (/last_whatsapp_contact_at|column|schema cache|does not exist/i.test(contactError.message)) {
+          console.error("[whatsapp] contact timestamp skipped — column missing", {
+            workspace_id: input.workspaceId,
+            operation: "last_whatsapp_contact_at",
+          });
+        } else {
+          console.error("[whatsapp] contact timestamp update failed", {
+            workspace_id: input.workspaceId,
+            operation: "last_whatsapp_contact_at",
+            message: contactError.message,
+          });
+        }
+      }
 
       await supabaseAdmin
         .from("orders")

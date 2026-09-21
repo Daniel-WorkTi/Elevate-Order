@@ -20,7 +20,7 @@ import { authorizeWorkspaceInput } from "@/lib/workspace/authorize-workspace-inp
 import { isMissingWorkspaceColumn, parseWorkspaceId } from "@/lib/workspace/parse-workspace-id";
 import { isWorkspaceAccessError } from "@/lib/workspace/require-workspace-access";
 import { coalesceText, staticFieldsFromSnapshot } from "@/lib/orders/hydrate-static-fields";
-import { isDropiCodPendingAction } from "@/lib/orders/cod-operation";
+import { isDropiCodPendingAction, paginateDropiPendingActions } from "@/lib/orders/cod-operation";
 import { paymentMethodFromSnapshot, resolveOrderLineItems } from "@/lib/orders/order-line-items";
 
 export type SyncedOrder = {
@@ -37,7 +37,12 @@ export type SyncedOrder = {
   last_event_at: string | null;
 };
 
-const ORDER_COLUMNS_FULL =
+/** Core operational columns — always request these first. */
+const ORDER_COLUMNS_CORE =
+  "id, order_id, shopify_order_id, confirmed_at, cod_reply_intent, cod_reply_at, cod_reply_text, cod_request_sent_at, cod_handled_at, cod_handled_by_user_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, created_at, workspace_id";
+
+/** Prefer contact column when present; never fall all the way to LEGACY just for this. */
+const ORDER_COLUMNS_WITH_CONTACT =
   "id, order_id, shopify_order_id, confirmed_at, cod_reply_intent, cod_reply_at, cod_reply_text, cod_request_sent_at, cod_handled_at, cod_handled_by_user_id, status_id, status_name, details, tracking_code, tracking_url, shipping_company, total, currency, customer_name, phone, email, country, city, postal_code, address, product_summary, snapshot, source, last_event_at, last_whatsapp_contact_at, created_at, workspace_id";
 
 const ORDER_COLUMNS_LEGACY =
@@ -45,6 +50,12 @@ const ORDER_COLUMNS_LEGACY =
 
 function isMissingColumnError(error: { message?: string } | null | undefined) {
   return /column|schema cache|does not exist/i.test(error?.message ?? "");
+}
+
+function isMissingContactColumnError(error: { message?: string } | null | undefined) {
+  return (
+    isMissingColumnError(error) && /last_whatsapp_contact_at/i.test(error?.message ?? "")
+  );
 }
 
 export type CodReplyFilter = "all" | "dropi_pending" | "yes" | "no" | "awaiting";
@@ -190,6 +201,7 @@ async function enrichOrderProductImages(
     const twin = await supabaseAdmin
       .from("orders")
       .select("snapshot")
+      .eq("workspace_id", workspaceId)
       .eq("shopify_order_id", order.shopify_order_id)
       .ilike("source", "%shopify%")
       .limit(1)
@@ -228,16 +240,8 @@ async function enrichOrderProductImages(
       .limit(1)
       .maybeSingle();
 
-    let store = storeQuery.data;
-    if (!store) {
-      const fallback = await supabaseAdmin
-        .from("shopify_stores")
-        .select("shop_domain, access_token")
-        .is("uninstalled_at", null)
-        .limit(1)
-        .maybeSingle();
-      store = fallback.data;
-    }
+    const store = storeQuery.data;
+    // Never fall back to another tenant's Shopify credentials.
 
     const host = normalizeShopifyDomain(store?.shop_domain ?? "");
     const token = store?.access_token?.trim();
@@ -611,7 +615,7 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
       };
 
       let listQuery = applyListFilters(
-        supabaseAdmin.from("orders").select(ORDER_COLUMNS_FULL, { count: "exact" }),
+        supabaseAdmin.from("orders").select(ORDER_COLUMNS_WITH_CONTACT, { count: "exact" }),
       );
 
       listQuery = listQuery.order(data.sort, {
@@ -619,12 +623,42 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
         nullsFirst: false,
       });
 
+      const DROPI_PENDING_SCAN_LIMIT = 500;
+      const useDropiPendingPagination = data.codReply === "dropi_pending";
+
       const from = (data.page - 1) * data.pageSize;
       const to = from + data.pageSize - 1;
-      let { data: rows, error, count } = await listQuery.range(from, to);
+      let rows: OrdersRow[] | null = null;
+      let error: { message?: string } | null = null;
+      let count: number | null = null;
+
+      if (useDropiPendingPagination) {
+        ({ data: rows, error } = await listQuery.limit(DROPI_PENDING_SCAN_LIMIT));
+      } else {
+        ({ data: rows, error, count } = await listQuery.range(from, to));
+      }
 
       if (error && isMissingWorkspaceColumn(error.message)) {
-        return emptyResult(null, data);
+        return emptyResult(
+          "Orders are missing workspace scope. Apply workspace identity migrations.",
+          data,
+        );
+      }
+
+      // Missing contact column must NOT drop COD/confirmed/customer fields.
+      if (error && isMissingContactColumnError(error)) {
+        listQuery = applyListFilters(
+          supabaseAdmin.from("orders").select(ORDER_COLUMNS_CORE, { count: "exact" }),
+        );
+        listQuery = listQuery.order(data.sort, {
+          ascending: data.dir === "asc",
+          nullsFirst: false,
+        });
+        if (useDropiPendingPagination) {
+          ({ data: rows, error } = await listQuery.limit(DROPI_PENDING_SCAN_LIMIT));
+        } else {
+          ({ data: rows, error, count } = await listQuery.range(from, to));
+        }
       }
 
       if (error && isMissingColumnError(error)) {
@@ -635,7 +669,11 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
           ascending: data.dir === "asc",
           nullsFirst: false,
         });
-        ({ data: rows, error, count } = await listQuery.range(from, to));
+        if (useDropiPendingPagination) {
+          ({ data: rows, error } = await listQuery.limit(DROPI_PENDING_SCAN_LIMIT));
+        } else {
+          ({ data: rows, error, count } = await listQuery.range(from, to));
+        }
       }
 
       if (error) {
@@ -650,20 +688,28 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
         codReplyCounts = undefined;
       }
 
-      const total =
-        data.codReply === "dropi_pending"
-          ? (codReplyCounts?.dropi_pending ?? count ?? 0)
-          : (count ?? 0);
-      const pageCount = Math.max(1, Math.ceil(total / data.pageSize));
-
       const facetBase = applyBase(
-        supabaseAdmin.from("orders").select("status_name, shipping_company"),
+        supabaseAdmin.from("orders").select("status_name, shipping_company, country"),
       );
       const { data: facetRows } = await facetBase.limit(2000);
 
       let orders = ((rows ?? []) as OrdersRow[]).map(mapOrder);
-      if (data.codReply === "dropi_pending") {
-        orders = orders.filter(isDropiCodPendingAction);
+      let total = count ?? 0;
+      let pageCount = Math.max(1, Math.ceil(total / data.pageSize));
+
+      if (useDropiPendingPagination) {
+        const paged = paginateDropiPendingActions(
+          orders,
+          data.page,
+          data.pageSize,
+          isDropiCodPendingAction,
+        );
+        orders = paged.rows;
+        total = paged.total;
+        pageCount = paged.pageCount;
+        if (codReplyCounts) {
+          codReplyCounts = { ...codReplyCounts, dropi_pending: paged.total };
+        }
       }
 
       return {
@@ -675,7 +721,7 @@ export const querySyncedOrders = createServerFn({ method: "POST" })
         facets: {
           statuses: uniqueSorted((facetRows ?? []).map((row) => row.status_name)),
           shippingCompanies: uniqueSorted((facetRows ?? []).map((row) => row.shipping_company)),
-          countries: uniqueSorted(orders.map((order) => order.country)),
+          countries: uniqueSorted((facetRows ?? []).map((row) => row.country)),
         },
         ...(codReplyCounts ? { codReplyCounts } : {}),
         error: null,
@@ -722,12 +768,21 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
             .eq("workspace_id", workspaceId)
             .maybeSingle();
 
-        const { data: scopedRow, error: scopedError } = await loadScoped(ORDER_COLUMNS_FULL);
+        const { data: scopedRow, error: scopedError } = await loadScoped(ORDER_COLUMNS_WITH_CONTACT);
         let error = scopedError;
         let row = (scopedRow as OrdersRow | null) ?? null;
 
         if (error && isMissingWorkspaceColumn(error.message)) {
-          return { order: null, error: null };
+          return {
+            order: null,
+            error: "Orders are missing workspace scope. Apply workspace identity migrations.",
+          };
+        }
+
+        if (error && isMissingContactColumnError(error)) {
+          const withoutContact = await loadScoped(ORDER_COLUMNS_CORE);
+          error = withoutContact.error;
+          row = (withoutContact.data as OrdersRow | null) ?? null;
         }
 
         if (error && isMissingColumnError(error)) {
@@ -745,10 +800,12 @@ export const getSyncedOrder = createServerFn({ method: "GET" })
 
         let order = mapOrder(row);
         if (!order.customer_name || !order.product_summary || (!order.phone && !order.email)) {
+          // Always scope by workspace — same external order_id may exist in other tenants.
           const events = await supabaseAdmin
             .from("order_events")
             .select("raw, shipping_company")
             .eq("order_id", data.orderId)
+            .eq("workspace_id", workspaceId)
             .order("event_date", { ascending: false })
             .limit(8);
           for (const event of events.data ?? []) {
@@ -841,7 +898,10 @@ export const listOrderEvents = createServerFn({ method: "GET" })
         const { data: rows, error } = await selectEvents();
 
         if (error && isMissingWorkspaceColumn(error.message)) {
-          return { events: [], error: null };
+          return {
+            events: [],
+            error: "Order events are missing workspace scope. Apply workspace identity migrations.",
+          };
         }
 
         if (error) {

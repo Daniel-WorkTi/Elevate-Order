@@ -131,6 +131,67 @@ test("delivered without a prior message is not recovered", () => {
   assert.equal(snapshot.revenue, 94.9);
 });
 
+test("null total or currency is not treated as zero revenue", () => {
+  const snapshot = aggregateRecovery([
+    {
+      orderId: 1,
+      customerName: "A",
+      source: "Dropi Pro",
+      total: null,
+      currency: "EUR",
+      statusName: "Failed delivery",
+      details: "Unavailable",
+      lastEventAt: "2026-08-16T10:00:00.000Z",
+      events: [],
+    },
+    {
+      orderId: 2,
+      customerName: "B",
+      source: "Dropi Pro",
+      total: 50,
+      currency: null,
+      statusName: "Failed delivery",
+      details: "Unavailable",
+      lastEventAt: "2026-08-16T10:00:00.000Z",
+      events: [],
+    },
+  ]);
+  assert.equal(snapshot.revenue, 0);
+  assert.equal(snapshot.atRisk, 0);
+  assert.equal(snapshot.orderCount, 2);
+  assert.equal(snapshot.platforms.dropi.workflow, 2);
+});
+
+test("mixed currencies do not silently sum into headline revenue", () => {
+  const snapshot = aggregateRecovery([
+    {
+      orderId: 1,
+      customerName: "A",
+      source: "Dropi Pro",
+      total: 100,
+      currency: "EUR",
+      statusName: "Waiting",
+      details: null,
+      lastEventAt: "2026-08-16T10:00:00.000Z",
+      events: [],
+    },
+    {
+      orderId: 2,
+      customerName: "B",
+      source: "Dropi Pro",
+      total: 200,
+      currency: "BRL",
+      statusName: "Waiting",
+      details: null,
+      lastEventAt: "2026-08-16T11:00:00.000Z",
+      events: [],
+    },
+  ]);
+  assert.equal(snapshot.revenue, 100);
+  assert.equal(snapshot.platforms.dropi.revenue, 100);
+  assert.equal(snapshot.orderCount, 2);
+});
+
 test("customerInitials uses first and last name", () => {
   assert.equal(customerInitials("Ana Lima"), "AL");
   assert.equal(customerInitials("Rui"), "RU");

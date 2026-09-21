@@ -14,7 +14,7 @@ import {
 } from "@/lib/orders/order-line-items";
 import { cn } from "@/lib/utils";
 
-/** Mock-style money: "45,49 PLN" / "63,43 R$" */
+/** Format money for order line display: "45,49 PLN" / "63,43 R$". */
 function formatDetailMoney(amount: number, currency: string): string {
   const n = new Intl.NumberFormat("pt-PT", {
     minimumFractionDigits: 2,

@@ -69,5 +69,13 @@ export function findMalformedPlaceholders(content: string): string[] {
   if (broken?.length) {
     issues.push("Malformed placeholder syntax detected.");
   }
-  return issues;
+  // Catch {{customer name}}, {{foo-bar}}, empty {{}} — not valid tokens.
+  const invalidTokens = content.match(/\{\{\s*([^}]*)\s*\}\}/g) ?? [];
+  for (const token of invalidTokens) {
+    const inner = token.replace(/^\{\{\s*|\s*\}\}$/g, "");
+    if (!inner || !/^[a-zA-Z0-9_]+$/.test(inner)) {
+      issues.push(`Invalid placeholder: ${token.trim()}`);
+    }
+  }
+  return [...new Set(issues)];
 }

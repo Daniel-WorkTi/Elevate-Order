@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import {
   filterInboxConversations,
@@ -92,14 +93,20 @@ export function WhatsAppInboxPanel() {
 
   const sendMutation = useMutation({
     mutationFn: sendWhatsAppInboxMessage,
-    onSuccess: async () => {
-      setDraft("");
-      setClientMessageId(null);
+    onSuccess: async (result) => {
+      if (result.status === "sent") {
+        setDraft("");
+        setClientMessageId(null);
+        toast.success(t("orders.detail.messageSent"));
+      } else if (result.status === "failed") {
+        toast.error(t("orders.detail.messageSendFailed"));
+      }
       await queryClient.invalidateQueries({
         queryKey: ["whatsapp", "conversation", workspaceId, selectedId],
       });
       await queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations", workspaceId] });
-      toast.success(t("orders.detail.messageSent"));
+      await queryClient.invalidateQueries({ queryKey: ["inbox", "queue", workspaceId] });
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
     },
     onError: () => {
       toast.error(t("orders.detail.messageSendFailed"));
@@ -283,6 +290,14 @@ export function WhatsAppInboxPanel() {
       <div className="flex min-h-[480px] flex-col items-center justify-center rounded-[14px] border border-[#E6E8EC] bg-white px-6 text-center">
         <p className="text-[14px] font-medium text-[#0A0C10]">{t("inbox.loadError")}</p>
         <p className="mt-1 text-[13px] text-[#667085]">{t("inbox.whatsapp.retryHint")}</p>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-4 rounded-[10px]"
+          onClick={() => void listQuery.refetch()}
+        >
+          {t("common.retry")}
+        </Button>
       </div>
     );
   }

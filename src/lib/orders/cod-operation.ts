@@ -57,6 +57,29 @@ export function isDropiCodPendingAction(
   return deriveCodOperationStatus(order) === "pending_action";
 }
 
+/**
+ * Paginate after excluding externally-confirmed Dropi COD rows.
+ * Callers must pass SQL-prefiltered candidates (confirm + unhandled + supply).
+ */
+export function paginateDropiPendingActions<T>(
+  candidates: T[],
+  page: number,
+  pageSize: number,
+  isPending: (row: T) => boolean,
+): { rows: T[]; total: number; pageCount: number } {
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const safeSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
+  const filtered = candidates.filter(isPending);
+  const total = filtered.length;
+  const pageCount = Math.max(1, Math.ceil(total / safeSize));
+  const from = (safePage - 1) * safeSize;
+  return {
+    rows: filtered.slice(from, from + safeSize),
+    total,
+    pageCount,
+  };
+}
+
 export function matchesSupplyFilter(supply: Supply, source: string): boolean {
   return supplyMatchesSource(supply, source);
 }

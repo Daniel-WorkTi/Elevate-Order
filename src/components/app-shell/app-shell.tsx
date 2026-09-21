@@ -88,8 +88,12 @@ export function AppShell({
   const { workspaceId } = useWorkspaceId();
   const store = useStoreConnectionPreference(workspaceId);
   const oauthQuery = useQuery({
-    queryKey: ["connections", "shopify", "oauth", "shell"],
-    queryFn: () => getShopifyOauthStatus(),
+    queryKey: ["connections", "shopify", "oauth", "shell", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
     staleTime: 30_000,
     retry: false,
   });

@@ -34,8 +34,12 @@ function ConnectionsPage() {
   const store = useStoreConnectionPreference(workspaceId);
   const dropea = useDropeaConnectionPreference(workspaceId);
   const shopifyOauth = useQuery({
-    queryKey: ["connections", "shopify", "oauth"],
-    queryFn: () => getShopifyOauthStatus(),
+    queryKey: ["connections", "shopify", "oauth", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
   });
   const dropiDash = useQuery({
     queryKey: ["connections", "dropi", "dashboard", workspaceId],
@@ -64,12 +68,25 @@ function ConnectionsPage() {
         dropea.hmacSecretConfigured,
       ).status
     : dropea.linked && dropea.apiTokenConfigured && dropea.hmacSecretConfigured
-      ? "connected"
+      ? "configured"
       : "not_configured";
 
-  const dropiLinked = dropiStatus === "connected" || dropiStatus === "configured";
-  const dropeaLinked = dropeaStatus === "connected" || dropeaStatus === "configured";
   const whatsappLinked = whatsappStatus.data?.status === "connected";
+
+  const hubLabel = (
+    status: "connected" | "configured" | "error" | "not_configured",
+    labelKey: (s: typeof status) => string,
+  ) => {
+    if (status === "connected") return t("connections.linked");
+    if (status === "configured" || status === "error") return t(labelKey(status));
+    return t("connections.notConnected");
+  };
+
+  const hubTone = (status: "connected" | "configured" | "error" | "not_configured") => {
+    if (status === "connected") return "ok" as const;
+    if (status === "configured" || status === "error") return "wait" as const;
+    return "off" as const;
+  };
 
   return (
     <AppShell title={t("connections.title")} subtitle={t("connections.subtitle")}>
@@ -90,27 +107,15 @@ function ConnectionsPage() {
           <ConnectionRow
             to="/connections/dropi"
             title="Dropi"
-            statusLabel={
-              dropiStatus === "error"
-                ? t(dropiStatusLabelKey(dropiStatus))
-                : dropiLinked
-                  ? t("connections.linked")
-                  : t("connections.notConnected")
-            }
-            tone={dropiStatus === "error" ? "wait" : dropiLinked ? "ok" : "off"}
+            statusLabel={hubLabel(dropiStatus, dropiStatusLabelKey)}
+            tone={hubTone(dropiStatus)}
             icon={<SupplyMark supply="dropi" size={36} className="rounded-[10px]" />}
           />
           <ConnectionRow
             to="/connections/dropea"
             title="Dropea"
-            statusLabel={
-              dropeaStatus === "error"
-                ? t(dropeaStatusLabelKey(dropeaStatus))
-                : dropeaLinked
-                  ? t("connections.linked")
-                  : t("connections.notConnected")
-            }
-            tone={dropeaStatus === "error" ? "wait" : dropeaLinked ? "ok" : "off"}
+            statusLabel={hubLabel(dropeaStatus, dropeaStatusLabelKey)}
+            tone={hubTone(dropeaStatus)}
             icon={<SupplyMark supply="dropea" size={36} className="rounded-[10px]" />}
           />
           <ConnectionRow

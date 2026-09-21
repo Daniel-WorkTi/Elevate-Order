@@ -19,6 +19,7 @@ type OrderInboxFields = Pick<
   | "currency"
   | "status_name"
   | "confirmed_at"
+  | "last_whatsapp_contact_at"
 >;
 
 export type WhatsAppConversationListItem = {
@@ -31,6 +32,7 @@ export type WhatsAppConversationListItem = {
   productSummary: string | null;
   statusName: string | null;
   confirmedAt: string | null;
+  lastWhatsAppContactAt: string | null;
   customerName: string | null;
   lastMessagePreview: string | null;
   lastMessageAt: string | null;
@@ -244,6 +246,7 @@ function mapOrderFields(
   | "productSummary"
   | "statusName"
   | "confirmedAt"
+  | "lastWhatsAppContactAt"
   | "customerName"
 > {
   return {
@@ -254,6 +257,7 @@ function mapOrderFields(
     productSummary: order.product_summary?.trim() || null,
     statusName: order.status_name?.trim() || null,
     confirmedAt: order.confirmed_at ?? null,
+    lastWhatsAppContactAt: order.last_whatsapp_contact_at ?? null,
     customerName: order.customer_name?.trim() || null,
   };
 }
@@ -266,16 +270,42 @@ async function loadOrdersById(
   const map = new Map<string, OrderInboxFields>();
   if (orderUuids.length === 0) return map;
 
-  const { data: orders } = await supabaseAdmin
+  const withContact =
+    "id, order_id, customer_name, product_summary, total, currency, status_name, confirmed_at, last_whatsapp_contact_at";
+  const withoutContact =
+    "id, order_id, customer_name, product_summary, total, currency, status_name, confirmed_at";
+
+  let result: { data: unknown; error: { message: string } | null } = await supabaseAdmin
     .from("orders")
-    .select(
-      "id, order_id, customer_name, product_summary, total, currency, status_name, confirmed_at",
-    )
+    .select(withContact)
     .eq("workspace_id", workspaceId)
     .in("id", orderUuids);
 
-  for (const order of orders ?? []) {
-    map.set(order.id, order);
+  if (result.error && /last_whatsapp_contact_at/i.test(result.error.message)) {
+    result = await supabaseAdmin
+      .from("orders")
+      .select(withoutContact)
+      .eq("workspace_id", workspaceId)
+      .in("id", orderUuids);
+  }
+
+  if (result.error) {
+    console.error("[whatsapp-inbox] loadOrdersById failed", result.error.message);
+    throw new Error("Unable to load order details for WhatsApp inbox.");
+  }
+
+  for (const order of (result.data ?? []) as Array<Record<string, unknown>>) {
+    map.set(String(order["id"]), {
+      id: String(order["id"]),
+      order_id: Number(order["order_id"]),
+      customer_name: (order["customer_name"] as string | null) ?? null,
+      product_summary: (order["product_summary"] as string | null) ?? null,
+      total: (order["total"] as number | null) ?? null,
+      currency: (order["currency"] as string | null) ?? null,
+      status_name: (order["status_name"] as string | null) ?? null,
+      confirmed_at: (order["confirmed_at"] as string | null) ?? null,
+      last_whatsapp_contact_at: (order["last_whatsapp_contact_at"] as string | null) ?? null,
+    });
   }
   return map;
 }
@@ -287,22 +317,49 @@ async function loadPhoneOrderIndex(
 ): Promise<Map<string, OrderInboxFields[]>> {
   const index = new Map<string, OrderInboxFields[]>();
 
-  const { data: rows } = await supabaseAdmin
+  const withContact =
+    "id, order_id, customer_name, product_summary, total, currency, status_name, confirmed_at, last_whatsapp_contact_at, phone";
+  const withoutContact =
+    "id, order_id, customer_name, product_summary, total, currency, status_name, confirmed_at, phone";
+
+  let result: { data: unknown; error: { message: string } | null } = await supabaseAdmin
     .from("orders")
-    .select(
-      "id, order_id, customer_name, product_summary, total, currency, status_name, confirmed_at, phone",
-    )
+    .select(withContact)
     .eq("workspace_id", workspaceId)
     .not("phone", "is", null)
     .order("last_event_at", { ascending: false, nullsFirst: false })
     .limit(500);
 
-  for (const row of rows ?? []) {
-    const phone = normalizePhoneToE164(row.phone);
+  if (result.error && /last_whatsapp_contact_at/i.test(result.error.message)) {
+    result = await supabaseAdmin
+      .from("orders")
+      .select(withoutContact)
+      .eq("workspace_id", workspaceId)
+      .not("phone", "is", null)
+      .order("last_event_at", { ascending: false, nullsFirst: false })
+      .limit(500);
+  }
+
+  if (result.error) {
+    console.error("[whatsapp-inbox] loadPhoneOrderIndex failed", result.error.message);
+    throw new Error("Unable to load order index for WhatsApp inbox.");
+  }
+
+  for (const row of (result.data ?? []) as Array<Record<string, unknown>>) {
+    const phone = normalizePhoneToE164((row["phone"] as string | null) ?? null);
     if (!phone) continue;
-    const { phone: _phone, ...order } = row;
     const list = index.get(phone) ?? [];
-    list.push(order);
+    list.push({
+      id: String(row["id"]),
+      order_id: Number(row["order_id"]),
+      customer_name: (row["customer_name"] as string | null) ?? null,
+      product_summary: (row["product_summary"] as string | null) ?? null,
+      total: (row["total"] as number | null) ?? null,
+      currency: (row["currency"] as string | null) ?? null,
+      status_name: (row["status_name"] as string | null) ?? null,
+      confirmed_at: (row["confirmed_at"] as string | null) ?? null,
+      last_whatsapp_contact_at: (row["last_whatsapp_contact_at"] as string | null) ?? null,
+    });
     index.set(phone, list);
   }
 
@@ -315,7 +372,9 @@ function resolveOrderForConversation(
   phoneIndex: Map<string, OrderInboxFields[]>,
 ): { order: OrderInboxFields | null; ambiguousOrderCount: number } {
   if (row.order_id) {
-    return { order: ordersById.get(row.order_id) ?? null, ambiguousOrderCount: 0 };
+    const linked = ordersById.get(row.order_id);
+    if (linked) return { order: linked, ambiguousOrderCount: 0 };
+    // Stale conversation.order_id (order deleted / moved) — fall back to phone match.
   }
 
   const matches = phoneIndex.get(row.customer_phone_e164) ?? [];
@@ -379,6 +438,7 @@ function buildListItem(
     productSummary: orderFields?.productSummary ?? null,
     statusName: orderFields?.statusName ?? null,
     confirmedAt: orderFields?.confirmedAt ?? null,
+    lastWhatsAppContactAt: orderFields?.lastWhatsAppContactAt ?? null,
     customerName: orderFields?.customerName ?? null,
     lastMessagePreview: row.last_message_preview,
     lastMessageAt: row.last_message_at,
@@ -558,10 +618,29 @@ export const sendWhatsAppInboxMessage = createServerFn({ method: "POST" })
         throw new Error("conversation_not_found");
       }
 
+      let orderId = conv.order_id;
+      if (orderId) {
+        const { data: linkedOrder } = await supabaseAdmin
+          .from("orders")
+          .select("id")
+          .eq("id", orderId)
+          .eq("workspace_id", authorized.id)
+          .maybeSingle();
+        if (!linkedOrder) {
+          // Stale link: clear so future sends use conversation phone unbound.
+          await supabaseAdmin
+            .from("whatsapp_conversations")
+            .update({ order_id: null })
+            .eq("id", conv.id)
+            .eq("workspace_id", authorized.id);
+          orderId = null;
+        }
+      }
+
       return await runSendWhatsAppTextMessage({
         workspaceId: authorized.id,
         userId: context.userId,
-        orderId: conv.order_id,
+        orderId,
         conversationId: conv.id,
         clientMessageId: data.clientMessageId,
         recipientPhone: conv.customer_phone_e164,

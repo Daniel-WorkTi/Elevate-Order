@@ -1042,12 +1042,18 @@ export const en: TranslationDict = {
   "onboarding.configuration.headline": "Configure your operation",
   "onboarding.configuration.question": "Where do your orders come from?",
   "onboarding.configuration.chooserHint":
-    "Choose one option to start. You can add other integrations later.",
-  "onboarding.configuration.addLater": "You can add other integrations later in Connections.",
+    "Choose the platform you use today to get started. You can connect other integrations later.",
+  "onboarding.configuration.addLater": "Connecting one platform is enough to continue.",
   "onboarding.configuration.continueWhatsApp": "Continue to WhatsApp",
-  "onboarding.configuration.card.shopify": "Connect your Shopify store.",
-  "onboarding.configuration.card.dropi": "Connect your Dropi Pro operation.",
-  "onboarding.configuration.card.dropea": "Connect your Dropea operation.",
+  "onboarding.configuration.card.shopify":
+    "Connect your Shopify store and sync orders with ELEVATE.",
+  "onboarding.configuration.card.dropi":
+    "Automatically receive orders and updates from your Dropi operation.",
+  "onboarding.configuration.card.dropea":
+    "Sync your Dropea operation and track orders in ELEVATE.",
+  "onboarding.configuration.cta.shopify": "Connect Shopify",
+  "onboarding.configuration.cta.dropi": "Connect Dropi",
+  "onboarding.configuration.cta.dropea": "Connect Dropea",
   "onboarding.configuration.setup.shopify":
     "Authorize Shopify. Connected only after the install is confirmed.",
   "onboarding.configuration.setup.dropi":
@@ -1057,11 +1063,12 @@ export const en: TranslationDict = {
   "onboarding.configuration.waitingFirstEvent": "Waiting for first event",
   "onboarding.configuration.addAnother": "Add another integration",
   "onboarding.setup.shopify.title": "Connect Shopify",
-  "onboarding.setup.shopify.body": "Connect your Shopify store to ELEVATE.",
-  "onboarding.setup.shopify.yourStore": "Your store",
-  "onboarding.setup.shopify.dontKnow": "Don't know your store's original address?",
+  "onboarding.setup.shopify.body":
+    "Connect your store so ELEVATE can sync and track your orders.",
+  "onboarding.setup.shopify.yourStore": "Your Shopify store",
+  "onboarding.setup.shopify.dontKnow": "Not sure which address to use?",
   "onboarding.setup.shopify.findMyshopify":
-    "In Shopify, go to Settings → Domains and look for the address ending in myshopify.com.",
+    "In Shopify, go to Settings → Domains and copy the original address ending in .myshopify.com.",
   "onboarding.setup.shopify.useMyshopify": "Use the original Shopify domain.",
   "onboarding.setup.shopify.domainInvalid": "Use a domain like store-name.myshopify.com.",
   "onboarding.setup.shopify.continueCta": "Continue with Shopify",
@@ -1069,15 +1076,27 @@ export const en: TranslationDict = {
   "onboarding.setup.shopify.connected": "Shopify connected",
   "onboarding.setup.dropi.title": "Connect Dropi Pro",
   "onboarding.setup.dropi.body":
-    "Automatically receive orders and updates from your Dropi operation.",
+    "Set up the webhook to automatically receive orders and updates from your operation.",
+  "onboarding.setup.dropi.step1Title": "Open Dropi",
   "onboarding.setup.dropi.step1Lead": "In Dropi, go to:",
   "onboarding.setup.dropi.step1Path": "Settings → API → Webhooks",
-  "onboarding.setup.dropi.step2": "Copy the link below and paste it into Dropi's webhook field.",
+  "onboarding.setup.dropi.step2Title": "Copy your link",
+  "onboarding.setup.dropi.step2": "Copy this link:",
+  "onboarding.setup.dropi.step3Title": "Paste in Dropi and save",
+  "onboarding.setup.dropi.step3Lead":
+    "Paste the link into the order notifications field and click Save.",
+  "onboarding.setup.dropi.step3Save": "Save",
+  "onboarding.setup.dropi.confirmSaved": "I pasted and saved the webhook in Dropi",
+  "onboarding.setup.dropi.configComplete": "Setup complete",
+  "onboarding.setup.dropi.configCompleteHint":
+    "When Dropi sends the next order or update, ELEVATE will start receiving them automatically.",
   "onboarding.setup.dropi.step3": "In Dropi, click Save.",
   "onboarding.setup.dropi.waiting": "● Waiting for the first Dropi update...",
   "onboarding.setup.dropi.connected": "Dropi Pro connected",
   "onboarding.setup.dropea.title": "Connect Dropea",
-  "onboarding.setup.dropea.body": "Connect your Dropea operation to ELEVATE.",
+  "onboarding.setup.dropea.body":
+    "Connect your operation to sync your orders with ELEVATE.",
+  "onboarding.setup.dropea.credentialsHint": "Use the API credentials from your Dropea account.",
   "onboarding.setup.dropea.connecting": "Connecting...",
   "onboarding.setup.dropea.connectFailed":
     "We couldn't connect with those details. Check them and try again.",

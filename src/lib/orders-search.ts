@@ -7,7 +7,8 @@ import type { OrdersQueryInput } from "@/lib/synced-orders.functions";
 export type CodReplyFilter = "all" | "dropi_pending" | "yes" | "no" | "awaiting";
 
 export const ordersSearchSchema = z.object({
-  supply: z.enum(["dropi", "dropea", "shopify"]).catch("dropi"),
+  // Operational tabs are Dropi | Dropea only — unknown/shopify URLs fall back to dropi.
+  supply: z.enum(["dropi", "dropea"]).catch("dropi"),
   codReply: z.enum(["all", "dropi_pending", "yes", "no", "awaiting"]).catch("all"),
   q: z.string().optional(),
   status: z.string().optional(),
@@ -56,7 +57,7 @@ export function dateRangeFromSearch(search: Pick<OrdersSearch, "date" | "from" |
 export function searchToQuery(search: OrdersSearch): OrdersQueryInput {
   const range = dateRangeFromSearch(search);
   const query: OrdersQueryInput = {
-    supply: search.supply === "shopify" ? "dropi" : search.supply,
+    supply: search.supply,
     page: search.page,
     pageSize: search.pageSize,
     sort: search.sort,
@@ -101,8 +102,12 @@ export function clearFiltersSearch(search: OrdersSearch): OrdersSearch {
   };
 }
 
-export function withSupply(search: OrdersSearch, supply: Supply): OrdersSearch {
-  return { ...search, supply, page: 1 };
+export function withSupply(
+  search: OrdersSearch,
+  supply: Supply,
+): OrdersSearch {
+  const operational = supply === "dropea" ? "dropea" : "dropi";
+  return { ...search, supply: operational, page: 1 };
 }
 
 /** i18n keys for date presets — translate with `t(DATE_PRESET_I18N_KEY[date])`. */

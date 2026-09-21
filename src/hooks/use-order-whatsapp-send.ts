@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useT } from "@/lib/i18n/locale-context";
@@ -29,8 +29,11 @@ export function useOrderWhatsAppSend({
   workspaceId: string | null | undefined;
 }) {
   const t = useT();
+  const queryClient = useQueryClient();
   const [sendState, setSendState] = useState<SendUiState>("idle");
   const [sendErrorMessage, setSendErrorMessage] = useState<string | null>(null);
+  /** Stable across rapid double-clicks before React state commits. */
+  const clientMessageIdRef = useRef<string | null>(null);
   const [clientMessageId, setClientMessageId] = useState<string | null>(null);
 
   const whatsappQuery = useQuery({
@@ -47,16 +50,23 @@ export function useOrderWhatsAppSend({
 
   const sendMutation = useMutation({
     mutationFn: sendWhatsAppMessage,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.status === "sent") {
         setSendState("sent");
         toast.success(t("orders.detail.messageSent"));
         if (result.deliveryHint === "recipient_is_connected_account") {
           toast.info(t("orders.detail.messageSentToSelfHint"), { duration: 8000 });
         }
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["order", workspaceId, order.id] }),
+          queryClient.invalidateQueries({ queryKey: ["order", workspaceId, order.order_id] }),
+          queryClient.invalidateQueries({ queryKey: ["orders"] }),
+          queryClient.invalidateQueries({ queryKey: ["inbox", "queue", workspaceId] }),
+        ]);
       } else if (result.status === "failed") {
         setSendState("error");
         setSendErrorMessage(t("orders.detail.messageSendFailed"));
+        toast.error(t("orders.detail.messageSendFailed"));
       } else {
         setSendState("sending");
       }
@@ -70,14 +80,15 @@ export function useOrderWhatsAppSend({
   });
 
   function ensureClientMessageId(): string {
-    if (clientMessageId) return clientMessageId;
+    if (clientMessageIdRef.current) return clientMessageIdRef.current;
     const id = crypto.randomUUID();
+    clientMessageIdRef.current = id;
     setClientMessageId(id);
     return id;
   }
 
   function handleSend() {
-    if (!workspaceId || !phone || sendMutation.isPending) return;
+    if (!workspaceId || !phone || sendMutation.isPending || sendState === "sending") return;
     setSendState("sending");
     setSendErrorMessage(null);
     sendMutation.mutate({
@@ -92,30 +103,33 @@ export function useOrderWhatsAppSend({
   }
 
   function handleRetry() {
-    if (!clientMessageId) {
-      setClientMessageId(crypto.randomUUID());
+    if (!clientMessageIdRef.current) {
+      const id = crypto.randomUUID();
+      clientMessageIdRef.current = id;
+      setClientMessageId(id);
     }
     handleSend();
   }
 
   const sendDisabled =
-    !message.trim() || sendMutation.isPending || sendState === "sent" || !canSendInApp;
+    !canSendInApp ||
+    !message.trim() ||
+    sendMutation.isPending ||
+    sendState === "sending" ||
+    sendState === "sent";
 
   return {
+    sendState,
+    sendErrorMessage,
+    clientMessageId,
     connection,
     gatewayMode,
     canSendInApp,
     showWaMeFallback,
-    sendState,
-    sendErrorMessage,
+    whatsappQuery,
     sendMutation,
     sendDisabled,
     handleSend,
     handleRetry,
-    resetSendState: () => {
-      setSendState("idle");
-      setSendErrorMessage(null);
-      setClientMessageId(null);
-    },
   };
 }

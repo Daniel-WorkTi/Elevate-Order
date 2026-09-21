@@ -89,8 +89,8 @@ export function DropeaSetupPanel({
   if (fullyLinked) {
     if (onboarding) {
       return (
-        <section className="rounded-[14px] border border-border bg-card px-5 py-6 text-center shadow-[var(--shadow-card)]">
-          <p className="text-[15px] font-semibold text-emerald-800">
+        <section className="rounded-[16px] border border-[#E6E8EC] bg-white px-7 py-8 text-center shadow-[var(--shadow-card)]">
+          <p className="text-[16px] font-semibold text-emerald-800">
             ✓ {t("onboarding.setup.dropea.connected")}
           </p>
         </section>
@@ -132,7 +132,11 @@ export function DropeaSetupPanel({
 
   if (onboarding) {
     return (
-      <section className="space-y-4 rounded-[14px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <section className="space-y-5 rounded-[16px] border border-[#E6E8EC] bg-white p-7 shadow-[var(--shadow-card)] sm:p-8">
+        <p className="text-[14px] leading-relaxed text-muted-foreground">
+          {t("onboarding.setup.dropea.credentialsHint")}
+        </p>
+
         <SecretField
           id="onboarding-dropea-api-token"
           label={t("connections.apiToken")}
@@ -179,15 +183,15 @@ export function DropeaSetupPanel({
               }
             })();
           }}
-          className="h-11 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[14px] shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
+          className="h-12 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[15px] shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
         >
-          <Link2 className="size-3.5" strokeWidth={1.75} />
+          <Link2 className="size-4" strokeWidth={1.75} />
           {saving || connecting
             ? t("onboarding.setup.dropea.connecting")
             : t("connections.connectDropea")}
         </Button>
 
-        {error ? <p className="text-[13px] font-medium text-red-600">{error}</p> : null}
+        {error ? <p className="text-[14px] font-medium text-red-600">{error}</p> : null}
       </section>
     );
   }

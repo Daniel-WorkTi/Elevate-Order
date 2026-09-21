@@ -61,9 +61,10 @@ function parsePeriod(value: unknown): ProfitPeriod {
 
 function inRange(stamp: string | null, fromMs: number | null, toMs: number | null): boolean {
   if (fromMs == null || toMs == null) return true;
-  if (!stamp) return true;
+  // Dated range must not silently include undated / invalid stamps.
+  if (!stamp) return false;
   const time = Date.parse(stamp);
-  if (Number.isNaN(time)) return true;
+  if (Number.isNaN(time)) return false;
   return time >= fromMs && time <= toMs;
 }
 
@@ -72,9 +73,9 @@ async function loadEvents(
     ids: number[],
   ) => Promise<{ data: EventRow[] | null; error: { message?: string } | null }>,
   orderIds: number[],
-): Promise<Map<number, RecoveryEventInput[]>> {
+): Promise<{ byOrder: Map<number, RecoveryEventInput[]>; error: string | null }> {
   const byOrder = new Map<number, RecoveryEventInput[]>();
-  if (orderIds.length === 0) return byOrder;
+  if (orderIds.length === 0) return { byOrder, error: null };
 
   const chunkSize = 200;
   for (let i = 0; i < orderIds.length; i += chunkSize) {
@@ -83,7 +84,7 @@ async function loadEvents(
 
     if (error) {
       console.error("queryRecoveryDashboard events", error);
-      continue;
+      return { byOrder, error: "Unable to load recovery timeline events." };
     }
 
     for (const row of data ?? []) {
@@ -97,7 +98,7 @@ async function loadEvents(
     }
   }
 
-  return byOrder;
+  return { byOrder, error: null };
 }
 
 export const queryRecoveryDashboard = createServerFn({ method: "POST" })
@@ -172,11 +173,13 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
         return inRange(row.last_event_at ?? row.created_at, fromMs, toMs);
       });
 
-      const events = await loadEvents(
+      const { byOrder: eventsByOrder, error: eventsError } = await loadEvents(
         async (ids) => {
+          // Scope by workspace so shared external order_ids cannot leak events across tenants.
           const result = await supabaseAdmin
             .from("order_events")
             .select("order_id, status_name, details, event_date")
+            .eq("workspace_id", workspaceId)
             .in("order_id", ids);
           return {
             data: (result.data ?? null) as EventRow[] | null,
@@ -185,6 +188,14 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
         },
         filtered.map((row) => row.order_id),
       );
+
+      if (eventsError) {
+        return {
+          snapshot: emptyRecoverySnapshot(),
+          fetchedAt,
+          error: eventsError,
+        };
+      }
 
       const orders: RecoveryOrderInput[] = filtered.map((row) => ({
         orderId: row.order_id,
@@ -195,7 +206,7 @@ export const queryRecoveryDashboard = createServerFn({ method: "POST" })
         statusName: row.status_name,
         details: row.details,
         lastEventAt: row.last_event_at ?? row.created_at,
-        events: events.get(row.order_id) ?? [],
+        events: eventsByOrder.get(row.order_id) ?? [],
       }));
 
       return {

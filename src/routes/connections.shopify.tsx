@@ -11,7 +11,6 @@ import { useStoreConnectionPreference } from "@/hooks/use-store-connection-prefe
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { getShopifyDashboard } from "@/lib/integrations/shopify/shopify.functions";
 import {
-  disconnectShopifyStore,
   getShopifyOauthStatus,
   syncConnectedShopifyStore,
 } from "@/lib/integrations/shopify/oauth.functions";
@@ -21,23 +20,29 @@ import { cn } from "@/lib/utils";
 
 const connectionsRoute = getRouteApi("/connections");
 
-const shopifyOauthQuery = queryOptions({
-  queryKey: ["connections", "shopify", "oauth"],
-  queryFn: () => getShopifyOauthStatus(),
-});
+const shopifyOauthQuery = (workspaceId: string) =>
+  queryOptions({
+    queryKey: ["connections", "shopify", "oauth", workspaceId],
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
+    enabled: Boolean(workspaceId),
+  });
 
-const shopifyDashboardQuery = queryOptions({
-  queryKey: ["connections", "shopify", "dashboard"],
-  queryFn: () => getShopifyDashboard(),
-  placeholderData: keepPreviousData,
-});
+const shopifyDashboardQuery = (workspaceId: string) =>
+  queryOptions({
+    queryKey: ["connections", "shopify", "dashboard", workspaceId],
+    queryFn: () =>
+      getShopifyDashboard({
+        data: { workspaceId },
+      }),
+    enabled: Boolean(workspaceId),
+    placeholderData: keepPreviousData,
+  });
 
 export const Route = createFileRoute("/connections/shopify")({
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(shopifyDashboardQuery),
-      context.queryClient.ensureQueryData(shopifyOauthQuery),
-    ]),
+  // Workspace-scoped dashboard/oauth load in the component (needs useWorkspaceId).
   head: () => ({
     meta: [
       { title: metaT("meta.shopifyTitle") },
@@ -50,9 +55,9 @@ export const Route = createFileRoute("/connections/shopify")({
 function StoreConnectionPage() {
   const { t } = useI18n();
   const { error: oauthError } = connectionsRoute.useSearch();
-  const query = useQuery(shopifyDashboardQuery);
-  const oauthQuery = useQuery(shopifyOauthQuery);
   const { workspaceId } = useWorkspaceId();
+  const query = useQuery(shopifyDashboardQuery(workspaceId));
+  const oauthQuery = useQuery(shopifyOauthQuery(workspaceId));
   const { linked, storeName, storeDomain, connect, disconnect, busy } =
     useStoreConnectionPreference(workspaceId);
   const [syncing, setSyncing] = useState(false);
@@ -61,10 +66,14 @@ function StoreConnectionPage() {
   const fullyLinked = Boolean(oauth?.connected && oauth.shopDomain) || linked;
 
   async function runSync() {
+    if (!workspaceId) {
+      toast.error(t("connections.shopifySyncFailed"));
+      return;
+    }
     setSyncing(true);
     try {
       const result = await syncConnectedShopifyStore({
-        data: workspaceId ? { workspaceId } : {},
+        data: { workspaceId },
       });
       await Promise.all([query.refetch(), oauthQuery.refetch()]);
       if (!result.ok) {

@@ -1,5 +1,5 @@
 import type { Supply } from "@/lib/order-domain";
-import { getOrderCurrency, getOrderSupply } from "@/lib/order-domain";
+import { getOrderSupply } from "@/lib/order-domain";
 import type { Money } from "@/lib/money/format-money";
 import { calculateProfit } from "@/lib/money/calculate-profit";
 
@@ -34,11 +34,13 @@ type FinancialOrderRow = {
  * Normalize one order into financial fields.
  * Revenue = latest order snapshot `total` (orders table is upserted per order_id — no event double-count).
  * Costs/fees are not invented when absent from the sync payload.
+ * Missing/invalid currency → revenue null (counted as skipped by aggregators), never fake EUR.
  */
 export function normalizeOrderFinancials(order: FinancialOrderRow): OrderFinancials {
-  const currency = getOrderCurrency({ currency: order.currency });
+  const code = order.currency?.trim().toUpperCase() ?? "";
+  const currency = /^[A-Z]{3}$/.test(code) ? code : null;
   const revenue: Money | null =
-    order.total != null && Number.isFinite(order.total)
+    currency && order.total != null && Number.isFinite(order.total)
       ? { amount: order.total, currency }
       : null;
 

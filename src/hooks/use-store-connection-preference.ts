@@ -46,8 +46,12 @@ export function useStoreConnectionPreference(workspaceId = "") {
   }, []);
 
   const oauthQuery = useQuery({
-    queryKey: ["connections", "shopify", "oauth"],
-    queryFn: () => getShopifyOauthStatus(),
+    queryKey: ["connections", "shopify", "oauth", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
   });
 
   const oauth = oauthQuery.data;
@@ -86,16 +90,21 @@ export function useStoreConnectionPreference(workspaceId = "") {
   );
 
   const disconnect = useCallback(async () => {
+    if (!workspaceId) return false;
     setBusy(true);
     try {
-      await disconnectShopifyStore();
+      const result = await disconnectShopifyStore({
+        data: { workspaceId },
+      });
+      if (!result.ok) return false;
       purgeLegacyShopifyLocalSecrets();
       setManualLabel({ storeName: null, storeDomain: null });
       await queryClient.invalidateQueries({ queryKey: ["connections", "shopify"] });
+      return true;
     } finally {
       setBusy(false);
     }
-  }, [queryClient]);
+  }, [queryClient, workspaceId]);
 
   return {
     linked,

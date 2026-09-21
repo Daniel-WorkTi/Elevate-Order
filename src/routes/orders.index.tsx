@@ -170,15 +170,19 @@ function OrdersPage() {
     setSyncing(true);
     try {
       if (supply !== "dropea") {
-        const oauth = await syncConnectedShopifyStore({
-          data: workspaceId ? { workspaceId } : {},
-        });
-        if (oauth.ok) {
-          importedToast(t, oauth.imported, oauth.enriched);
-        } else if (oauth.error && oauth.error !== "No Shopify store connected.") {
-          toast.error(oauth.error);
-        } else {
+        if (!workspaceId) {
           toast.message(t("orders.refreshNeedsShopify"));
+        } else {
+          const oauth = await syncConnectedShopifyStore({
+            data: { workspaceId },
+          });
+          if (oauth.ok) {
+            importedToast(t, oauth.imported, oauth.enriched);
+          } else if (oauth.error && oauth.error !== "No Shopify store connected.") {
+            toast.error(oauth.error);
+          } else {
+            toast.message(t("orders.refreshNeedsShopify"));
+          }
         }
       }
       await query.refetch();

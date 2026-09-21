@@ -38,7 +38,7 @@ function OrderDetailPage() {
   const queryClient = useQueryClient();
   const { id } = Route.useParams();
   const { workspaceId } = useWorkspaceId();
-  const store = useStoreConnectionPreference();
+  const store = useStoreConnectionPreference(workspaceId);
   const messageRef = useRef<HTMLTextAreaElement | null>(null);
   const isPreview = id === ORDER_DETAIL_PREVIEW_ID;
   const orderId = Number(id);

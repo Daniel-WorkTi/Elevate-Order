@@ -26,11 +26,12 @@ export function formatInboxPhone(e164: string): string {
 }
 
 export function inboxOrderStatusKey(item: WhatsAppConversationListItem): OrderStatusKey | null {
-  if (!item.statusName && !item.confirmedAt) return null;
+  if (!item.statusName && !item.confirmedAt && !item.lastWhatsAppContactAt) return null;
   return getOrderStatus({
     status_name: item.statusName,
     details: null,
     confirmed_at: item.confirmedAt,
+    last_whatsapp_contact_at: item.lastWhatsAppContactAt,
   }).key;
 }
 

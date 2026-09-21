@@ -11,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import {
-  disconnectShopifyStore,
   getShopifyOauthStatus,
   syncConnectedShopifyStore,
 } from "@/lib/integrations/shopify/oauth.functions";
@@ -107,8 +106,12 @@ function HeaderShopifyChip({
   const { workspaceId } = useWorkspaceId();
   const store = useStoreConnectionPreference(workspaceId);
   const oauthQuery = useQuery({
-    queryKey: ["connections", "shopify", "oauth", "header"],
-    queryFn: () => getShopifyOauthStatus(),
+    queryKey: ["connections", "shopify", "oauth", "header", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
     staleTime: 30_000,
     retry: false,
   });
@@ -136,10 +139,14 @@ function HeaderShopifyChip({
   const oauthConfigured = Boolean(oauth?.oauthConfigured);
 
   async function runSync() {
+    if (!workspaceId) {
+      toast.error(t("connections.shopifySyncFailed"));
+      return;
+    }
     setSyncing(true);
     try {
       const result = await syncConnectedShopifyStore({
-        data: workspaceId ? { workspaceId } : {},
+        data: { workspaceId },
       });
       await oauthQuery.refetch();
       if (!result.ok) {
@@ -256,11 +263,19 @@ function HeaderShopifyChip({
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  store.disconnect();
-                  if (oauthLinked) {
-                    void disconnectShopifyStore().then(() => oauthQuery.refetch());
-                  }
-                  toast.success(t("shell.shopifyDisconnected"));
+                  void (async () => {
+                    if (!workspaceId) {
+                      toast.error(t("connections.shopifySyncFailed"));
+                      return;
+                    }
+                    const ok = await store.disconnect();
+                    if (!ok) {
+                      toast.error(t("connections.shopifySyncFailed"));
+                      return;
+                    }
+                    await oauthQuery.refetch();
+                    toast.success(t("shell.shopifyDisconnected"));
+                  })();
                 }}
                 className="h-9 rounded-[10px] border-[#E6E8EC] text-[13px] shadow-none"
               >

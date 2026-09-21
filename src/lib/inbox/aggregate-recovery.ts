@@ -75,8 +75,8 @@ export type RecoverySnapshot = {
 
 type Classified = {
   supply: RecoverySupply;
-  total: number;
-  currency: string;
+  /** Null when total/currency cannot support honest money metrics. */
+  money: { amount: number; currency: string } | null;
   atRisk: boolean;
   recovered: boolean;
   enteredWorkflow: boolean;
@@ -86,6 +86,17 @@ type Classified = {
 };
 
 const SUCCESS: ReadonlySet<OrderStatusKey> = new Set(["delivered"]);
+const ISO_CURRENCY = /^[A-Z]{3}$/;
+
+function resolveMoney(
+  total: number | null,
+  currency: string | null,
+): { amount: number; currency: string } | null {
+  const code = currency?.trim().toUpperCase() ?? "";
+  if (!ISO_CURRENCY.test(code)) return null;
+  if (total == null || !Number.isFinite(total)) return null;
+  return { amount: total, currency: code };
+}
 
 function emptyPlatform(supply: RecoverySupply): PlatformRecovery {
   return {
@@ -119,7 +130,7 @@ function classify(order: RecoveryOrderInput): Classified | null {
   const supply = getOrderSupply({ source: order.source });
   if (supply !== "dropi" && supply !== "dropea") return null;
 
-  const total = typeof order.total === "number" && Number.isFinite(order.total) ? order.total : 0;
+  const money = resolveMoney(order.total, order.currency);
   const current = getOrderStatus({
     status_name: order.statusName,
     details: order.details,
@@ -151,8 +162,7 @@ function classify(order: RecoveryOrderInput): Classified | null {
 
   return {
     supply,
-    total,
-    currency: order.currency?.trim() || "",
+    money,
     atRisk: current.key === "incident",
     recovered,
     enteredWorkflow,
@@ -217,6 +227,12 @@ export function aggregateRecovery(
   let confirmed = 0;
   const recoveredRows: RecoveredOrderRow[] = [];
   const chartMap = new Map<string, RecoveryChartPoint>();
+  /** Headline money locks to first valid ISO currency — never mix BRL+EUR silently. */
+  let headlineCurrency: string | null = null;
+  const platformCurrency: Record<RecoverySupply, string | null> = {
+    dropi: null,
+    dropea: null,
+  };
 
   const bumpChart = (iso: string | null, field: "recovered" | "atRisk", amount: number) => {
     if (!iso || amount <= 0) return;
@@ -233,14 +249,39 @@ export function aggregateRecovery(
     chartMap.set(key, current);
   };
 
-  for (const row of classified) {
-    revenue += row.total;
-    platforms[row.supply].revenue += row.total;
+  const acceptsMoney = (
+    money: { amount: number; currency: string },
+    locked: string | null,
+  ): { ok: boolean; nextLock: string } => {
+    if (locked == null) return { ok: true, nextLock: money.currency };
+    return { ok: locked === money.currency, nextLock: locked };
+  };
 
-    if (row.atRisk) {
-      atRisk += row.total;
-      platforms[row.supply].atRisk += row.total;
-      bumpChart(row.lastEventAt, "atRisk", row.total);
+  for (const row of classified) {
+    if (row.money) {
+      const head = acceptsMoney(row.money, headlineCurrency);
+      if (head.ok) {
+        headlineCurrency = head.nextLock;
+        revenue += row.money.amount;
+        if (row.atRisk) {
+          atRisk += row.money.amount;
+          bumpChart(row.lastEventAt, "atRisk", row.money.amount);
+        }
+        if (row.recovered) {
+          recovered += row.money.amount;
+          bumpChart(row.lastEventAt, "recovered", row.money.amount);
+        }
+      }
+
+      const plat = acceptsMoney(row.money, platformCurrency[row.supply]);
+      if (plat.ok) {
+        platformCurrency[row.supply] = plat.nextLock;
+        platforms[row.supply].revenue += row.money.amount;
+        if (row.atRisk) platforms[row.supply].atRisk += row.money.amount;
+        if (row.recovered) platforms[row.supply].recovered += row.money.amount;
+      }
+    } else if (row.atRisk) {
+      bumpChart(row.lastEventAt, "atRisk", 0);
     }
 
     if (row.enteredWorkflow) {
@@ -248,18 +289,15 @@ export function aggregateRecovery(
     }
 
     if (row.recovered) {
-      recovered += row.total;
       confirmed += 1;
-      platforms[row.supply].recovered += row.total;
       platforms[row.supply].confirmed += 1;
-      bumpChart(row.lastEventAt, "recovered", row.total);
       recoveredRows.push({
         orderId: row.orderId,
         displayId: `#${row.orderId}`,
         customer: row.customer,
         supply: row.supply,
-        amount: row.total,
-        currency: row.currency,
+        amount: row.money?.amount ?? 0,
+        currency: row.money?.currency ?? "",
         lastEventAt: row.lastEventAt,
       });
     }

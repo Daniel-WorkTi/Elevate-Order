@@ -11,8 +11,7 @@ export function convertStoredAmount(
   if (amount == null || !Number.isFinite(amount)) return null;
   const from = readIsoCurrency(fromCurrency);
   const to = readIsoCurrency(displayCurrency);
-  if (!to) return null;
-  if (!from) return amount;
+  if (!to || !from) return null;
   return convertMoney({
     amount,
     fromCurrency: from,
@@ -28,11 +27,12 @@ export function formatStoredAmount(
   rateMap: Record<string, number>,
   locale = "pt-PT",
 ): string {
-  const to = readIsoCurrency(displayCurrency) ?? "EUR";
-  const converted = convertStoredAmount(amount, fromCurrency, to, rateMap);
-  if (converted == null) {
-    return formatMoney(amount, to, locale);
-  }
+  const to = readIsoCurrency(displayCurrency);
+  if (!to) return "—";
+  const from = readIsoCurrency(fromCurrency);
+  if (!from) return "—";
+  const converted = convertStoredAmount(amount, from, to, rateMap);
+  if (converted == null) return "—";
   return formatMoney(converted, to, locale);
 }
 

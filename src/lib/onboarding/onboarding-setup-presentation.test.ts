@@ -60,18 +60,21 @@ describe("onboarding setup presentation (shared panels)", () => {
     );
   });
 
-  it("Dropi onboarding shows 3 steps + real webhook; no ConnectionHowTo docs", () => {
+  it("Dropi onboarding shows 3 steps + confirm checkbox; no waiting / no HowTo", () => {
     const panel = readSrc("src/components/connections/dropi/dropi-setup-panel.tsx");
     assert.match(panel, /variant === "onboarding"/);
     assert.match(panel, /onboarding\.setup\.dropi\.step1Path/);
-    assert.match(panel, /Configurações → API → Webhooks|onboarding\.setup\.dropi\.step1Path/);
+    assert.match(panel, /onboarding\.setup\.dropi\.step1Title/);
+    assert.match(panel, /onboarding\.setup\.dropi\.confirmSaved/);
+    assert.match(panel, /onboarding\.setup\.dropi\.configComplete/);
+    assert.match(panel, /configuredByUser/);
     assert.match(panel, /webhookUrl/);
-    assert.match(panel, /onboarding\.setup\.dropi\.waiting/);
-    // HowTo only in connections branch
+    assert.doesNotMatch(panel, /Testar conexão|test webhook/i);
     const onboardingStart = panel.indexOf("if (onboarding) {");
     const connectionsReturn = panel.lastIndexOf("return (");
     const onboardingSection = panel.slice(onboardingStart, connectionsReturn);
     assert.doesNotMatch(onboardingSection, /ConnectionHowTo/);
+    assert.doesNotMatch(onboardingSection, /onboarding\.setup\.dropi\.waiting/);
     assert.doesNotMatch(onboardingSection, /HMAC|payload|localhost/i);
   });
 
@@ -96,10 +99,12 @@ describe("onboarding setup presentation (shared panels)", () => {
     assert.match(step, /onboarding\.configuration\.addAnother/);
     assert.match(step, /setActiveProvider\(null\)/);
     assert.match(step, /lg:grid-cols-3/);
-    assert.match(step, /max-w-\[680px\]/);
-    // OAuth still uses real /auth/shopify
+    assert.match(step, /max-w-\[1100px\]/);
+    assert.match(step, /max-w-\[820px\]/);
+    assert.match(step, /min-h-\[260px\]/);
     assert.match(step, /\/auth\/shopify\?/);
-    // Dropi webhook from backend helper
     assert.match(step, /getWorkspaceWebhookUrl/);
+    assert.match(step, /canProgressDropiOnboarding/);
+    assert.match(step, /markDropiConfiguredByUser|markConfiguredByUser/);
   });
 });

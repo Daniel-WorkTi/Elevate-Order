@@ -1,15 +1,23 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 export const DROPI_CONNECTION_KEY = "elevate-dropi-connection";
 
+/**
+ * Operator confirmation that they pasted+saved the Dropi webhook URL.
+ * This is configured_by_user — NOT Connected / verified.
+ * Real Connected comes only from the first valid inbound Dropi webhook.
+ */
 export type DropiConnectionPreference = {
-  /** Operator explicitly linked Dropi for this workspace/browser. */
+  /** @deprecated Prefer configuredByUser — same storage field. */
   linked: boolean;
+  /** User confirmed webhook was saved in Dropi (onboarding progression). */
+  configuredByUser: boolean;
   linkedAt: string | null;
 };
 
 const DEFAULT: DropiConnectionPreference = {
   linked: false,
+  configuredByUser: false,
   linkedAt: null,
 };
 
@@ -25,9 +33,11 @@ function readPreference(): DropiConnectionPreference {
   try {
     const raw = window.localStorage.getItem(DROPI_CONNECTION_KEY);
     if (!raw) return DEFAULT;
-    const parsed = JSON.parse(raw) as Partial<DropiConnectionPreference>;
+    const parsed = JSON.parse(raw) as Partial<DropiConnectionPreference> & { linked?: boolean };
+    const configuredByUser = Boolean(parsed.configuredByUser ?? parsed.linked);
     return {
-      linked: Boolean(parsed.linked),
+      linked: configuredByUser,
+      configuredByUser,
       linkedAt: typeof parsed.linkedAt === "string" ? parsed.linkedAt : null,
     };
   } catch {
@@ -58,7 +68,14 @@ function subscribe(listener: Listener) {
 function writePreference(next: DropiConnectionPreference) {
   cached = next;
   try {
-    window.localStorage.setItem(DROPI_CONNECTION_KEY, JSON.stringify(next));
+    window.localStorage.setItem(
+      DROPI_CONNECTION_KEY,
+      JSON.stringify({
+        linked: next.configuredByUser,
+        configuredByUser: next.configuredByUser,
+        linkedAt: next.linkedAt,
+      }),
+    );
   } catch {
     // ignore
   }
@@ -66,7 +83,8 @@ function writePreference(next: DropiConnectionPreference) {
 }
 
 /**
- * Per-operator Dropi link state. After Connect, UI shows Connected (like Shopify).
+ * Dropi onboarding confirmation (configured_by_user).
+ * Never maps to Connections "Connected" — that requires backend events.
  */
 export function useDropiConnectionPreference() {
   const preference = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -81,19 +99,30 @@ export function useDropiConnectionPreference() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const connect = useCallback(() => {
+  const markConfiguredByUser = useCallback((confirmed: boolean) => {
+    if (!confirmed) {
+      writePreference({ linked: false, configuredByUser: false, linkedAt: null });
+      return;
+    }
     writePreference({
       linked: true,
+      configuredByUser: true,
       linkedAt: new Date().toISOString(),
     });
   }, []);
 
+  /** @deprecated Use markConfiguredByUser(true) */
+  const connect = useCallback(() => {
+    markConfiguredByUser(true);
+  }, [markConfiguredByUser]);
+
   const disconnect = useCallback(() => {
-    writePreference({ linked: false, linkedAt: null });
-  }, []);
+    markConfiguredByUser(false);
+  }, [markConfiguredByUser]);
 
   return {
     ...preference,
+    markConfiguredByUser,
     connect,
     disconnect,
   };

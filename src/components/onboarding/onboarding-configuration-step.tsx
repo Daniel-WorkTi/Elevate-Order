@@ -11,6 +11,7 @@ import { SupplyMark } from "@/components/supply-logo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDropeaConnectionPreference } from "@/hooks/use-dropea-connection-preference";
+import { useDropiConnectionPreference } from "@/hooks/use-dropi-connection-preference";
 import { useStoreConnectionPreference } from "@/hooks/use-store-connection-preference";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import {
@@ -24,10 +25,10 @@ import { applyOperatorDropeaSummary } from "@/lib/integrations/dropea/dropea-ope
 import { getDropiDashboard } from "@/lib/integrations/dropi/dropi.functions";
 import { applyOperatorDropiSummary } from "@/lib/integrations/dropi/dropi-operator-status";
 import {
-  disconnectShopifyStore,
   getShopifyOauthStatus,
 } from "@/lib/integrations/shopify/oauth.functions";
 import { getWorkspaceWebhookUrl } from "@/lib/integrations/workspace-webhook.functions";
+import { canProgressDropiOnboarding } from "@/lib/onboarding/dropi-onboarding-progress";
 import { useT } from "@/lib/i18n/locale-context";
 import { ensureDefaultWorkspace } from "@/lib/workspace/workspace.functions";
 import { cn } from "@/lib/utils";
@@ -85,8 +86,12 @@ export function OnboardingConfigurationStep({
   }, [ready, workspaceId, refresh]);
 
   const oauthQuery = useQuery({
-    queryKey: ["connections", "shopify", "oauth"],
-    queryFn: () => getShopifyOauthStatus(),
+    queryKey: ["connections", "shopify", "oauth", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
     placeholderData: keepPreviousData,
   });
 
@@ -101,6 +106,11 @@ export function OnboardingConfigurationStep({
     disconnect: disconnectDropea,
     busy: dropeaBusy,
   } = useDropeaConnectionPreference(workspaceId);
+
+  const {
+    configuredByUser: dropiConfiguredByUser,
+    markConfiguredByUser: markDropiConfiguredByUser,
+  } = useDropiConnectionPreference();
 
   const dropiQuery = useQuery({
     queryKey: ["connections", "dropi", "dashboard", workspaceId],
@@ -159,11 +169,13 @@ export function OnboardingConfigurationStep({
 
   const dropiConnected = isConnectedState(dropiState);
   const dropeaConnected = isConnectedState(dropeaState);
-  const anyConnected = shopifyConnected || dropiConnected || dropeaConnected;
+  const dropiProgressable = canProgressDropiOnboarding({
+    backendStatus: dropiSummary?.status ?? "not_configured",
+    configuredByUser: dropiConfiguredByUser,
+  });
+  const anySourceReady = shopifyConnected || dropiProgressable || dropeaConnected;
 
-  const dropiServerReady = Boolean(
-    dropiQuery.data?.summary.serverConfigured && dropiQuery.data?.summary.authConfigured,
-  );
+  const dropiServerReady = Boolean(dropiQuery.data?.summary.serverConfigured);
   const dropeaServerReady = Boolean(dropeaQuery.data?.summary.serverConfigured);
 
   const loading =
@@ -183,82 +195,98 @@ export function OnboardingConfigurationStep({
     supply: "shopify" | "dropi" | "dropea";
     name: string;
     description: string;
+    cta: string;
     connected: boolean;
+    configured: boolean;
   }> = [
     {
       id: "shopify",
       supply: "shopify",
       name: "Shopify",
       description: t("onboarding.configuration.card.shopify"),
+      cta: t("onboarding.configuration.cta.shopify"),
       connected: shopifyConnected,
+      configured: false,
     },
     {
       id: "dropi",
       supply: "dropi",
       name: "Dropi Pro",
       description: t("onboarding.configuration.card.dropi"),
+      cta: t("onboarding.configuration.cta.dropi"),
       connected: dropiConnected,
+      configured: dropiProgressable && !dropiConnected,
     },
     {
       id: "dropea",
       supply: "dropea",
       name: "Dropea",
       description: t("onboarding.configuration.card.dropea"),
+      cta: t("onboarding.configuration.cta.dropea"),
       connected: dropeaConnected,
+      configured: false,
     },
   ];
 
   return (
-    <div className="mx-auto w-full max-w-[1000px]">
-      <OnboardingStepper currentStep="configuration" className="mb-6" />
+    <div className="mx-auto w-full max-w-[1100px]">
+      <OnboardingStepper currentStep="configuration" className="mb-10" />
 
       {activeProvider === null ? (
         <>
-          <header className="mb-8 text-center">
-            <h2 className="text-[24px] font-semibold tracking-tight text-foreground md:text-[28px]">
+          <header className="mb-10 max-w-[640px]">
+            <h2 className="text-[28px] font-semibold tracking-tight text-foreground md:text-[32px]">
               {t("onboarding.configuration.headline")}
             </h2>
-            <p className="mt-2 text-[16px] font-medium text-foreground">
+            <p className="mt-3 text-[16px] font-medium leading-snug text-foreground">
               {t("onboarding.configuration.question")}
             </p>
-            <p className="mt-1.5 text-[14px] text-muted-foreground">
+            <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
               {t("onboarding.configuration.chooserHint")}
             </p>
           </header>
 
           {loading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Skeleton className="h-52 w-full rounded-[14px]" />
-              <Skeleton className="h-52 w-full rounded-[14px]" />
-              <Skeleton className="h-52 w-full rounded-[14px]" />
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-[260px] w-full rounded-[16px]" />
+              <Skeleton className="h-[260px] w-full rounded-[16px]" />
+              <Skeleton className="h-[260px] w-full rounded-[16px]" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {providers.map((provider) => (
                 <button
                   key={provider.id}
                   type="button"
                   onClick={() => setActiveProvider(provider.id)}
                   className={cn(
-                    "flex h-full min-h-[220px] flex-col items-center rounded-[14px] border border-border bg-card p-6 text-center shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-150",
-                    "hover:border-[color:var(--elevate-blue)]/40 hover:shadow-[0_1px_2px_rgb(10_12_16/0.06)]",
+                    "group flex h-full min-h-[260px] flex-col items-start rounded-[16px] border border-[#E6E8EC] bg-white p-7 text-left shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-150",
+                    "hover:-translate-y-0.5 hover:border-[color:var(--elevate-blue)]/45 hover:shadow-[0_8px_24px_rgb(10_12_16/0.06)]",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--elevate-blue)]/40",
                   )}
                 >
-                  <SupplyMark supply={provider.supply} size={48} className="rounded-[12px]" />
-                  <p className="mt-4 text-[16px] font-semibold tracking-tight text-foreground">
+                  <SupplyMark
+                    supply={provider.supply}
+                    size={56}
+                    className="rounded-[14px]"
+                  />
+                  <p className="mt-5 text-[18px] font-semibold tracking-tight text-foreground">
                     {provider.name}
                   </p>
-                  <p className="mt-2 flex-1 text-[13px] leading-relaxed text-muted-foreground">
+                  <p className="mt-2.5 flex-1 text-[14px] leading-relaxed text-muted-foreground">
                     {provider.description}
                   </p>
                   {provider.connected ? (
-                    <span className="mt-4 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-800">
+                    <span className="mt-6 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[13px] font-semibold text-emerald-800">
                       {t("connections.connected")}
                     </span>
+                  ) : provider.configured ? (
+                    <span className="mt-6 inline-flex items-center rounded-full border border-border bg-[#F7F8FA] px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">
+                      {t("connections.configured")}
+                    </span>
                   ) : (
-                    <span className="mt-4 inline-flex h-10 items-center justify-center rounded-[10px] bg-[color:var(--elevate-blue)] px-5 text-[14px] font-medium text-white">
-                      {t("onboarding.connect")}
+                    <span className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-[10px] bg-[color:var(--elevate-blue)] px-5 text-[14px] font-medium text-white transition-colors group-hover:bg-[color:var(--elevate-blue-hover)]">
+                      {provider.cta}
                     </span>
                   )}
                 </button>
@@ -266,11 +294,11 @@ export function OnboardingConfigurationStep({
             </div>
           )}
 
-          <p className="mt-6 text-center text-[13px] text-muted-foreground">
+          <p className="mt-8 text-center text-[14px] text-muted-foreground">
             {t("onboarding.configuration.addLater")}
           </p>
 
-          {anyConnected ? (
+          {anySourceReady ? (
             <OnboardingNav
               onContinue={onContinue}
               continueLabel={t("onboarding.configuration.continueWhatsApp")}
@@ -289,27 +317,32 @@ export function OnboardingConfigurationStep({
           )}
         </>
       ) : (
-        <div className="mx-auto w-full max-w-[680px]">
-          <div className="mb-4">
+        <div className="mx-auto w-full max-w-[820px]">
+          <div className="mb-5">
             <Button
               type="button"
               variant="ghost"
               onClick={() => setActiveProvider(null)}
-              className="h-9 rounded-[10px] px-2 text-[14px] text-muted-foreground hover:text-foreground"
+              className="h-10 rounded-[10px] px-2 text-[14px] text-muted-foreground hover:text-foreground"
             >
               ← {t("onboarding.back")}
             </Button>
           </div>
 
-          <header className="mb-5">
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground md:text-[24px]">
+          <header className="mb-7">
+            <SupplyMark
+              supply={activeProvider}
+              size={52}
+              className="rounded-[14px]"
+            />
+            <h2 className="mt-5 text-[26px] font-semibold tracking-tight text-foreground md:text-[28px]">
               {activeProvider === "shopify"
                 ? t("onboarding.setup.shopify.title")
                 : activeProvider === "dropi"
                   ? t("onboarding.setup.dropi.title")
                   : t("onboarding.setup.dropea.title")}
             </h2>
-            <p className="mt-1.5 text-[14px] text-muted-foreground">
+            <p className="mt-2 max-w-[560px] text-[15px] leading-relaxed text-muted-foreground">
               {activeProvider === "shopify"
                 ? t("onboarding.setup.shopify.body")
                 : activeProvider === "dropi"
@@ -338,8 +371,8 @@ export function OnboardingConfigurationStep({
               }}
               onConnect={connect}
               onDisconnect={async () => {
-                await disconnect();
-                await disconnectShopifyStore({});
+                const ok = await disconnect();
+                if (!ok) return;
                 await queryClient.invalidateQueries({ queryKey: ["connections", "shopify"] });
                 await oauthQuery.refetch();
               }}
@@ -354,6 +387,8 @@ export function OnboardingConfigurationStep({
               urlError={dropiWebhook.isError ? t("connections.webhookUrlError") : null}
               serverReady={dropiServerReady}
               status={dropiSummary?.status ?? "not_configured"}
+              configuredByUser={dropiConfiguredByUser}
+              onConfiguredByUserChange={markDropiConfiguredByUser}
             />
           ) : null}
 
@@ -373,27 +408,27 @@ export function OnboardingConfigurationStep({
           ) : null}
 
           {((activeProvider === "shopify" && shopifyConnected) ||
-            (activeProvider === "dropi" && dropiConnected) ||
+            (activeProvider === "dropi" && dropiProgressable) ||
             (activeProvider === "dropea" && dropeaConnected)) && (
-            <div className="mt-6 space-y-3">
+            <div className="mt-8 space-y-3">
               <Button
                 type="button"
                 onClick={onContinue}
-                className="h-11 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[14px] text-white shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
+                className="h-12 w-full rounded-[10px] bg-[color:var(--elevate-blue)] text-[15px] text-white shadow-none hover:bg-[color:var(--elevate-blue-hover)]"
               >
                 {t("onboarding.configuration.continueWhatsApp")}
               </Button>
               <button
                 type="button"
                 onClick={() => setActiveProvider(null)}
-                className="mx-auto block text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+                className="mx-auto block text-[14px] text-muted-foreground transition-colors hover:text-foreground"
               >
                 {t("onboarding.configuration.addAnother")}
               </button>
             </div>
           )}
 
-          {!shopifyConnected && !dropiConnected && !dropeaConnected ? (
+          {!anySourceReady ? (
             <div className="mt-6 text-center">
               <button
                 type="button"

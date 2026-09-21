@@ -83,8 +83,12 @@ export function OnboardingReadyStep({ userId, onBack }: OnboardingReadyStepProps
   } = useDropeaConnectionPreference(workspaceId);
 
   const shopifyQuery = useQuery({
-    queryKey: ["connections", "shopify", "oauth"],
-    queryFn: () => getShopifyOauthStatus(),
+    queryKey: ["connections", "shopify", "oauth", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () =>
+      getShopifyOauthStatus({
+        data: { workspaceId },
+      }),
   });
 
   const dropiQuery = useQuery({

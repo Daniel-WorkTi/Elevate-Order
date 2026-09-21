@@ -1,6 +1,6 @@
 import { displayCarrierName } from "@/lib/carriers";
 import type { LanguageCode } from "@/lib/i18n/languages";
-import { formatOrderTotal, getOrderCurrency, safeTrackingHref } from "@/lib/order-domain";
+import { formatOrderTotal, safeTrackingHref } from "@/lib/order-domain";
 import {
   extractPlaceholders,
   isVariableSupported,
@@ -43,10 +43,14 @@ function buildTrackingSection(ctx: TemplateRenderContext, language?: LanguageCod
 
 function formatTotal(ctx: TemplateRenderContext): string {
   if (ctx.total == null || !Number.isFinite(ctx.total)) return "";
+  // Never invent a currency code for WhatsApp copy — plain amount when unknown.
+  if (!ctx.currency?.trim()) {
+    return ctx.total.toFixed(2);
+  }
   return (
     formatOrderTotal({
       total: ctx.total,
-      currency: ctx.currency ?? null,
+      currency: ctx.currency,
     }) ?? ""
   );
 }
@@ -78,11 +82,8 @@ function valueForKey(
     case "total":
       return formatTotal(ctx);
     case "currency":
-      return ctx.currency?.trim()
-        ? ctx.currency.trim().toUpperCase()
-        : ctx.total != null
-          ? getOrderCurrency({ currency: ctx.currency ?? null })
-          : "";
+      // Never invent a currency code — empty when order has none.
+      return ctx.currency?.trim() ? ctx.currency.trim().toUpperCase() : "";
     case "tracking_section":
       return buildTrackingSection(ctx, language);
     default:

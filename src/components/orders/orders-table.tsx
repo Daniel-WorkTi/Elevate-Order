@@ -108,11 +108,7 @@ export function OrdersTable({
             >
               <Link
                 to={
-                  search.supply === "shopify"
-                    ? "/connections/shopify"
-                    : search.supply === "dropea"
-                      ? "/connections/dropea"
-                      : "/connections/dropi"
+                  search.supply === "dropea" ? "/connections/dropea" : "/connections/dropi"
                 }
               >
                 {t("orders.checkConnection")}

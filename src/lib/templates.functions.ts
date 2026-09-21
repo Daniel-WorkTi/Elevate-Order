@@ -235,6 +235,7 @@ export const saveMessageTemplate = createServerFn({ method: "POST" })
               updated_at: updatedAt,
             })
             .eq("id", existing.data.id)
+            .eq("workspace_id", workspaceId)
             .select("kind, content, updated_at")
             .maybeSingle();
           if (updated.error) {

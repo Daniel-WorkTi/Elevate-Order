@@ -20,6 +20,7 @@ type OrdersRow = {
   id: string;
   order_id: number;
   total: number | string | null;
+  currency: string | null;
   source: string;
   status_name: string | null;
   last_event_at: string | null;
@@ -116,13 +117,19 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
 
       const { data: rows, error } = await supabaseAdmin
         .from("orders")
-        .select("id, order_id, total, source, status_name, last_event_at, created_at")
+        .select("id, order_id, total, currency, source, status_name, last_event_at, created_at")
         .eq("workspace_id", workspaceId)
         .order("last_event_at", { ascending: false })
         .limit(5000);
 
       if (error && isMissingWorkspaceColumn(error.message)) {
-        return emptyResult(data.supply, data.period, data.from, data.to, "");
+        return emptyResult(
+          data.supply,
+          data.period,
+          data.from,
+          data.to,
+          "Orders are missing workspace scope. Apply workspace identity migrations.",
+        );
       }
 
       if (error) {
@@ -146,9 +153,10 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
       const filtered = supplyMatched.filter((row) => {
         if (fromMs == null || toMs == null) return true;
         const stamp = row.last_event_at ?? row.created_at;
-        if (!stamp) return true; // keep undated rows when a range is set
+        // Dated range must not silently include undated rows (inflates period metrics).
+        if (!stamp) return false;
         const time = Date.parse(stamp);
-        if (Number.isNaN(time)) return true;
+        if (Number.isNaN(time)) return false;
         return time >= fromMs && time <= toMs;
       });
 
@@ -157,7 +165,7 @@ export const queryProfitsOrders = createServerFn({ method: "POST" })
           id: row.id,
           order_id: row.order_id,
           total: asNumber(row.total),
-          currency: null,
+          currency: row.currency,
           source: row.source ?? "",
           last_event_at: row.last_event_at,
           created_at: row.created_at,

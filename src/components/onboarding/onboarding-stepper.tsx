@@ -21,7 +21,7 @@ export function OnboardingStepper({
     <ol
       aria-label={t("onboarding.progressAria")}
       className={cn(
-        "mx-auto flex w-full max-w-[960px] items-start justify-between gap-2",
+        "mx-auto flex w-full max-w-[720px] items-start justify-between gap-4 sm:gap-6",
         className,
       )}
     >
@@ -37,17 +37,17 @@ export function OnboardingStepper({
                 <span
                   aria-hidden
                   className={cn(
-                    "absolute top-4 left-[calc(50%+20px)] right-[calc(-50%+20px)] h-px",
-                    complete || active ? "bg-[color:var(--elevate-blue)]/35" : "bg-border",
+                    "absolute top-[18px] left-[calc(50%+22px)] right-[calc(-50%+22px)] h-px",
+                    complete || active ? "bg-[color:var(--elevate-blue)]/40" : "bg-border",
                   )}
                 />
               ) : null}
               <span
                 aria-current={active ? "step" : undefined}
                 className={cn(
-                  "relative z-[1] grid size-8 place-items-center rounded-full text-[13px] font-semibold tabular-nums transition-colors duration-150",
+                  "relative z-[1] grid size-9 place-items-center rounded-full text-[14px] font-semibold tabular-nums transition-colors duration-150",
                   active
-                    ? "bg-[color:var(--elevate-blue)] text-white"
+                    ? "bg-[color:var(--elevate-blue)] text-white shadow-[0_0_0_4px_color-mix(in_srgb,var(--elevate-blue)_16%,transparent)]"
                     : complete
                       ? "bg-[color:var(--elevate-blue)] text-white"
                       : "border border-border bg-card text-muted-foreground",
@@ -58,7 +58,7 @@ export function OnboardingStepper({
             </div>
             <span
               className={cn(
-                "mt-2.5 max-w-full truncate text-center text-[13px] font-medium",
+                "mt-3 max-w-full truncate text-center text-[14px] font-medium tracking-tight",
                 active || complete
                   ? "text-[color:var(--elevate-blue)]"
                   : "text-muted-foreground",

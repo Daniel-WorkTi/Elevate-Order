@@ -56,8 +56,19 @@ export const getWhatsAppConnectionStatus = createServerFn({ method: "GET" })
       await authorizeWorkspaceInput(userId, data.workspaceId);
       return await provider.getConnectionStatus(data.workspaceId);
     } catch (error) {
-      console.error("[whatsapp] connection status failed", error);
-      return empty;
+      const { isWorkspaceAccessError } = await import("@/lib/workspace/require-workspace-access");
+      if (isWorkspaceAccessError(error)) throw error;
+      console.error("[whatsapp] connection status failed", {
+        workspace_id: data.workspaceId,
+        operation: "getConnectionStatus",
+        message: error instanceof Error ? error.message : "unknown",
+      });
+      // Never pretend "disconnected" when the lookup itself failed.
+      return {
+        ...empty,
+        configured: provider.isConfigured(),
+        status: "error",
+      };
     }
   });
 

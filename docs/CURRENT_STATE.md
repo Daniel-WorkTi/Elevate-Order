@@ -1,8 +1,8 @@
 # ELEVATE — Current State
 
-**Updated:** 2026-09-20 (Onboarding provider setup — presentation variant)  
+**Updated:** 2026-09-20 (Dropi onboarding final — configured_by_user + tenant webhook isolation)  
 **Canon:** [PROJECT.md](../PROJECT.md) · [DESIGN.md](../DESIGN.md) · this file  
-**External ops:** [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md)  
+**External ops:** [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) · [LAUNCH_READINESS.md](./LAUNCH_READINESS.md)  
 **Agents:** [AGENTS.md](../AGENTS.md)
 
 ---
@@ -31,10 +31,29 @@
 
 | Surface | UI |
 | --- | --- |
+| **Chooser desktop** | ~1100px content; 3-up cards ~260px tall; left-aligned premium cards |
+| **Setup desktop** | ~820px central surface; logo + title + guided panel |
 | **Onboarding Shopify** | Domain + Continuar com Shopify (real OAuth); myshopify help; advanced token collapsed |
-| **Onboarding Dropi** | 3 steps (Configurações → API → Webhooks); real webhook URL + copy; waiting until first event |
+| **Onboarding Dropi** | Guided 01–03 + real unique webhook URL + checkbox → **configured_by_user** (not Connected) |
 | **Onboarding Dropea** | Token API + HMAC only; friendly errors; no webhook docs |
 | **Connections** | Full management (howto, sync, disconnect, webhook for Dropea, etc.) |
+
+### Dropi status semantics
+
+| Signal | Meaning |
+| --- | --- |
+| Checkbox / `configuredByUser` (local) | Operator says webhook was pasted+saved → onboarding may continue |
+| Backend `configured` | Workspace webhook endpoint exists; no events yet → Connections shows **Configurado** |
+| Backend `connected` | First valid inbound Dropi webhook for that workspace → **Conectado** (`lastSuccessfulEventAt` / events) |
+
+Copying the URL alone never changes status. Invalid/unknown webhook tokens return **401** and write nothing.
+
+### Dropi webhook tenant isolation (production)
+
+- Table `workspace_webhook_endpoints`: `UNIQUE(token)`, `UNIQUE(workspace_id, supply)`
+- Token: `elevate_wh_` + 24 cryptographically random bytes (hex) — no user/workspace id in URL
+- Resolve: path `/api/public/webhooks/orders/$token` → lookup token → `workspace_id` + `supply`
+- Writes stamp `workspace_id` from auth; cross-workspace `order_id` collisions are skipped
 
 Legacy `?step=store|orders` → `configuration`. Skip = not configured, never Connected.
 
@@ -52,8 +71,12 @@ Classification is code + real dependencies (not unit-test green alone).
 | Shopify OAuth | **CODE_READY_EXTERNAL_SETUP_REQUIRED** | Partner redirect URI + API key/secret + `PUBLIC_APP_URL` |
 | Shopify → `shopify_stores` + sync | **CODE_READY_EXTERNAL_SETUP_REQUIRED** | Post-install sync persists normalized Shopify orders (store platform — not Dropi/Dropea ops tabs) |
 | Dropi webhook → orders | **CODE_READY_EXTERNAL_SETUP_REQUIRED** | External Dropi URL + `ELEVATE_WEBHOOK_TOKEN`; Connected only after workspace events |
-| Dropi tenant isolation | **PARTIAL** | Runtime collision guard blocks cross-workspace overwrite; schema still global `UNIQUE(order_id)` (P1 migrate to composite uniqueness) |
-| Dropea credentials + sync | **CODE_READY_EXTERNAL_SETUP_REQUIRED** | Save validates API key; encrypt at rest; sync collision-guarded |
+| Dropi tenant isolation | **READY** | Opaque webhook token → workspace; prod `UNIQUE(workspace_id, order_id)` via `orders_workspace_order_id_uidx` |
+| Shopify persist | **READY** | Persist/enrichment scoped by workspace; no cross-tenant store fallback |
+| Dropea credentials + sync | **CODE_READY_EXTERNAL_SETUP_REQUIRED** | Save validates API key; encrypt at rest; workspace-scoped upsert |
+| Migration workspace-scoped order identity | **APPLIED (prod)** | `orders_workspace_order_id_uidx` + `order_events_workspace_order_event_uidx`; global `orders_order_id_key` removed. 49 NULL-workspace orders deferred. |
+| Future ownership CHECK NOT VALID | **APPLIED (prod)** | Probe-verified 2026-09-20: all 4 CHECKs reject new nulls; 49 null orders + 3 ownerless workspaces preserved. Do **not** VALIDATE yet. |
+| Legacy beta data | **PRESERVE** | 3 ownerless workspaces + 49 null-workspace Shopify orders (pre-hardening). Never auto-assign/delete. |
 | Canonical order pipeline | **READY** | Dropi/Dropea/Shopify normalizers → `orders` / `order_events` → server queries (no mock UI path) |
 | Supply queue isolation (UI) | **READY** | `supplyMatchesSource` keeps Dropi vs Dropea tabs separate |
 | Inbox / Orders UI | **READY** | Persisted rows only; empty/loading/error paths exist |
@@ -120,17 +143,17 @@ Values omitted. Deployed envs: **MANUAL VERIFICATION REQUIRED** (not inspected f
 
 **P0 (block real E2E until external):** production env pairing + migrations + Shopify/Dropi/Dropea/WA operator setup — see [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md).
 
-**P1 (schema):** global `UNIQUE(order_id)` — mitigated by collision skip, not fixed by composite unique `(workspace_id, order_id)`.
+**P1 (schema):** legacy `orders.workspace_id` / `order_events.workspace_id` NULL rows — inventory + reconcile before NOT NULL; do not auto-assign.
 
 **P1 (onboarding cookie):** completion cookie is readable/forgeable client-side — acceptable for gate UX, not a security boundary.
 
 ---
 
-## Validation (Phase 3 + onboarding setup simplify)
+## Validation (Dropi onboarding final + tenant webhook)
 
 | Check | Result |
 | --- | --- |
-| `npm test` | **PASS** (206/206) |
+| `npm test` | **PASS** (217/217) |
 | `npm run typecheck` | **PASS** |
 | `npm run build` | **PASS** |
 | `npm run lint` | Pre-existing CRLF prettier noise — not mixed into this phase |

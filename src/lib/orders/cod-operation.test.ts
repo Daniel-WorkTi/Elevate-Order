@@ -8,6 +8,7 @@ import {
   isDropiExternallyConfirmed,
   isDropiOrder,
   isDropiSupplySource,
+  paginateDropiPendingActions,
 } from "@/lib/orders/cod-operation";
 
 function dropiConfirm(overrides: Record<string, unknown> = {}) {
@@ -67,6 +68,28 @@ test("H: external Dropi confirmation heuristic", () => {
   assert.equal(isDropiExternallyConfirmed({ status_name: "Aceptado", details: null }), true);
   assert.equal(isDropiExternallyConfirmed({ status_name: "Cancelled", details: null }), false);
   assert.equal(isDropiExternallyConfirmed({ status_name: "Waiting", details: null }), false);
+});
+
+test("paginateDropiPendingActions excludes externally confirmed before slicing", () => {
+  const candidates = [
+    { ...dropiConfirm({ status_name: "Waiting" }), order_id: 1 },
+    { ...dropiConfirm({ status_name: "Confirmed" }), order_id: 2 },
+    { ...dropiConfirm({ status_name: "Waiting" }), order_id: 3 },
+    { ...dropiConfirm({ status_name: "Aceptado" }), order_id: 4 },
+    { ...dropiConfirm({ status_name: "Waiting" }), order_id: 5 },
+  ];
+  const page1 = paginateDropiPendingActions(candidates, 1, 2, isDropiCodPendingAction);
+  assert.equal(page1.total, 3);
+  assert.equal(page1.pageCount, 2);
+  assert.deepEqual(
+    page1.rows.map((r) => r.order_id),
+    [1, 3],
+  );
+  const page2 = paginateDropiPendingActions(candidates, 2, 2, isDropiCodPendingAction);
+  assert.deepEqual(
+    page2.rows.map((r) => r.order_id),
+    [5],
+  );
 });
 
 test("I: external webhook after handled keeps handled timestamp on order", () => {

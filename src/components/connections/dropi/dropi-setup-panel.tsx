@@ -7,9 +7,8 @@ import { ConnectionHowTo } from "@/components/connections/workspace/connection-h
 import type { ConnectionPanelVariant } from "@/components/connections/store/store-connect-panel";
 import type { DropiConnectionStatus } from "@/lib/integrations/dropi/dropi-types";
 import { useT } from "@/lib/i18n/locale-context";
-import { cn } from "@/lib/utils";
 
-/** Dropi setup: copy webhook URL. Status comes from real webhook activity. */
+/** Dropi setup: copy webhook URL. Connected only after real inbound events. */
 export function DropiSetupPanel({
   webhookUrl,
   loadingUrl,
@@ -17,6 +16,8 @@ export function DropiSetupPanel({
   serverReady,
   status,
   variant = "connections",
+  configuredByUser = false,
+  onConfiguredByUserChange,
 }: {
   webhookUrl: string;
   loadingUrl?: boolean;
@@ -24,6 +25,9 @@ export function DropiSetupPanel({
   serverReady: boolean;
   status: DropiConnectionStatus;
   variant?: ConnectionPanelVariant;
+  /** Onboarding: user confirmed paste+save in Dropi (not Connected). */
+  configuredByUser?: boolean;
+  onConfiguredByUserChange?: (confirmed: boolean) => void;
 }) {
   const t = useT();
   const onboarding = variant === "onboarding";
@@ -40,11 +44,14 @@ export function DropiSetupPanel({
     }
   }
 
-  if (onboarding && status === "connected") {
+  if (onboarding && (configuredByUser || status === "connected")) {
     return (
-      <section className="rounded-[14px] border border-border bg-card px-5 py-6 text-center shadow-[var(--shadow-card)]">
-        <p className="text-[15px] font-semibold text-emerald-800">
-          ✓ {t("onboarding.setup.dropi.connected")}
+      <section className="space-y-3 rounded-[16px] border border-[#E6E8EC] bg-white px-7 py-8 text-center shadow-[var(--shadow-card)] sm:px-8">
+        <p className="text-[16px] font-semibold text-emerald-800">
+          ✓ {t("onboarding.setup.dropi.configComplete")}
+        </p>
+        <p className="mx-auto max-w-[480px] text-[14px] leading-relaxed text-muted-foreground">
+          {t("onboarding.setup.dropi.configCompleteHint")}
         </p>
       </section>
     );
@@ -52,38 +59,45 @@ export function DropiSetupPanel({
 
   if (onboarding) {
     return (
-      <section className="space-y-5 rounded-[14px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-        <ol className="space-y-4">
-          <li className="flex gap-3">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue-soft)] text-[12px] font-semibold text-[color:var(--elevate-blue)]">
-              1
+      <section className="space-y-7 rounded-[16px] border border-[#E6E8EC] bg-white p-7 shadow-[var(--shadow-card)] sm:p-8">
+        <ol className="space-y-6">
+          <li className="flex gap-4">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue-soft)] text-[13px] font-semibold tabular-nums text-[color:var(--elevate-blue)]">
+              01
             </span>
-            <div>
-              <p className="text-[13px] text-muted-foreground">{t("onboarding.setup.dropi.step1Lead")}</p>
-              <p className="mt-1 text-[14px] font-semibold text-foreground">
+            <div className="min-w-0 pt-0.5">
+              <p className="text-[15px] font-semibold text-foreground">
+                {t("onboarding.setup.dropi.step1Title")}
+              </p>
+              <p className="mt-2 text-[14px] font-semibold text-foreground">
                 {t("onboarding.setup.dropi.step1Path")}
               </p>
             </div>
           </li>
-          <li className="flex gap-3">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue-soft)] text-[12px] font-semibold text-[color:var(--elevate-blue)]">
-              2
+          <li className="flex gap-4">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue-soft)] text-[13px] font-semibold tabular-nums text-[color:var(--elevate-blue)]">
+              02
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] text-foreground">{t("onboarding.setup.dropi.step2")}</p>
-              <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="text-[15px] font-semibold text-foreground">
+                {t("onboarding.setup.dropi.step2Title")}
+              </p>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {t("onboarding.setup.dropi.step2")}
+              </p>
+              <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center">
                 <Input
                   readOnly
                   value={loadingUrl ? t("connections.generatingWebhookUrl") : webhookUrl}
                   onFocus={(event) => event.currentTarget.select()}
-                  className="h-10 flex-1 rounded-[10px] border-border bg-[#F7F8FA] font-mono text-[12px] shadow-none"
+                  className="h-11 flex-1 rounded-[10px] border-border bg-[#F7F8FA] font-mono text-[13px] shadow-none"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   disabled={!webhookUrl || Boolean(loadingUrl)}
                   onClick={() => void copy()}
-                  className="h-10 shrink-0 rounded-[10px] border-border text-[13px] shadow-none"
+                  className="h-11 shrink-0 rounded-[10px] border-border text-[14px] shadow-none"
                 >
                   {copied ? (
                     <Check className="size-3.5 text-emerald-600" strokeWidth={1.75} />
@@ -93,33 +107,40 @@ export function DropiSetupPanel({
                   {copied ? t("connections.copied") : t("connections.copy")}
                 </Button>
               </div>
-              {urlError ? <p className="mt-1.5 text-[12px] font-medium text-red-600">{urlError}</p> : null}
+              {urlError ? <p className="mt-2 text-[13px] font-medium text-red-600">{urlError}</p> : null}
             </div>
           </li>
-          <li className="flex gap-3">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue-soft)] text-[12px] font-semibold text-[color:var(--elevate-blue)]">
-              3
+          <li className="flex gap-4">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--elevate-blue-soft)] text-[13px] font-semibold tabular-nums text-[color:var(--elevate-blue)]">
+              03
             </span>
-            <p className="pt-1 text-[13px] text-foreground">{t("onboarding.setup.dropi.step3")}</p>
+            <div className="min-w-0 pt-0.5">
+              <p className="text-[15px] font-semibold text-foreground">
+                {t("onboarding.setup.dropi.step3Title")}
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">
+                {t("onboarding.setup.dropi.step3Lead")}
+              </p>
+            </div>
           </li>
         </ol>
 
-        <div
-          className={cn(
-            "rounded-[10px] border px-3.5 py-3 text-[13px]",
-            !serverReady
-              ? "border-border bg-[#F7F8FA] text-muted-foreground"
-              : status === "configured"
-                ? "border-amber-200 bg-amber-50 text-amber-900"
-                : "border-border bg-[#F7F8FA] text-muted-foreground",
-          )}
-        >
-          {!serverReady
-            ? t("connections.dropiServerNotReady")
-            : status === "configured"
-              ? t("onboarding.setup.dropi.waiting")
-              : t("onboarding.setup.dropi.waiting")}
-        </div>
+        {!serverReady ? (
+          <p className="text-[14px] text-muted-foreground">{t("connections.dropiServerNotReady")}</p>
+        ) : null}
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-[12px] border border-[#E6E8EC] bg-[#F7F8FA] px-4 py-4">
+          <input
+            type="checkbox"
+            checked={configuredByUser}
+            disabled={!webhookUrl || Boolean(loadingUrl) || !serverReady}
+            onChange={(event) => onConfiguredByUserChange?.(event.target.checked)}
+            className="mt-0.5 size-4 rounded border-border text-[color:var(--elevate-blue)] focus-visible:ring-[color:var(--elevate-blue)]/40"
+          />
+          <span className="text-[14px] leading-snug text-foreground">
+            {t("onboarding.setup.dropi.confirmSaved")}
+          </span>
+        </label>
       </section>
     );
   }
